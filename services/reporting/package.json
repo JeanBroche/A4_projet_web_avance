@@ -1,0 +1,11 @@
+{
+  "name": "@aeronexis/reporting",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node -e \"console.log('@aeronexis/reporting: dev placeholder')\"",
+    "lint": "node -e \"process.exit(0)\"",
+    "test": "node -e \"process.exit(0)\"",
+    "build": "node -e \"process.exit(0)\""
+  }
+}

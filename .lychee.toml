@@ -1,0 +1,5 @@
+# Local dev endpoints are not reachable in CI (link-check workflow).
+exclude = [
+  '^https?://localhost(:\d+)?',
+  '^https?://127\.0\.0\.1(:\d+)?',
+]

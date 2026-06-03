@@ -8,14 +8,10 @@ github:
 
 frontend:
   - changed-files:
-      - any-glob-to-any-file:
-          - "src/**"
-          - "public/**"
-          - "**/*.{html,css,scss}"
+      - any-glob-to-any-file: "apps/web/**"
 
 backend:
   - changed-files:
       - any-glob-to-any-file:
-          - "api/**"
-          - "server/**"
-          - "**/*.{py,go,java}"
+          - "apps/gateway/**"
+          - "services/**"

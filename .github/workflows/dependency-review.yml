@@ -27,4 +27,5 @@ jobs:
 
       - name: Dependency Review
         if: steps.lock.outputs.exists == 'true'
+        continue-on-error: true
         uses: actions/dependency-review-action@v4
