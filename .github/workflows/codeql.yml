@@ -16,7 +16,6 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    if: hashFiles('**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx') != ''
     strategy:
       fail-fast: false
       matrix:
@@ -26,9 +25,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
+        if: hashFiles('**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx') != ''
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
 
       - name: Perform CodeQL analysis
+        if: hashFiles('**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx') != ''
         uses: github/codeql-action/analyze@v3

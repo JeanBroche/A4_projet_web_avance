@@ -10,10 +10,10 @@ jobs:
   dependency-review:
     name: Review dependencies
     runs-on: ubuntu-latest
-    if: hashFiles('package-lock.json', 'pnpm-lock.yaml', 'yarn.lock') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Dependency Review
+        if: hashFiles('package-lock.json', 'pnpm-lock.yaml', 'yarn.lock') != ''
         uses: actions/dependency-review-action@v4
