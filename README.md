@@ -8,7 +8,7 @@ Projet web avance (A4) : ERP modulaire pour composants mecaniques de haute preci
 
 - Node.js 20+
 - [pnpm](https://pnpm.io/) 9 (via Corepack : `corepack enable`)
-- Docker (pour l environnement local, [issue #4](https://github.com/JeanBroche/A4_projet_web_avance/issues/4))
+- Docker Desktop (environnement local)
 
 ### Installation
 
@@ -25,6 +25,23 @@ Copier les variables d environnement :
 cp .env.example .env
 ```
 
+### Environnement Docker
+
+```bash
+pnpm docker:up    # demarrer PostgreSQL, MongoDB, Kafka, Redis, MinIO
+pnpm docker:down  # arreter les conteneurs
+```
+
+Ports et commandes de verification : [infra/docker/README.md](infra/docker/README.md).
+
+| Service    | Connexion hote par defaut |
+| ---------- | ------------------------- |
+| PostgreSQL | `postgresql://aeronexis:aeronexis_dev@localhost:5432/aeronexis` |
+| MongoDB    | `mongodb://localhost:27017/aeronexis` |
+| Redis      | `redis://localhost:6379` |
+| Kafka      | `localhost:9092` |
+| MinIO      | API http://localhost:9000 — console http://localhost:9001 |
+
 ### Scripts racine
 
 | Commande | Description |
@@ -33,8 +50,8 @@ cp .env.example .env
 | `pnpm lint` | Lint sur tous les workspaces |
 | `pnpm test` | Tests sur tous les workspaces |
 | `pnpm build` | Build sur tous les workspaces |
-| `pnpm docker:up` | Placeholder — Docker Compose prevu en issue #4 |
-| `pnpm docker:down` | Placeholder — Docker Compose prevu en issue #4 |
+| `pnpm docker:up` | Demarre Docker Compose (`infra/docker`) |
+| `pnpm docker:down` | Arrete Docker Compose |
 
 ### Arborescence
 
@@ -54,7 +71,7 @@ services/
 packages/
   shared/           # Types et constantes partages
 infra/
-  docker/           # Docker Compose (issue #4)
+  docker/           # Docker Compose
 docs/
 ```
 
