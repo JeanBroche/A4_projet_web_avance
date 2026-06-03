@@ -20,7 +20,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download actionlint
+        run: bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.12
+
       - name: Run actionlint
-        uses: raven-actions/actionlint@v2
-        with:
-          files: ".github/workflows/"
+        run: ./actionlint -color
