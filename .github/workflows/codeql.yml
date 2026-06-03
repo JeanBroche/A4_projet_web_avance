@@ -46,5 +46,8 @@ jobs:
           languages: ${{ matrix.language }}
 
       - name: Perform CodeQL analysis
-        if: steps.src.outputs.exists == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: steps.src.outputs.exists == 'true'
         uses: github/codeql-action/analyze@v3
+        with:
+          # Code scanning not enabled on this repo (no GHAS); analysis only, no SARIF upload.
+          upload: false
