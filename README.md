@@ -38,7 +38,7 @@ cp .env.example .env
 
 ### Arborescence
 
-```
+```text
 apps/
   web/              # Nuxt (issue #6)
   gateway/          # API Gateway (issue #5)
