@@ -56,8 +56,8 @@ docker exec -it aeronexis-redis redis-cli ping
 
 ### MinIO
 
-- API : http://localhost:9000
-- Console : http://localhost:9001 (identifiants `minioadmin` / `minioadmin` par defaut)
+- API : port `9000` sur `localhost` (voir `MINIO_ENDPOINT` dans `.env.example`)
+- Console : port `9001` sur `localhost` (identifiants `minioadmin` / `minioadmin` par defaut)
 
 ## Variables d environnement
 

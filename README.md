@@ -40,7 +40,7 @@ Ports et commandes de verification : [infra/docker/README.md](infra/docker/READM
 | MongoDB    | `mongodb://localhost:27017/aeronexis` |
 | Redis      | `redis://localhost:6379` |
 | Kafka      | `localhost:9092` |
-| MinIO      | API http://localhost:9000 — console http://localhost:9001 |
+| MinIO      | `localhost:9000` (API), `localhost:9001` (console) — voir `MINIO_*` dans `.env.example` |
 
 ### Scripts racine
 
