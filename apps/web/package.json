@@ -1,11 +1,29 @@
 {
-  "name": "@aeronexis/web",
-  "version": "0.0.0",
+  "name": "web",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "node -e \"console.log('@aeronexis/web: dev placeholder')\"",
-    "lint": "node -e \"process.exit(0)\"",
-    "test": "node -e \"process.exit(0)\"",
-    "build": "node -e \"process.exit(0)\""
-  }
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.111",
+    "@iconify-json/simple-icons": "^1.2.84",
+    "@nuxt/ui": "^4.8.1",
+    "nuxt": "^4.4.6",
+    "prisma": "^7.8.0",
+    "tailwindcss": "^4.3.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.15.2",
+    "eslint": "^10.4.1",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.3"
+  },
+  "packageManager": "pnpm@11.5.0"
 }
