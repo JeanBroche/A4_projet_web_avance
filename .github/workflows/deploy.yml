@@ -10,7 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/dev-cd'
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
