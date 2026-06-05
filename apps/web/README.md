@@ -15,17 +15,11 @@ Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
   </picture>
 </a>
 
-> The starter template for Vue is on https://github.com/nuxt-ui-templates/starter-vue.
-
 ## Quick Start
 
 ```bash [Terminal]
 npm create nuxt@latest -- -t ui
 ```
-
-## Deploy your own
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-name=starter&repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fstarter&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fnuxt%2Fstarter-dark.png&demo-url=https%3A%2F%2Fstarter-template.nuxt.dev%2F&demo-title=Nuxt%20Starter%20Template&demo-description=A%20minimal%20template%20to%20get%20started%20with%20Nuxt%20UI.)
 
 ## Setup
 
