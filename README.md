@@ -46,7 +46,10 @@ Ports et commandes de verification : [infra/docker/README.md](infra/docker/READM
 
 | Commande | Description |
 |----------|-------------|
-| `pnpm dev` | Lance les scripts `dev` de chaque workspace (placeholders) |
+| `pnpm dev` | Lance les scripts `dev` de chaque workspace |
+| `pnpm dev:api` | Gateway Moleculer HTTP (`GET /health`, port 4000) |
+| `pnpm dev:auth` | Microservice `auth` (action `auth.ping`) |
+| `pnpm dev:backend` | Lance `api` + `auth` en parallele |
 | `pnpm dev:web` | Lance le frontend Nuxt sur le port 3000 |
 | `pnpm lint` | Lint sur tous les workspaces |
 | `pnpm test` | Tests sur tous les workspaces |
@@ -61,6 +64,7 @@ apps/
   web/              # Nuxt (issue #6)
   gateway/          # API Gateway (issue #5)
 services/
+  api/              # Gateway HTTP Moleculer (issue #5)
   auth/             # Microservices Moleculer (issue #5)
   production/
   stock/
@@ -71,12 +75,32 @@ services/
   audit/
 packages/
   shared/           # Types et constantes partages
+  moleculer-config/ # Config broker Moleculer partagee
 infra/
   docker/           # Docker Compose
 docs/
 ```
 
 Backlog : [Milestone M0 — Socle technique](https://github.com/JeanBroche/A4_projet_web_avance/milestone/1).
+
+### Backend Moleculer (issue #5)
+
+Demarrer l infra puis les services :
+
+```bash
+pnpm docker:up
+pnpm dev:backend
+```
+
+Verification manuelle :
+
+```bash
+curl.exe http://localhost:4000/health
+curl.exe http://localhost:4000/api/health
+cd services/auth && pnpm run call:ping
+```
+
+Details : [`services/api/README.md`](services/api/README.md), [`services/auth/README.md`](services/auth/README.md).
 
 ## Integration continue
 

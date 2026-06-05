@@ -1,12 +1,10 @@
 {
-  "name": "@aeronexis/auth",
+  "name": "@aeronexis/api",
   "version": "0.0.0",
   "private": true,
   "scripts": {
     "dev": "moleculer-runner --config moleculer.config.js --hot services/**/*.service.js",
     "start": "moleculer-runner --config moleculer.config.js services/**/*.service.js",
-    "call:ping": "moleculer call auth.ping -c moleculer.config.js --id moleculer-cli --level error",
-    "smoke:ping": "node scripts/smoke-ping.js",
     "lint": "node -e \"process.exit(0)\"",
     "test": "node -e \"process.exit(0)\"",
     "build": "node -e \"process.exit(0)\""
@@ -14,9 +12,7 @@
   "dependencies": {
     "@aeronexis/moleculer-config": "workspace:*",
     "ioredis": "^5.11.0",
-    "moleculer": "^0.15.0"
-  },
-  "devDependencies": {
-    "moleculer-cli": "^0.8.2"
+    "moleculer": "^0.15.0",
+    "moleculer-web": "^0.10.7"
   }
 }

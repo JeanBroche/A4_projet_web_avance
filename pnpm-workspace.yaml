@@ -2,9 +2,12 @@ packages:
   - "apps/*"
   - "services/*"
   - "packages/*"
+overrides:
+  moleculer-cli>moleculer: "^0.15.0"
 allowBuilds:
   '@parcel/watcher': true
   '@prisma/engines': true
+  es5-ext: set this to true or false
   esbuild: true
   prisma: true
   unrs-resolver: true

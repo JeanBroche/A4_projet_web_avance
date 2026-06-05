@@ -8,6 +8,9 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter @aeronexis/api dev",
+    "dev:auth": "pnpm --filter @aeronexis/auth dev",
+    "dev:backend": "pnpm --parallel --filter @aeronexis/api --filter @aeronexis/auth dev",
     "dev:web": "pnpm --filter web dev",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r --if-present run typecheck",
