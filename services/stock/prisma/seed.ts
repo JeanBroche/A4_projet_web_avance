@@ -41,16 +41,24 @@ const MATERIALS = [
 
 async function main() {
   for (const material of MATERIALS) {
-    await prisma.material.upsert({
+    const existing = await prisma.material.findFirst({
       where: {
-        siteCode_code: {
-          siteCode: "SITE-LYO",
-          code: material.code
-        }
-      },
-      update: material,
-      create: { ...material, siteCode: "SITE-LYO" }
+        siteCode: "SITE-LYO",
+        code: material.code,
+        deletedAt: null
+      }
     });
+
+    if (existing) {
+      await prisma.material.update({
+        where: { id: existing.id },
+        data: material
+      });
+    } else {
+      await prisma.material.create({
+        data: { ...material, siteCode: "SITE-LYO" }
+      });
+    }
   }
 
   console.log("Stock seed completed:", { materials: MATERIALS.length, siteCode: "SITE-LYO" });

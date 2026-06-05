@@ -7,16 +7,18 @@ Outillage Prisma partage du monorepo AERONEXIS. **Aucune table metier** : chaque
 | Fichier | Role |
 |---------|------|
 | `src/create-client.ts` | Factory `PrismaClient` + `@prisma/adapter-pg` (Prisma 7) |
+| `src/soft-delete-extension.ts` | Extension : `delete` -> `deletedAt`, lectures filtrees |
 | `scripts/migrate-all.mjs` | Applique les migrations des 5 MS M1 |
 | `scripts/seed-all.mjs` | Seeds auth → stock → commande → production → expedition |
 
 ## Usage dans un microservice
 
 ```js
-import { createPrismaClient } from "@aeronexis/db";
-import { PrismaClient } from "./generated/prisma/client.js";
+import { createPrismaClient, createSoftDeleteExtension } from "@aeronexis/db";
+import { PrismaClient, Prisma } from "./generated/prisma/client.js";
 
-export const prisma = createPrismaClient(PrismaClient);
+const client = createPrismaClient(PrismaClient);
+export const prisma = client.$extends(createSoftDeleteExtension(Prisma));
 ```
 
 ## Scripts racine

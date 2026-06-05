@@ -24,46 +24,60 @@ const ROLES = [
 ] as const;
 
 async function main() {
-  const site = await prisma.site.upsert({
-    where: { code: "SITE-LYO" },
-    update: { name: "Site Lyon", isActive: true },
-    create: {
-      code: "SITE-LYO",
-      name: "Site Lyon",
-      isActive: true
-    }
+  const existingSite = await prisma.site.findFirst({
+    where: { code: "SITE-LYO", deletedAt: null }
   });
+  const site = existingSite
+    ? await prisma.site.update({
+        where: { id: existingSite.id },
+        data: { name: "Site Lyon", isActive: true }
+      })
+    : await prisma.site.create({
+        data: { code: "SITE-LYO", name: "Site Lyon", isActive: true }
+      });
 
   for (const role of ROLES) {
-    await prisma.role.upsert({
-      where: { code: role.code },
-      update: { label: role.label },
-      create: role
+    const existingRole = await prisma.role.findFirst({
+      where: { code: role.code, deletedAt: null }
     });
+    if (existingRole) {
+      await prisma.role.update({
+        where: { id: existingRole.id },
+        data: { label: role.label }
+      });
+    } else {
+      await prisma.role.create({ data: role });
+    }
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@aeronexis.local" },
-    update: {
-      passwordHash,
-      firstName: "Admin",
-      lastName: "Aeronexis",
-      siteId: site.id,
-      isActive: true
-    },
-    create: {
-      email: "admin@aeronexis.local",
-      passwordHash,
-      firstName: "Admin",
-      lastName: "Aeronexis",
-      siteId: site.id,
-      isActive: true
-    }
+  const existingAdmin = await prisma.user.findFirst({
+    where: { email: "admin@aeronexis.local", deletedAt: null }
   });
+  const admin = existingAdmin
+    ? await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: {
+          passwordHash,
+          firstName: "Admin",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      })
+    : await prisma.user.create({
+        data: {
+          email: "admin@aeronexis.local",
+          passwordHash,
+          firstName: "Admin",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      });
 
-  const adminRole = await prisma.role.findUniqueOrThrow({
-    where: { code: "admin" }
+  const adminRole = await prisma.role.findFirstOrThrow({
+    where: { code: "admin", deletedAt: null }
   });
 
   await prisma.userRole.upsert({

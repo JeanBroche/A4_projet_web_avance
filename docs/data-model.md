@@ -21,6 +21,12 @@ Cartographie architecture cible → microservices → persistance (M1).
 - **`packages/db`** : outillage uniquement (`createPrismaClient`, `migrate-all`, `seed-all`).
 - **Pas de FK inter-schemas** : references metier via codes string (`siteCode`, `orderNumber`, `productCode`).
 
+## Soft delete
+
+Champs `deletedAt` sur les entites metier (Site, User, Role, Material, Client, ProductStock, Delivery). Index uniques partiels PostgreSQL (`WHERE deletedAt IS NULL`) pour permettre la re-creation d'un code apres suppression logique.
+
+Extension `@aeronexis/db` : `createSoftDeleteExtension(Prisma)` — `delete` / `deleteMany` posent `deletedAt`, les lectures excluent les lignes supprimees. Hors scope : `UserRole`, `RefreshToken` (revocation via `revokedAt`).
+
 ## Topics Kafka (cible)
 
 | Topic | Producteur | Consommateur |

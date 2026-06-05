@@ -19,11 +19,13 @@ model Material {
   supplier          String?
   lastReplenishment DateTime? @db.Date
   siteCode          String
+  deletedAt         DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  @@unique([siteCode, code])
   @@index([siteCode])
+  @@index([deletedAt])
+  @@index([siteCode, code])
   @@schema("stock")
   @@map("materials")
 }

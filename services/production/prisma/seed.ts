@@ -10,26 +10,34 @@ config({ path: resolve(__dirname, "../../../.env") });
 const prisma = createPrismaClient(PrismaClient);
 
 async function main() {
-  await prisma.productStock.upsert({
+  const existing = await prisma.productStock.findFirst({
     where: {
-      siteCode_productCode: {
-        siteCode: "SITE-LYO",
-        productCode: "PROD-001"
-      }
-    },
-    update: {
-      description: "Palier haute precision PN-100",
-      quantity: 10,
-      reservedQuantity: 2
-    },
-    create: {
+      siteCode: "SITE-LYO",
       productCode: "PROD-001",
-      description: "Palier haute precision PN-100",
-      quantity: 10,
-      reservedQuantity: 2,
-      siteCode: "SITE-LYO"
+      deletedAt: null
     }
   });
+
+  if (existing) {
+    await prisma.productStock.update({
+      where: { id: existing.id },
+      data: {
+        description: "Palier haute precision PN-100",
+        quantity: 10,
+        reservedQuantity: 2
+      }
+    });
+  } else {
+    await prisma.productStock.create({
+      data: {
+        productCode: "PROD-001",
+        description: "Palier haute precision PN-100",
+        quantity: 10,
+        reservedQuantity: 2,
+        siteCode: "SITE-LYO"
+      }
+    });
+  }
 
   console.log("Production seed completed:", { productCode: "PROD-001", siteCode: "SITE-LYO" });
 }

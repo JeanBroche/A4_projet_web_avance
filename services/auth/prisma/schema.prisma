@@ -9,46 +9,55 @@ datasource db {
 }
 
 model Site {
-  id        String   @id @default(cuid())
-  code      String   @unique
+  id        String    @id @default(cuid())
+  code      String
   name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   users User[]
 
+  @@index([deletedAt])
+  @@index([code])
   @@schema("auth")
   @@map("sites")
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String
   passwordHash String
   firstName    String
   lastName     String
   siteId       String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   site          Site?          @relation(fields: [siteId], references: [id])
   roles         UserRole[]
   refreshTokens RefreshToken[]
 
   @@index([siteId])
+  @@index([deletedAt])
+  @@index([email])
   @@schema("auth")
   @@map("users")
 }
 
 model Role {
-  id    String @id @default(cuid())
-  code  String @unique
-  label String
+  id        String    @id @default(cuid())
+  code      String
+  label     String
+  deletedAt DateTime?
 
   users UserRole[]
 
+  @@index([deletedAt])
+  @@index([code])
   @@schema("auth")
   @@map("roles")
 }
