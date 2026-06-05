@@ -7,7 +7,7 @@ Projet web avance (A4) : ERP modulaire pour composants mecaniques de haute preci
 ### Prerequis
 
 - Node.js 20+
-- [pnpm](https://pnpm.io/) 9 (via Corepack : `corepack enable`)
+- [pnpm](https://pnpm.io/) 11 (via Corepack : `corepack enable`)
 - Docker Desktop (environnement local)
 
 ### Installation
@@ -47,6 +47,7 @@ Ports et commandes de verification : [infra/docker/README.md](infra/docker/READM
 | Commande | Description |
 |----------|-------------|
 | `pnpm dev` | Lance les scripts `dev` de chaque workspace (placeholders) |
+| `pnpm dev:web` | Lance le frontend Nuxt sur le port 3000 |
 | `pnpm lint` | Lint sur tous les workspaces |
 | `pnpm test` | Tests sur tous les workspaces |
 | `pnpm build` | Build sur tous les workspaces |

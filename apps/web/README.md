@@ -1,58 +1,60 @@
-# Nuxt Starter Template
+# web — Frontend AERONEXIS
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
+Application Nuxt du monorepo AERONEXIS Dynamics (issue [#6](https://github.com/JeanBroche/A4_projet_web_avance/issues/6)).
 
-Use this template to get started with [Nuxt UI](https://ui.nuxt.com) quickly.
+## Demarrage
 
-- [Live demo](https://starter-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation/nuxt)
-
-<a href="https://starter-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png">
-    <img alt="Nuxt Starter Template" src="https://ui.nuxt.com/assets/templates/nuxt/starter-light.png" width="830" height="466">
-  </picture>
-</a>
-
-## Quick Start
-
-```bash [Terminal]
-npm create nuxt@latest -- -t ui
-```
-
-## Setup
-
-Make sure to install the dependencies:
+Depuis la **racine** du monorepo :
 
 ```bash
-pnpm install
+pnpm dev:web
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+Depuis ce dossier (`apps/web`) — equivalent :
 
 ```bash
 pnpm dev
+# ou
+pnpm dev:web
 ```
 
-## Production
+L'application est accessible sur [http://localhost:3000](http://localhost:3000).
 
-Build the application for production:
+## Proxy API
+
+En developpement, les requetes vers `/api/*` sont proxifiees vers la gateway Moleculer (`moleculer-web`, issue #5).
+
+Le proxy cible `http://localhost:4000` (port par defaut de `moleculer-web`, configurable dans `nuxt.config.ts` quand la gateway #5 sera en place).
+
+Verification manuelle (gateway demarree) :
 
 ```bash
-pnpm build
+curl http://localhost:3000/api/health
 ```
 
-Locally preview production build:
+## Layouts
 
-```bash
-pnpm preview
+Layouts squelettes par espace metier dans `app/layouts/` :
+
+- `default` — shell principal (header/footer)
+- `auth` — pages d'authentification
+- `production`, `logistique`, `commercial`, `direction` — espaces metier
+
+Utilisation dans une page :
+
+```ts
+definePageMeta({ layout: 'production' })
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+## Session (stub)
 
-## Renovate integration
+Le composable `useSession()` (`app/composables/useSession.ts`) expose un utilisateur mock (`role: 'guest'`) en attendant l'auth (issue #11).
 
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.
+## Scripts
+
+| Commande | Description |
+|----------|-------------|
+| `pnpm dev` | Serveur de developpement |
+| `pnpm build` | Build production |
+| `pnpm lint` | ESLint |
+| `pnpm typecheck` | Verification TypeScript |
