@@ -56,6 +56,10 @@ Ports et commandes de verification : [infra/docker/README.md](infra/docker/READM
 | `pnpm build` | Build sur tous les workspaces |
 | `pnpm docker:up` | Demarre Docker Compose (`infra/docker`) |
 | `pnpm docker:down` | Arrete Docker Compose |
+| `pnpm db:migrate` | Applique les migrations Prisma (5 MS) |
+| `pnpm db:migrate:dev` | Migrations Prisma en dev |
+| `pnpm db:seed` | Seed de reference (auth, stock, commande, production, expedition) |
+| `pnpm db:studio:auth` | Prisma Studio — schema `auth` (idem `:stock`, `:commande`, `:production`, `:expedition`) |
 
 ### Arborescence
 
@@ -75,6 +79,7 @@ services/
   audit/
 packages/
   shared/           # Types et constantes partages
+  db/               # Outillage Prisma (factory, migrate/seed)
   moleculer-config/ # Config broker Moleculer partagee
 infra/
   docker/           # Docker Compose

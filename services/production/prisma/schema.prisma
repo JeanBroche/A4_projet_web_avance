@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["production"]
+}
+
+model ProductStock {
+  id               String   @id @default(cuid())
+  productCode      String
+  description      String?
+  quantity         Int      @default(0)
+  reservedQuantity Int      @default(0)
+  siteCode         String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([siteCode, productCode])
+  @@index([siteCode])
+  @@schema("production")
+  @@map("product_stocks")
+}

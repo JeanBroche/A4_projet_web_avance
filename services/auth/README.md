@@ -5,6 +5,21 @@ Premier service metier Moleculer (issue [#5](https://github.com/JeanBroche/A4_pr
 ## Prerequis
 
 - Redis demarre : `pnpm docker:up`
+- PostgreSQL + migrations : `pnpm db:migrate` (schema `auth`)
+
+## Prisma (M1)
+
+| Schema PG | Modeles |
+|-----------|---------|
+| `auth` | Site, User, Role, UserRole, RefreshToken |
+
+Import client :
+
+```js
+import { prisma } from "@aeronexis/auth/db";
+```
+
+Seed : `pnpm db:seed` (apres migration). Admin : `admin@aeronexis.local` / `SEED_ADMIN_PASSWORD`.
 
 ## Demarrage
 

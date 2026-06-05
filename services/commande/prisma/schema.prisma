@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["commande"]
+}
+
+model Client {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  name              String
+  country           String?
+  type              String?
+  annualRevenue     Int?
+  firstContractDate DateTime? @db.Date
+  status            String    @default("active")
+  siteCode          String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([siteCode])
+  @@schema("commande")
+  @@map("clients")
+}

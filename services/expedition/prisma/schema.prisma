@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["expedition"]
+}
+
+model Delivery {
+  id                   String    @id @default(cuid())
+  code                 String    @unique
+  orderNumber          String
+  status               String    @default("pending")
+  expectedDeliveryDate DateTime? @db.Date
+  shippedAt            DateTime?
+  siteCode             String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([siteCode])
+  @@index([orderNumber])
+  @@schema("expedition")
+  @@map("deliveries")
+}
