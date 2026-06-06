@@ -9,4 +9,3 @@ config({ path: resolve(__dirname, "../../../.env") });
 
 const client = createPrismaClient(PrismaClient);
 export const prisma = client.$extends(createSoftDeleteExtension(Prisma));
-export * from "./generated/prisma/client.js";

@@ -23,9 +23,92 @@ model Material {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  movements    StockMovement[]
+  reservations StockReservation[]
+  alerts       StockAlert[]
+  delays       SupplierDelay[]
+
   @@index([siteCode])
   @@index([deletedAt])
   @@index([siteCode, code])
   @@schema("stock")
   @@map("materials")
+}
+
+model StockMovement {
+  id          String   @id @default(cuid())
+  materialId  String
+  siteCode    String
+  type        String
+  quantity    Int
+  reason      String?
+  documentRef String?
+  createdAt   DateTime @default(now())
+
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@index([materialId])
+  @@index([siteCode])
+  @@index([type])
+  @@index([createdAt])
+  @@schema("stock")
+  @@map("stock_movements")
+}
+
+model StockReservation {
+  id         String    @id @default(cuid())
+  ofId       String
+  materialId String
+  siteCode   String
+  quantity   Int
+  status     String    @default("ACTIVE")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  releasedAt DateTime?
+
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@index([ofId])
+  @@index([materialId])
+  @@index([siteCode])
+  @@index([status])
+  @@schema("stock")
+  @@map("stock_reservations")
+}
+
+model StockAlert {
+  id         String    @id @default(cuid())
+  materialId String
+  siteCode   String
+  severity   String    @default("WARNING")
+  message    String
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@index([materialId])
+  @@index([siteCode])
+  @@index([resolvedAt])
+  @@schema("stock")
+  @@map("stock_alerts")
+}
+
+model SupplierDelay {
+  id           String    @id @default(cuid())
+  materialId   String
+  supplier     String
+  expectedDate DateTime  @db.Date
+  actualDate   DateTime? @db.Date
+  notes        String?
+  createdAt    DateTime  @default(now())
+
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@index([materialId])
+  @@index([supplier])
+  @@index([expectedDate])
+  @@schema("stock")
+  @@map("supplier_delays")
 }
