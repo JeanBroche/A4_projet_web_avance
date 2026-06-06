@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
+    "dev:web": "nuxt dev",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
@@ -15,7 +16,6 @@
     "@iconify-json/simple-icons": "^1.2.84",
     "@nuxt/ui": "^4.8.1",
     "nuxt": "^4.4.6",
-    "prisma": "^7.8.0",
     "tailwindcss": "^4.3.0",
     "zod": "^4.4.3"
   },

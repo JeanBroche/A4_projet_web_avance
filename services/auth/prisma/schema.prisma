@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["auth"]
+}
+
+model Site {
+  id        String    @id @default(cuid())
+  code      String
+  name      String
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  users User[]
+
+  @@index([deletedAt])
+  @@index([code])
+  @@schema("auth")
+  @@map("sites")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  siteId       String?
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  site          Site?          @relation(fields: [siteId], references: [id])
+  roles         UserRole[]
+  refreshTokens RefreshToken[]
+
+  @@index([siteId])
+  @@index([deletedAt])
+  @@index([email])
+  @@schema("auth")
+  @@map("users")
+}
+
+model Role {
+  id        String    @id @default(cuid())
+  code      String
+  label     String
+  deletedAt DateTime?
+
+  users UserRole[]
+
+  @@index([deletedAt])
+  @@index([code])
+  @@schema("auth")
+  @@map("roles")
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@schema("auth")
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("auth")
+  @@map("refresh_tokens")
+}

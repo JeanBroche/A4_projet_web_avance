@@ -8,11 +8,23 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter @aeronexis/api dev",
+    "dev:auth": "pnpm --filter @aeronexis/auth dev",
+    "dev:backend": "pnpm --parallel --filter @aeronexis/api --filter @aeronexis/auth dev",
+    "dev:web": "pnpm --filter web dev",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r run test",
     "build": "pnpm -r run build",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
-    "docker:down": "docker compose -f infra/docker/docker-compose.yml down"
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "db:migrate": "node packages/db/scripts/migrate-all.mjs deploy",
+    "db:migrate:dev": "node packages/db/scripts/migrate-all.mjs dev",
+    "db:seed": "node packages/db/scripts/seed-all.mjs",
+    "db:studio:auth": "pnpm --filter @aeronexis/auth exec prisma studio",
+    "db:studio:stock": "pnpm --filter @aeronexis/stock exec prisma studio",
+    "db:studio:commande": "pnpm --filter @aeronexis/commande exec prisma studio",
+    "db:studio:production": "pnpm --filter @aeronexis/production exec prisma studio",
+    "db:studio:expedition": "pnpm --filter @aeronexis/expedition exec prisma studio"
   }
 }

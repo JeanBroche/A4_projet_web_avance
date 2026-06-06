@@ -2,13 +2,42 @@
   "name": "@aeronexis/auth",
   "version": "0.0.0",
   "private": true,
+  "exports": {
+    "./db": "./src/db.mjs"
+  },
   "scripts": {
-    "dev": "node -e \"console.log('@aeronexis/auth: dev placeholder')\"",
-    "lint": "node -e \"process.exit(0)\"",
-    "test": "node -e \"process.exit(0)\"",
-    "build": "node -e \"process.exit(0)\""
+    "dev": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.js --hot services/**/*.service.js",
+    "start": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.js services/**/*.service.js",
+    "call:ping": "moleculer call auth.ping -c moleculer.config.js --id moleculer-cli --level error",
+    "smoke:ping": "node scripts/smoke-ping.js",
+    "smoke:auth": "node --import tsx scripts/smoke-auth.js",
+    "db:generate": "prisma generate",
+    "build": "prisma generate",
+    "lint": "prisma generate",
+    "typecheck": "node -e \"process.exit(0)\"",
+    "test": "node --import tsx --test tests/**/*.test.mjs"
   },
   "dependencies": {
-    "moleculer": "^0.15.0"
+    "@aeronexis/db": "workspace:*",
+    "@aeronexis/moleculer-config": "workspace:*",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.4.2",
+    "ioredis": "^5.11.0",
+    "jsonwebtoken": "^9.0.3",
+    "moleculer": "^0.15.0",
+    "pg": "^8.16.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.15.2",
+    "moleculer-cli": "^0.8.2",
+    "prisma": "^7.8.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }
