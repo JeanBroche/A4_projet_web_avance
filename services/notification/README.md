@@ -1,3 +1,14 @@
 # notification
 
-Microservice Moleculer notification. Implementation prevue : [issue #5](https://github.com/JeanBroche/A4_projet_web_avance/issues/5).
+Microservice Moleculer notification (alertes, emails, in-app).
+
+## Persistance
+
+| Milestone | Store | Usage |
+|-----------|-------|-------|
+| M1+ | Redis | Etat des notifications, cache regles |
+| M1+ | Kafka | Consommation `stock.material.low`, `expedition.delivery.alert`, etc. |
+
+**M1** : pas de Prisma PostgreSQL. Pas inclus dans `pnpm db:migrate`.
+
+Implementation prevue : milestone dedie notification.

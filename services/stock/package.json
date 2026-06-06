@@ -2,13 +2,36 @@
   "name": "@aeronexis/stock",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "main": "./dist/db.js",
+  "types": "./dist/db.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/db.d.ts",
+      "import": "./dist/db.js"
+    }
+  },
   "scripts": {
     "dev": "node -e \"console.log('@aeronexis/stock: dev placeholder')\"",
-    "lint": "node -e \"process.exit(0)\"",
-    "test": "node -e \"process.exit(0)\"",
-    "build": "node -e \"process.exit(0)\""
+    "db:generate": "prisma generate",
+    "build": "prisma generate && tsc",
+    "lint": "prisma generate && tsc --noEmit",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "test": "node -e \"process.exit(0)\""
   },
   "dependencies": {
-    "moleculer": "^0.15.0"
+    "@aeronexis/db": "workspace:*",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2",
+    "moleculer": "^0.15.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.15.2",
+    "prisma": "^7.8.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }

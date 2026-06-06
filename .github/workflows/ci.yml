@@ -1,8 +1,12 @@
 name: CI
 
 on:
+  push:
   pull_request:
-    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -23,6 +27,8 @@ jobs:
   node:
     name: Node.js (lint, typecheck, test, build)
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -50,6 +56,10 @@ jobs:
       - name: Install dependencies
         if: steps.pkg.outputs.exists == 'true'
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspace dependencies
+        if: steps.pkg.outputs.exists == 'true'
+        run: pnpm --filter @aeronexis/db build
 
       - name: Lint
         if: steps.pkg.outputs.exists == 'true'

@@ -7,7 +7,7 @@ overrides:
 allowBuilds:
   '@parcel/watcher': true
   '@prisma/engines': true
-  es5-ext: set this to true or false
+  es5-ext: false
   esbuild: true
   prisma: true
   unrs-resolver: true
