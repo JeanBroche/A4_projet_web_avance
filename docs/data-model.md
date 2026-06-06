@@ -8,7 +8,7 @@ Cartographie architecture cible → microservices → persistance (M1).
 |---------|---------|----------------|----------------|
 | Auth | `services/auth` | PostgreSQL | `auth` — Site, User, Role, UserRole, RefreshToken |
 | Production | `services/production` | PostgreSQL | `production` — ProductStock (+ Product/BOM/MO en M3) |
-| Stock | `services/stock` | PostgreSQL | `stock` — Material |
+| Stock | `services/stock` | PostgreSQL | `stock` — Material, StockMovement, StockReservation, StockAlert, SupplierDelay |
 | Commande | `services/commande` | PostgreSQL | `commande` — Client (+ Order/OrderLine en M5) |
 | Expedition | `services/expedition` | PostgreSQL | `expedition` — Delivery |
 | Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` — KPI_Dashboard (pas de migration M1) |
@@ -20,6 +20,20 @@ Cartographie architecture cible → microservices → persistance (M1).
 - **1 PostgreSQL** Docker, **1 namespace Postgres par MS** (`@@schema("...")`).
 - **`packages/db`** : outillage uniquement (`createPrismaClient`, `migrate-all`, `seed-all`).
 - **Pas de FK inter-schemas** : references metier via codes string (`siteCode`, `orderNumber`, `productCode`).
+
+## Microservice Stock (M4)
+
+Le modele `Material` joue le role de `StockLevel` consolide : `available = currentStock - reservedStock`, `minimumStock` est le seuil utilise par les alertes. Les tables transactionnelles M4 referencent `Material.id` via FK interne au schema `stock`.
+
+| Table | Role |
+|-------|------|
+| `materials` | Niveau courant + seuil, soft-delete |
+| `stock_movements` | Historique entrees / sorties / ajustements (`type` IN/OUT/ADJUST) |
+| `stock_reservations` | Reservations OF (`status` ACTIVE/RELEASED/CANCELLED) |
+| `stock_alerts` | Alertes seuil ouvertes (resolution via `resolvedAt`) |
+| `supplier_delays` | Retards fournisseur declares manuellement |
+
+`ofId` est une reference string libre (`OF-...`) en attendant le MS production (M3).
 
 ## Soft delete
 
