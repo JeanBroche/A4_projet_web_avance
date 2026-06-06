@@ -11,6 +11,8 @@ const require = createRequire(import.meta.url);
 
 config({ path: resolve(__dirname, "../../../.env") });
 
+process.env.JWT_SECRET ??= "ci-test-jwt-secret";
+
 const moleculerConfig = require("../moleculer.config.js");
 const authService = require("../services/auth.service.js");
 
@@ -40,12 +42,14 @@ function skipIfNoDb(t) {
 }
 
 before(async () => {
-  if (!adminPassword) {
-    throw new Error("SEED_ADMIN_PASSWORD is required for auth tests.");
-  }
-
   broker.createService(authService);
   await broker.start();
+
+  if (!adminPassword) {
+    dbAvailable = false;
+    console.warn("Skipping auth integration tests: SEED_ADMIN_PASSWORD unavailable.");
+    return;
+  }
 
   try {
     const { prisma } = await import("../src/db.mjs");
