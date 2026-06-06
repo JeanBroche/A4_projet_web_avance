@@ -5,8 +5,11 @@ const config = require("../moleculer.config.js");
 
 const broker = new ServiceBroker({
   ...config,
-  nodeID: "smoke-cli"
+  nodeID: "smoke-cli",
+  transporter: null
 });
+
+broker.createService(require("../services/auth.service.js"));
 
 broker
   .start()
