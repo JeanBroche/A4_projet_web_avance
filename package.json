@@ -2,7 +2,7 @@
   "name": "aeronexis-erp",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@11.5.0",
+  "packageManager": "pnpm@11.5.2",
   "engines": {
     "node": ">=20"
   },
@@ -10,7 +10,8 @@
     "dev": "pnpm -r --parallel run dev",
     "dev:api": "pnpm --filter @aeronexis/api dev",
     "dev:auth": "pnpm --filter @aeronexis/auth dev",
-    "dev:backend": "pnpm --parallel --filter @aeronexis/api --filter @aeronexis/auth dev",
+    "dev:stock": "pnpm --filter @aeronexis/stock dev",
+    "dev:backend": "pnpm --parallel --filter @aeronexis/api --filter @aeronexis/auth --filter @aeronexis/stock dev",
     "dev:web": "pnpm --filter web dev",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r --if-present run typecheck",

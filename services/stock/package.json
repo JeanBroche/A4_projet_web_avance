@@ -2,34 +2,36 @@
   "name": "@aeronexis/stock",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
-  "main": "./dist/db.js",
-  "types": "./dist/db.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/db.d.ts",
-      "import": "./dist/db.js"
-    }
+    "./db": "./src/db.mjs"
   },
   "scripts": {
-    "dev": "node -e \"console.log('@aeronexis/stock: dev placeholder')\"",
+    "dev": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.js --hot services/**/*.service.js",
+    "start": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.js services/**/*.service.js",
+    "call:ping": "moleculer call stock.ping -c moleculer.config.js --id moleculer-cli --level error",
     "db:generate": "prisma generate",
-    "build": "prisma generate && tsc",
-    "lint": "prisma generate && tsc --noEmit",
-    "typecheck": "prisma generate && tsc --noEmit",
-    "test": "node -e \"process.exit(0)\""
+    "build": "prisma generate",
+    "lint": "prisma generate",
+    "typecheck": "node -e \"process.exit(0)\"",
+    "test": "node --import tsx --test tests/**/*.test.mjs"
   },
   "dependencies": {
     "@aeronexis/db": "workspace:*",
+    "@aeronexis/moleculer-config": "workspace:*",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",
+    "ioredis": "^5.11.0",
+    "jsonwebtoken": "^9.0.3",
     "moleculer": "^0.15.0",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.15.0",
     "@types/pg": "^8.15.2",
+    "moleculer-cli": "^0.8.2",
     "prisma": "^7.8.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"

@@ -49,7 +49,8 @@ Ports et commandes de verification : [infra/docker/README.md](infra/docker/READM
 | `pnpm dev` | Lance les scripts `dev` de chaque workspace |
 | `pnpm dev:api` | Gateway Moleculer HTTP (`GET /health`, port 4000) |
 | `pnpm dev:auth` | Microservice `auth` (action `auth.ping`) |
-| `pnpm dev:backend` | Lance `api` + `auth` en parallele |
+| `pnpm dev:stock` | Microservice `stock` (issue [#96](https://github.com/JeanBroche/A4_projet_web_avance/issues/96)) |
+| `pnpm dev:backend` | Lance `api` + `auth` + `stock` en parallele |
 | `pnpm dev:web` | Lance le frontend Nuxt sur le port 3000 |
 | `pnpm lint` | Lint sur tous les workspaces |
 | `pnpm test` | Tests sur tous les workspaces |
