@@ -57,6 +57,10 @@ jobs:
         if: steps.pkg.outputs.exists == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace dependencies
+        if: steps.pkg.outputs.exists == 'true'
+        run: pnpm --filter @aeronexis/db build
+
       - name: Lint
         if: steps.pkg.outputs.exists == 'true'
         run: pnpm run lint
