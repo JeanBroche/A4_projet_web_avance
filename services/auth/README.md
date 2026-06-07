@@ -68,11 +68,11 @@ pnpm run smoke:auth
 Exemples `moleculer call` :
 
 ```bash
-moleculer call auth.login --email admin@aeronexis.local --password "<SEED_ADMIN_PASSWORD>" -c moleculer.config.js
-moleculer call auth.me --accessToken "<accessToken>" -c moleculer.config.js
-moleculer call auth.refresh --refreshToken "<refreshToken>" -c moleculer.config.js
-moleculer call auth.logout --refreshToken "<refreshToken>" -c moleculer.config.js
-moleculer call auth.role.list --accessToken "<accessToken>" -c moleculer.config.js
+pnpm exec moleculer call auth.login --email admin@aeronexis.local --password "<SEED_ADMIN_PASSWORD>" -c moleculer.config.ts
+pnpm exec moleculer call auth.me --accessToken "<accessToken>" -c moleculer.config.ts
+pnpm exec moleculer call auth.refresh --refreshToken "<refreshToken>" -c moleculer.config.ts
+pnpm exec moleculer call auth.logout --refreshToken "<refreshToken>" -c moleculer.config.ts
+pnpm exec moleculer call auth.role.list --accessToken "<accessToken>" -c moleculer.config.ts
 ```
 
 ## Tests
@@ -85,4 +85,4 @@ Tests d'integration (`node:test`) : login, refresh, logout, me, RBAC admin. Les 
 
 ## Template service metier
 
-Le fichier [`service.schema.js`](service.schema.js) documente la convention de nommage des actions et la structure minimale d'un service.
+Le fichier [`service.schema.ts`](service.schema.ts) documente la convention de nommage des actions et la structure minimale d'un service TypeScript.
