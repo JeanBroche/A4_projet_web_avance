@@ -2,13 +2,25 @@
   "name": "@aeronexis/notification",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "node -e \"console.log('@aeronexis/notification: dev placeholder')\"",
-    "lint": "node -e \"process.exit(0)\"",
+    "dev": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.ts --hot services/**/*.service.ts",
+    "start": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.ts services/**/*.service.ts",
+    "call:ping": "node --import tsx ./node_modules/moleculer-cli/bin/moleculer.js call notification.ping -c moleculer.config.ts --id moleculer-cli --level error",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "node -e \"process.exit(0)\"",
-    "build": "node -e \"process.exit(0)\""
+    "build": "tsc --noEmit"
   },
   "dependencies": {
+    "@aeronexis/moleculer-config": "workspace:*",
+    "ioredis": "^5.11.0",
     "moleculer": "^0.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "moleculer-cli": "^0.8.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }

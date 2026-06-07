@@ -6,9 +6,7 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
-
 const prisma = createPrismaClient(PrismaClient);
-
 type MaterialSeed = {
   code: string;
   description: string;
@@ -62,19 +60,16 @@ const MATERIALS: MaterialSeed[] = [
     siteCode: "SITE-PAR"
   }
 ];
-
 async function upsertMaterial(material: MaterialSeed) {
   const existing = await prisma.material.findFirst({
     where: { siteCode: material.siteCode, code: material.code, deletedAt: null }
   });
-
   if (existing) {
     return prisma.material.update({
       where: { id: existing.id },
       data: material
     });
   }
-
   return prisma.material.create({ data: material });
 }
 
@@ -86,20 +81,16 @@ function daysAgo(days: number): Date {
 
 async function main() {
   const persisted: Record<string, string> = {};
-
   for (const material of MATERIALS) {
     const row = await upsertMaterial(material);
     persisted[`${material.siteCode}/${material.code}`] = row.id;
   }
-
   const matLyoTitane = persisted["SITE-LYO/MAT-002"];
   const matLyoAcier = persisted["SITE-LYO/MAT-001"];
-
   if (matLyoAcier) {
     const movementsExist = await prisma.stockMovement.findFirst({
       where: { materialId: matLyoAcier }
     });
-
     if (!movementsExist) {
       await prisma.stockMovement.createMany({
         data: [
@@ -132,12 +123,10 @@ async function main() {
       });
     }
   }
-
   if (matLyoTitane) {
     const alertExists = await prisma.stockAlert.findFirst({
       where: { materialId: matLyoTitane, resolvedAt: null }
     });
-
     if (!alertExists) {
       await prisma.stockAlert.create({
         data: {
@@ -148,11 +137,9 @@ async function main() {
         }
       });
     }
-
     const delayExists = await prisma.supplierDelay.findFirst({
       where: { materialId: matLyoTitane }
     });
-
     if (!delayExists) {
       await prisma.supplierDelay.create({
         data: {
@@ -164,13 +151,11 @@ async function main() {
       });
     }
   }
-
   console.log("Stock seed completed:", {
     materials: MATERIALS.length,
     sites: Array.from(new Set(MATERIALS.map((m) => m.siteCode)))
   });
 }
-
 main()
   .catch((error) => {
     console.error(error);

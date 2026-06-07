@@ -2,20 +2,21 @@
   "name": "@aeronexis/auth",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "exports": {
-    "./db": "./src/db.mjs"
+    "./db": "./src/db.ts"
   },
   "scripts": {
-    "dev": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.js --hot services/**/*.service.js",
-    "start": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.js services/**/*.service.js",
-    "call:ping": "moleculer call auth.ping -c moleculer.config.js --id moleculer-cli --level error",
-    "smoke:ping": "node scripts/smoke-ping.js",
-    "smoke:auth": "node --import tsx scripts/smoke-auth.js",
+    "dev": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.ts --hot services/**/*.service.ts",
+    "start": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.ts services/**/*.service.ts",
+    "call:ping": "node --import tsx ./node_modules/moleculer-cli/bin/moleculer.js call auth.ping -c moleculer.config.ts --id moleculer-cli --level error",
+    "smoke:ping": "node --import tsx scripts/smoke-ping.ts",
+    "smoke:auth": "node --import tsx scripts/smoke-auth.ts",
     "db:generate": "prisma generate",
     "build": "prisma generate",
-    "lint": "prisma generate",
-    "typecheck": "node -e \"process.exit(0)\"",
-    "test": "node --import tsx --test tests/**/*.test.mjs"
+    "lint": "prisma generate && tsc --noEmit",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@aeronexis/db": "workspace:*",

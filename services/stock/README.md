@@ -65,4 +65,4 @@ Les tests sautent automatiquement si PostgreSQL n est pas disponible. Ils utilis
 
 ## Kafka
 
-La publication d evenements (`stock.reserved`, `stock.movement.recorded`, `supplier.delay.reported`...) est branchee via [`src/lib/events.mjs`](src/lib/events.mjs). L implementation reelle (kafkajs) est differee a une issue infra dediee ; le stub journalise chaque evenement sous le tag `stock.event.pending` pour conserver la tracabilite du contrat futur.
+La publication d evenements (`stock.reserved`, `stock.movement.recorded`, `supplier.delay.reported`...) est branchee via [`src/lib/events.ts`](src/lib/events.ts).

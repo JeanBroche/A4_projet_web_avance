@@ -9,10 +9,10 @@ Configuration Moleculer partagee (issue [#5](https://github.com/JeanBroche/A4_pr
 
 Usage dans un service :
 
-```js
-const { createConfig } = require("@aeronexis/moleculer-config");
+```ts
+import { createConfig } from "@aeronexis/moleculer-config";
 
-module.exports = createConfig({
+export default createConfig({
   nodeID: "mon-service"
 });
 ```
