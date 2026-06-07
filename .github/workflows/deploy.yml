@@ -64,7 +64,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: compose.yml
-          target: ~/app/Aeronexis_ERP/compose.yml
+          target: ~/app/Aeronexis_ERP
       
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1
