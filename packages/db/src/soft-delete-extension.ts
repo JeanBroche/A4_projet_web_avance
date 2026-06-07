@@ -11,7 +11,8 @@ const SOFT_DELETE_MODELS = new Set([
   "Material",
   "Client",
   "ProductStock",
-  "Delivery"
+  "PickList",
+  "Shipment"
 ]);
 
 function isSoftDeleteModel(model: string | undefined): boolean {

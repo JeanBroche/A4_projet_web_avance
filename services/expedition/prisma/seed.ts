@@ -10,31 +10,78 @@ config({ path: resolve(__dirname, "../../../.env") });
 const prisma = createPrismaClient(PrismaClient);
 
 async function main() {
-  const existing = await prisma.delivery.findFirst({
-    where: { code: "DEL-001", deletedAt: null }
+  const pickList = await prisma.pickList.upsert({
+    where: { id: "seed-picklist-001" },
+    update: {
+      code: "PICK-2025-00001",
+      orderNumber: "CMD-2025-00001",
+      clientCode: "CLI-001",
+      siteCode: "SITE-LYO",
+      status: "COMPLETED",
+      ofId: "OF-SEED-001"
+    },
+    create: {
+      id: "seed-picklist-001",
+      code: "PICK-2025-00001",
+      orderNumber: "CMD-2025-00001",
+      clientCode: "CLI-001",
+      siteCode: "SITE-LYO",
+      status: "COMPLETED",
+      ofId: "OF-SEED-001",
+      lines: {
+        create: [
+          {
+            lineNumber: 1,
+            productCode: "PROD-001",
+            quantity: 2,
+            pickedQty: 2
+          }
+        ]
+      }
+    },
+    include: { lines: true }
   });
 
-  if (existing) {
-    await prisma.delivery.update({
-      where: { id: existing.id },
+  const existingShipment = await prisma.shipment.findFirst({
+    where: { code: "SHP-2025-00001", deletedAt: null }
+  });
+
+  if (existingShipment) {
+    await prisma.shipment.update({
+      where: { id: existingShipment.id },
       data: {
-        orderNumber: "ORD-PLACEHOLDER-001",
-        status: "pending",
-        siteCode: "SITE-LYO"
+        pickListId: pickList.id,
+        orderNumber: pickList.orderNumber,
+        clientCode: pickList.clientCode,
+        siteCode: pickList.siteCode,
+        status: "PLANNED"
       }
     });
   } else {
-    await prisma.delivery.create({
+    await prisma.shipment.create({
       data: {
-        code: "DEL-001",
-        orderNumber: "ORD-PLACEHOLDER-001",
-        status: "pending",
-        siteCode: "SITE-LYO"
+        code: "SHP-2025-00001",
+        pickListId: pickList.id,
+        orderNumber: pickList.orderNumber,
+        clientCode: pickList.clientCode,
+        siteCode: pickList.siteCode,
+        status: "PLANNED",
+        trackingEvents: {
+          create: {
+            fromStatus: null,
+            toStatus: "PLANNED",
+            notes: "Seed shipment"
+          }
+        }
       }
     });
   }
 
-  console.log("Expedition seed completed:", { delivery: "DEL-001", siteCode: "SITE-LYO" });
+  console.log("Expedition seed completed:", {
+    pickList: pickList.code,
+    shipment: "SHP-2025-00001",
+    siteCode: "SITE-LYO"
+  });
 }
 
 main()

@@ -38,7 +38,7 @@ export const prisma = client.$extends(createSoftDeleteExtension(Prisma));
 | `services/stock` | `stock` | Material |
 | `services/commande` | `commande` | Client |
 | `services/production` | `production` | ProductStock |
-| `services/expedition` | `expedition` | Delivery |
+| `services/expedition` | `expedition` | PickList, Shipment |
 
 Services **sans Prisma M1** : `reporting` (PG M7), `notification` (Redis/Kafka), `audit` (MongoDB).
 
