@@ -3,6 +3,7 @@ name: Build & Push Docker image
 on:
   push:
     branches:
+      - main
       - dev-cd
 
 env:
@@ -30,7 +31,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/nuxt-test-frontend
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/nuxt-frontend
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev-cd' }}
