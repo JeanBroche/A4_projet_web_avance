@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.service.json",
+  "include": [
+    "src",
+    "services",
+    "tests",
+    "prisma",
+    "moleculer.config.ts",
+    "prisma.config.ts"
+  ]
+}

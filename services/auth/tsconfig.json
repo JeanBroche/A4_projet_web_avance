@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.service.json",
+  "include": [
+    "src",
+    "services",
+    "tests",
+    "scripts",
+    "moleculer.config.ts",
+    "service.schema.ts"
+  ],
+  "exclude": ["src/generated"]
+}
