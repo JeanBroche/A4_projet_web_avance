@@ -1,0 +1,8 @@
+services:
+  web:
+    image: ghcr.io/${GITHUB_REPOSITORY}/nuxt-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
