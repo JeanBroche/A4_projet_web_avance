@@ -38,6 +38,6 @@ Reponse attendue : `200` avec `{ "status": "ok", "version": "0.0.0" }`.
 
 ## Architecture
 
-- `moleculer.config.js` — broker Redis (`REDIS_URL`), serializer JSON, logger JSON
-- `services/api.service.js` — routes HTTP moleculer-web
+- `moleculer.config.ts` — broker Redis (`REDIS_URL`), serializer JSON, logger JSON
+- `services/api.service.ts` — routes HTTP moleculer-web
 - Config partagee : `@aeronexis/moleculer-config` (correlationId via header `x-correlation-id`)

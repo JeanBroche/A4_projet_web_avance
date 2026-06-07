@@ -1,13 +1,11 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "Node16",
-    "moduleResolution": "Node16",
-    "declaration": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "strict": true,
-    "skipLibCheck": true
-  },
-  "include": ["src"]
+  "extends": "../../tsconfig.service.json",
+  "include": [
+    "src",
+    "services",
+    "tests",
+    "prisma",
+    "moleculer.config.ts",
+    "prisma.config.ts"
+  ]
 }
