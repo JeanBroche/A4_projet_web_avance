@@ -1,24 +1,22 @@
 import { Errors } from "moleculer";
+import type { ZodError } from "zod";
 
 const { MoleculerClientError } = Errors;
 
 export const ErrorCodes = {
   VALIDATION_ERROR: { status: 422, message: "Validation failed" },
-  INVALID_CREDENTIALS: { status: 401, message: "Invalid email or password" },
-  TOKEN_EXPIRED: { status: 401, message: "Token has expired" },
   TOKEN_INVALID: { status: 401, message: "Token is invalid" },
-  USER_INACTIVE: { status: 403, message: "User account is inactive" },
+  TOKEN_EXPIRED: { status: 401, message: "Token has expired" },
   FORBIDDEN: { status: 403, message: "Insufficient permissions" },
   NOT_FOUND: { status: 404, message: "Resource not found" },
-  CONFLICT: { status: 409, message: "Resource already exists" }
-};
+  CONFLICT: { status: 409, message: "Resource already exists" },
+  EXPEDITION_NOT_FOUND: { status: 404, message: "Expedition not found" },
+  INVALID_STATUS_TRANSITION: { status: 409, message: "Invalid expedition status transition" }
+} as const;
 
-/**
- * @param {keyof typeof ErrorCodes} code
- * @param {string} [message]
- * @param {unknown} [details]
- */
-export function createError(code, message, details) {
+export type ErrorCode = keyof typeof ErrorCodes;
+
+export function createError(code: ErrorCode, message?: string, details?: unknown) {
   const def = ErrorCodes[code];
   const payload = {
     error: {
@@ -36,19 +34,13 @@ export function createError(code, message, details) {
   );
 }
 
-/**
- * @param {import("zod").ZodError} zodError
- */
-export function validationError(zodError) {
+export function validationError(zodError: ZodError) {
   return createError("VALIDATION_ERROR", ErrorCodes.VALIDATION_ERROR.message, zodError.flatten());
 }
 
-/**
- * @param {unknown} error
- */
-export function parseOrThrow(error) {
-  if (error?.name === "ZodError") {
-    throw validationError(error);
+export function parseOrThrow(error: unknown): never {
+  if (error && typeof error === "object" && "name" in error && error.name === "ZodError") {
+    throw validationError(error as ZodError);
   }
   throw error;
 }
