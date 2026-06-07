@@ -10,7 +10,7 @@ Cartographie architecture cible → microservices → persistance (M1).
 | Production | `services/production` | PostgreSQL | `production` — ProductStock (+ Product/BOM/MO en M3) |
 | Stock | `services/stock` | PostgreSQL | `stock` — Material, StockMovement, StockReservation, StockAlert, SupplierDelay |
 | Commande | `services/commande` | PostgreSQL | `commande` — Client (+ Order/OrderLine en M5) |
-| Expedition | `services/expedition` | PostgreSQL | `expedition` — Delivery |
+| Expedition | `services/expedition` | PostgreSQL | `expedition` — PickList, Shipment |
 | Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` — KPI_Dashboard (pas de migration M1) |
 | Notification | `services/notification` | Redis + Kafka | Pas de Prisma M1 |
 | Audit | `services/audit` | MongoDB | Collections `audit_logs` (issue M0 #9) |

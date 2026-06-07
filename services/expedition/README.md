@@ -1,3 +1,43 @@
 # expedition
 
-Microservice Moleculer expedition. Implementation prevue : [issue #5](https://github.com/JeanBroche/A4_projet_web_avance/issues/5).
+Microservice Moleculer expedition (M6). Gere le picking, la planification, le suivi et l'historique des expeditions.
+
+## Actions Moleculer
+
+| Action | RBAC | Description |
+|--------|------|-------------|
+| `expedition.ping` | — | Health check |
+| `expedition.picklist.create` | logistique | Cree une liste de picking pour une commande |
+| `expedition.picklist.complete` | logistique | Finalise le picking |
+| `expedition.shipment.plan` | logistique | Planifie une expedition depuis un pick list complete |
+| `expedition.shipment.get` | auth | Detail d'une expedition |
+| `expedition.shipment.track` | auth | Timeline de tracking |
+| `expedition.shipment.updateStatus` | logistique | Transition de statut (PICKED, IN_TRANSIT, DELIVERED…) |
+| `expedition.shipment.history` | auth | Historique pagine avec filtres |
+
+## Events
+
+| Topic | Direction | Description |
+|-------|-----------|-------------|
+| `commande.order.finished` | Consomme | Auto-creation d'un pick list |
+| `shipment.planned` | Publie (stub log) | Apres planification |
+| `shipment.status.changed` | Publie (stub log) | Apres changement de statut |
+
+## Statuts shipment
+
+`PLANNED` → `PICKED` → `IN_TRANSIT` → `DELIVERED` (ou `CANCELLED`)
+
+## Dev
+
+```bash
+pnpm --filter @aeronexis/expedition dev
+pnpm --filter @aeronexis/expedition test
+pnpm --filter @aeronexis/expedition call:ping
+```
+
+```bash
+pnpm exec moleculer call expedition.picklist.create \
+  --orderNumber CMD-2025-00001 --siteCode SITE-LYO \
+  --lines '[{"productCode":"PROD-001","quantity":2}]' \
+  --accessToken <jwt>
+```

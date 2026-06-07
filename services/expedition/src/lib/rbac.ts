@@ -52,6 +52,6 @@ export function requireAnyRole(
   return payload;
 }
 
-export function requireCommercial(ctx: Context, accessToken?: string | null): AccessTokenPayload {
-  return requireAnyRole(ctx, accessToken ?? null, ["commercial"]);
+export function requireLogistique(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["logistique"]);
 }

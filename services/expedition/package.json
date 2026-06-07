@@ -14,7 +14,7 @@
     "build": "prisma generate && tsc --noEmit",
     "lint": "prisma generate && tsc --noEmit",
     "typecheck": "prisma generate && tsc --noEmit",
-    "test": "node -e \"process.exit(0)\""
+    "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@aeronexis/db": "workspace:*",

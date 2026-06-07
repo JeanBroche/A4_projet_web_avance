@@ -10,8 +10,13 @@ export const ErrorCodes = {
   FORBIDDEN: { status: 403, message: "Insufficient permissions" },
   NOT_FOUND: { status: 404, message: "Resource not found" },
   CONFLICT: { status: 409, message: "Resource already exists" },
-  EXPEDITION_NOT_FOUND: { status: 404, message: "Expedition not found" },
-  INVALID_STATUS_TRANSITION: { status: 409, message: "Invalid expedition status transition" }
+  PICKLIST_NOT_FOUND: { status: 404, message: "Pick list not found" },
+  SHIPMENT_NOT_FOUND: { status: 404, message: "Shipment not found" },
+  PICKLIST_ALREADY_COMPLETED: { status: 409, message: "Pick list is already completed" },
+  PICKLIST_NOT_COMPLETED: { status: 409, message: "Pick list must be completed before planning shipment" },
+  SHIPMENT_ALREADY_EXISTS: { status: 409, message: "Shipment already exists for this pick list" },
+  INVALID_STATUS_TRANSITION: { status: 409, message: "Invalid shipment status transition" },
+  STOCK_RESERVATION_MISSING: { status: 409, message: "No active stock reservation found for this order" }
 } as const;
 
 export type ErrorCode = keyof typeof ErrorCodes;

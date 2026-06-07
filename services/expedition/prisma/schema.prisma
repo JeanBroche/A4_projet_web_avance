@@ -8,22 +8,85 @@ datasource db {
   schemas  = ["expedition"]
 }
 
-model Delivery {
-  id                   String    @id @default(cuid())
-  code                 String
-  orderNumber          String
-  status               String    @default("pending")
-  expectedDeliveryDate DateTime? @db.Date
-  shippedAt            DateTime?
-  siteCode             String
-  deletedAt            DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+model PickList {
+  id          String         @id @default(cuid())
+  code        String
+  orderNumber String
+  ofId        String?
+  clientCode  String?
+  siteCode    String
+  status      String         @default("PENDING")
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  lines       PickListLine[]
+  shipment    Shipment?
 
   @@index([siteCode])
   @@index([orderNumber])
   @@index([deletedAt])
   @@index([code])
   @@schema("expedition")
-  @@map("deliveries")
+  @@map("pick_lists")
+}
+
+model PickListLine {
+  id          String    @id @default(cuid())
+  pickListId  String
+  lineNumber  Int
+  productCode String
+  quantity    Int
+  pickedQty   Int       @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  pickList    PickList  @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+
+  @@index([pickListId])
+  @@index([productCode])
+  @@schema("expedition")
+  @@map("pick_list_lines")
+}
+
+model Shipment {
+  id              String                  @id @default(cuid())
+  code            String
+  pickListId      String                  @unique
+  orderNumber     String
+  clientCode      String?
+  siteCode        String
+  status          String                  @default("PLANNED")
+  carrier         String?
+  plannedShipDate DateTime?               @db.Date
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  pickList        PickList                @relation(fields: [pickListId], references: [id])
+  trackingEvents  ShipmentTrackingEvent[]
+
+  @@index([siteCode])
+  @@index([orderNumber])
+  @@index([clientCode])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([code])
+  @@schema("expedition")
+  @@map("shipments")
+}
+
+model ShipmentTrackingEvent {
+  id         String   @id @default(cuid())
+  shipmentId String
+  fromStatus String?
+  toStatus   String
+  notes      String?
+  createdAt  DateTime @default(now())
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@index([createdAt])
+  @@schema("expedition")
+  @@map("shipment_tracking_events")
 }
