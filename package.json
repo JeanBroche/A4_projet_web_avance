@@ -27,6 +27,7 @@
     "db:studio:stock": "pnpm --filter @aeronexis/stock exec prisma studio",
     "db:studio:commande": "pnpm --filter @aeronexis/commande exec prisma studio",
     "db:studio:production": "pnpm --filter @aeronexis/production exec prisma studio",
-    "db:studio:expedition": "pnpm --filter @aeronexis/expedition exec prisma studio"
+    "db:studio:expedition": "pnpm --filter @aeronexis/expedition exec prisma studio",
+    "format": "prettier --write ."
   }
 }

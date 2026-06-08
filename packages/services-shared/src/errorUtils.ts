@@ -5,11 +5,15 @@ const { MoleculerClientError } = Errors;
 
 export const ErrorCodes = {
   VALIDATION_ERROR: { status: 422, message: "Validation failed" },
+  INVALID_CREDENTIALS: { status: 401, message: "Invalid email or password" },
   TOKEN_INVALID: { status: 401, message: "Token is invalid" },
   TOKEN_EXPIRED: { status: 401, message: "Token has expired" },
   FORBIDDEN: { status: 403, message: "Insufficient permissions" },
+  USER_INACTIVE: { status: 403, message: "User account is inactive" },
   NOT_FOUND: { status: 404, message: "Resource not found" },
   CONFLICT: { status: 409, message: "Resource already exists" },
+  INSUFFICIENT_STOCK: { status: 422, message: "Insufficient stock available" },
+  RESERVATION_INACTIVE: { status: 409, message: "Reservation is not active" },
   INVALID_STATUS_TRANSITION: { status: 409, message: "Invalid order status transition" },
   ORDER_NOT_EDITABLE: { status: 409, message: "Order cannot be edited in its current status" }
 } as const;

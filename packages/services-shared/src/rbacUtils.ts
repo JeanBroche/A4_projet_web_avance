@@ -1,6 +1,6 @@
 import type { Context } from "moleculer";
-import { createError } from "./errors.js";
-import { verifyAccessToken } from "./jwt.js";
+import { createError } from "./errorUtils.js"
+import { verifyAccessToken, type AccessTokenPayload } from "./jwtUtils.js";
 
 export function resolveAccessToken(accessToken: string | undefined | null, ctx: Context) {
   if (accessToken) {
@@ -28,8 +28,8 @@ export function resolveAccessToken(accessToken: string | undefined | null, ctx: 
   return null;
 }
 
-export function requireAuth(ctx: Context, accessToken: string | undefined | null) {
-  const token = resolveAccessToken(accessToken, ctx);
+export function requireAuth(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+  const token = resolveAccessToken(accessToken ?? null, ctx);
 
   if (!token) {
     throw createError("TOKEN_INVALID");
@@ -37,6 +37,30 @@ export function requireAuth(ctx: Context, accessToken: string | undefined | null
 
   return verifyAccessToken(token);
 }
+
+export function requireAnyRole(
+  ctx: Context,
+  accessToken: string | undefined | null,
+  roleCodes: string[]
+): AccessTokenPayload {
+  const payload = requireAuth(ctx, accessToken);
+  const roles = payload.roles || [];
+
+  if (roles.includes("admin")) {
+    return payload;
+  }
+
+  if (!roleCodes.some((code) => roles.includes(code))) {
+    throw createError("FORBIDDEN");
+  }
+
+  return payload;
+}
+
+export function requireCommercial(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["commercial"]);
+}
+
 
 export function requireRole(ctx: Context, accessToken: string | undefined | null, roleCode: string) {
   const payload = requireAuth(ctx, accessToken);

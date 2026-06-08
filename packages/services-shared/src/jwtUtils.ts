@@ -1,5 +1,5 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
-import { createError } from "./errors.js";
+import { createError } from "./errorUtils.js";
 
 const ACCESS_TTL = process.env.JWT_ACCESS_TTL || "15m";
 
