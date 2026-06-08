@@ -2,9 +2,8 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { requireAuth } from '../../src/lib/rbac.js';
+import { createError, parseOrThrow, requireAuth } from "@aeronexis/services-shared";
 import { meSchema } from '../../src/lib/schemas.js';
-import { createError, parseOrThrow } from '../../src/lib/errors.js';
 import { mapUser, mapRoles, userInclude, type UserWithRoles } from '../../src/lib/user-mapper.js';
 import { prisma } from '../../src/db.js';
 

@@ -3,10 +3,8 @@ import bcrypt from 'bcryptjs';
 
 import { Context } from 'moleculer';
 
-import { createError } from '../../src/lib/errors.js';
-import { requireAdmin } from '../../src/lib/rbac.js';
+import { createError, parseOrThrow, requireAdmin } from "@aeronexis/services-shared";
 import { userCreateSchema } from '../../src/lib/schemas.js';
-import { parseOrThrow } from '../../src/lib/errors.js';
 import { mapUser, mapRoles, userInclude } from '../../src/lib/user-mapper.js';
 import { prisma } from '../../src/db.js';
 

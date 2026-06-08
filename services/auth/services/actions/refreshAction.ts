@@ -1,20 +1,11 @@
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
+import { parseOrThrow, signAccessToken } from '@aeronexis/services-shared';
 import { refreshSchema } from '../../src/lib/schemas.js';
-import { createError, parseOrThrow } from '../../src/lib/errors.js';
-import {
-  userInclude,
-  buildAccessTokenPayload,
-} from '../../src/lib/user-mapper.js';
-import {
-  mapUser,
-  mapRoles,
-  type UserWithRoles,
-} from '../../src/lib/user-mapper.js';
-import { signAccessToken } from '../../src/lib/jwt.js';
+import { buildAccessTokenPayload } from '../../src/lib/user-mapper.js';
+import { mapUser, mapRoles } from '../../src/lib/user-mapper.js';
 import { rotateRefreshToken } from '../../src/lib/tokens.js';
 import { prisma } from '../../src/db.js';
 

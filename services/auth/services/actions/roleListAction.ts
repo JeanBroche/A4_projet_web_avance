@@ -2,9 +2,8 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { requireAdmin } from '../../src/lib/rbac.js';
+import { parseOrThrow, requireAdmin } from "@aeronexis/services-shared";
 import { accessTokenSchema } from '../../src/lib/schemas.js';
-import { parseOrThrow } from '../../src/lib/errors.js';
 import { prisma } from '../../src/db.js';
 
 type RoleListParams = z.infer<typeof accessTokenSchema>;

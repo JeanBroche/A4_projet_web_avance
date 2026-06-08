@@ -2,9 +2,8 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { requireAdmin } from '../../src/lib/rbac.js';
+import { parseOrThrow, requireAdmin } from "@aeronexis/services-shared";
 import { userListSchema } from '../../src/lib/schemas.js';
-import { parseOrThrow } from '../../src/lib/errors.js';
 import {
   mapUser,
   userInclude,

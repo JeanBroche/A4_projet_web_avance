@@ -1,14 +1,15 @@
 import type { ServiceSchema } from 'moleculer';
 
-import { loginAction } from './actions/loginAction.js';
-import { refreshAction } from './actions/refreshAction.js';
-import { logoutAction } from './actions/logoutAction.js';
-import { meAction } from './actions/meAction.js';
-import { userListAction } from './actions/userListAction.js';
-import { userCreateAction } from './actions/userCreateAction.js';
-import { userUpdateAction } from './actions/userUpdateAction.js';
-import { roleListAction } from './actions/roleListAction.js';
-
+import {
+  loginAction,
+  refreshAction,
+  logoutAction,
+  meAction,
+  userListAction,
+  userCreateAction,
+  userUpdateAction,
+  roleListAction,
+} from './actions/index.js';
 
 const AuthService: ServiceSchema = {
   name: 'auth',

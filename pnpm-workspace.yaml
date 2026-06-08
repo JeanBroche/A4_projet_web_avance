@@ -9,6 +9,7 @@ allowBuilds:
   '@prisma/engines': true
   es5-ext: false
   esbuild: true
+  node-base64: true
   prisma: true
   unrs-resolver: true
   vue-demi: true

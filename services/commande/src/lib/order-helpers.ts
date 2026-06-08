@@ -1,6 +1,6 @@
 import type { Client, CustomerOrder, CustomerOrderLine } from "../generated/prisma/client.js";
 import { prisma } from "../db.js";
-import { createError } from "./errors.js";
+import { createError } from "@aeronexis/services-shared";
 
 export const ORDER_STATUSES = {
   DRAFT: "DRAFT",

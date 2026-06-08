@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
+import { parseOrThrow } from "@aeronexis/services-shared";
 import { logoutSchema } from '../../src/lib/schemas.js';
-import { parseOrThrow } from '../../src/lib/errors.js';
 import { revokeRefreshToken } from '../../src/lib/tokens.js';
 import { prisma } from '../../src/db.js';
 
