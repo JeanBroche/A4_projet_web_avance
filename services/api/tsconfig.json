@@ -1,4 +1,0 @@
-{
-  "extends": "../../tsconfig.service.json",
-  "include": ["moleculer.config.ts", "services/**/*.ts"]
-}
