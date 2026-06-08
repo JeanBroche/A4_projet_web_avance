@@ -235,9 +235,12 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+<<<<<<< HEAD
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
+=======
+>>>>>>> 848d26d383c26f6f8edc624c27697ba9d26b4cfd
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
