@@ -5,7 +5,7 @@ Microservice Moleculer Stock (issue parent [#96](https://github.com/JeanBroche/A
 ## Pre-requis
 
 - PostgreSQL local (`pnpm docker:up`)
-- Variables : `POSTGRES_URL`, `JWT_SECRET`, `SEED_ADMIN_PASSWORD` (voir [`.env.example`](../../.env.example))
+- Variables : `STOCK_DATABASE_URL`, `JWT_SECRET`, `SEED_ADMIN_PASSWORD` (voir [`.env.example`](../../.env.example))
 
 ## Lancer le service
 

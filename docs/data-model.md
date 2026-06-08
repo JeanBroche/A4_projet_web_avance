@@ -4,22 +4,24 @@ Cartographie architecture cible → microservices → persistance (M1).
 
 ## Services backend et persistance
 
-| Service | Dossier | Persistance M1 | Schema / store |
-|---------|---------|----------------|----------------|
-| Auth | `services/auth` | PostgreSQL | `auth` — Site, User, Role, UserRole, RefreshToken |
-| Production | `services/production` | PostgreSQL | `production` — ProductStock (+ Product/BOM/MO en M3) |
-| Stock | `services/stock` | PostgreSQL | `stock` — Material, StockMovement, StockReservation, StockAlert, SupplierDelay |
-| Commande | `services/commande` | PostgreSQL | `commande` — Client (+ Order/OrderLine en M5) |
-| Expedition | `services/expedition` | PostgreSQL | `expedition` — PickList, Shipment |
-| Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` — KPI_Dashboard (pas de migration M1) |
-| Notification | `services/notification` | Redis + Kafka | Pas de Prisma M1 |
-| Audit | `services/audit` | MongoDB | Collections `audit_logs` (issue M0 #9) |
+| Service | Dossier | Base PG / store | Schema PG | Modeles |
+|---------|---------|-----------------|-----------|---------|
+| Auth | `services/auth` | `aeronexis_auth` | `auth` | Site, User, Role, UserRole, RefreshToken |
+| Production | `services/production` | `aeronexis_production` | `production` | ProductStock (+ Product/BOM/MO en M3) |
+| Stock | `services/stock` | `aeronexis_stock` | `stock` | Material, StockMovement, StockReservation, StockAlert, SupplierDelay |
+| Commande | `services/commande` | `aeronexis_commande` | `commande` | Client (+ Order/OrderLine en M5) |
+| Expedition | `services/expedition` | `aeronexis_expedition` | `expedition` | PickList, Shipment |
+| Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` | KPI_Dashboard (pas de migration M1) |
+| Notification | `services/notification` | Redis + Kafka | -- | Pas de Prisma M1 |
+| Audit | `services/audit` | MongoDB | -- | Collections `audit_logs` (issue M0 #9) |
 
 ## Organisation Prisma
 
-- **1 PostgreSQL** Docker, **1 namespace Postgres par MS** (`@@schema("...")`).
+- **1 container PostgreSQL** Docker, **1 base dediee par MS** (`aeronexis_<service>`), provisionnees par [`infra/postgres/init.sql`](../infra/postgres/init.sql) au premier `docker:up`.
+- Chaque base contient en plus un **schema PG nomme** (`@@schema("...")` Prisma) — tables exposees comme `aeronexis_auth.auth.users`, `aeronexis_stock.stock.materials`, etc.
+- Chaque service lit son URL via une env var dediee : `AUTH_DATABASE_URL`, `STOCK_DATABASE_URL`, `COMMANDE_DATABASE_URL`, `PRODUCTION_DATABASE_URL`, `EXPEDITION_DATABASE_URL`.
 - **`packages/db`** : outillage uniquement (`createPrismaClient`, `migrate-all`, `seed-all`).
-- **Pas de FK inter-schemas** : references metier via codes string (`siteCode`, `orderNumber`, `productCode`).
+- **Pas de FK inter-bases** ni inter-schemas : references metier via codes string (`siteCode`, `orderNumber`, `productCode`).
 
 ## Microservice Stock (M4)
 

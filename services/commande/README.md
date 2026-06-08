@@ -5,7 +5,7 @@ Microservice Moleculer Commandes (issue parent [#97](https://github.com/JeanBroc
 ## Pre-requis
 
 - PostgreSQL local (`pnpm docker:up`)
-- Variables : `POSTGRES_URL`, `JWT_SECRET` (voir [`.env.example`](../../.env.example))
+- Variables : `COMMANDE_DATABASE_URL`, `JWT_SECRET` (voir [`.env.example`](../../.env.example))
 
 ## Lancer le service
 

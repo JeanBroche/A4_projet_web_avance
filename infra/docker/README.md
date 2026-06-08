@@ -26,7 +26,10 @@ Fichier compose : [`docker-compose.yml`](docker-compose.yml).
 
 Volumes nommes : `pg_data`, `mongo_data`, `redis_data`, `kafka_data`, `minio_data`.
 
-Le conteneur `minio-init` cree le bucket `aeronexis-docs` au premier demarrage.
+Initialisation au premier demarrage :
+
+- `postgres` execute [`infra/postgres/init.sql`](../postgres/init.sql) qui cree 5 bases dediees (`aeronexis_auth`, `aeronexis_stock`, `aeronexis_commande`, `aeronexis_production`, `aeronexis_expedition`). La base admin `aeronexis` reste disponible pour `psql -l`, `pg_dump`, etc.
+- `minio-init` cree le bucket `aeronexis-docs`.
 
 ## Verification manuelle
 
@@ -34,6 +37,22 @@ Le conteneur `minio-init` cree le bucket `aeronexis-docs` au premier demarrage.
 
 ```bash
 docker exec -it aeronexis-postgres psql -U aeronexis -d aeronexis -c "SELECT 1;"
+docker exec -it aeronexis-postgres psql -U aeronexis -l
+# Attendu : aeronexis, aeronexis_auth, aeronexis_stock, aeronexis_commande, aeronexis_production, aeronexis_expedition
+```
+
+Re-init des bases (devs ayant deja le volume `pg_data`) : le script `init.sql` ne s execute qu au PREMIER demarrage. Pour le rejouer, soit :
+
+```powershell
+pnpm docker:down
+docker volume rm docker_pg_data    # ATTENTION : perte des donnees PG
+pnpm docker:up
+```
+
+Soit manuellement sans destruction :
+
+```powershell
+docker exec -i aeronexis-postgres psql -U aeronexis -d aeronexis -f /docker-entrypoint-initdb.d/init.sql
 ```
 
 ### MongoDB

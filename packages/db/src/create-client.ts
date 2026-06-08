@@ -7,10 +7,13 @@ export type PrismaClientConstructor<T> = new (options: {
 
 export function createPrismaClient<T>(
   Client: PrismaClientConstructor<T>,
-  connectionString = process.env.POSTGRES_URL
+  connectionString?: string
 ): T {
   if (!connectionString) {
-    throw new Error("POSTGRES_URL is required to create a Prisma client.");
+    throw new Error(
+      "A connection string is required to create a Prisma client. " +
+        "Chaque microservice doit passer son URL dediee (ex. process.env.AUTH_DATABASE_URL)."
+    );
   }
 
   const pool = new Pool({ connectionString });

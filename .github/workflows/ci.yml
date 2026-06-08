@@ -29,6 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       POSTGRES_URL: postgresql://ci:ci@localhost:5432/ci
+      AUTH_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_auth
+      STOCK_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_stock
+      COMMANDE_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_commande
+      PRODUCTION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_production
+      EXPEDITION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_expedition
       JWT_SECRET: ci-test-jwt-secret
       SEED_ADMIN_PASSWORD: ci-test-password
     steps:

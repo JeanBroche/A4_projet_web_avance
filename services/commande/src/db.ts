@@ -7,5 +7,5 @@ import { PrismaClient, Prisma } from "./generated/prisma/client.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 
-const client = createPrismaClient(PrismaClient);
+const client = createPrismaClient(PrismaClient, process.env.COMMANDE_DATABASE_URL);
 export const prisma = client.$extends(createSoftDeleteExtension(Prisma));

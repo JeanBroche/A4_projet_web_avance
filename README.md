@@ -36,11 +36,13 @@ Ports et commandes de verification : [infra/docker/README.md](infra/docker/READM
 
 | Service    | Connexion hote par defaut |
 | ---------- | ------------------------- |
-| PostgreSQL | `postgresql://aeronexis:aeronexis_dev@localhost:5432/aeronexis` |
+| PostgreSQL | `postgresql://aeronexis:aeronexis_dev@localhost:5432/aeronexis` (admin) |
 | MongoDB    | `mongodb://localhost:27017/aeronexis` |
 | Redis      | `redis://localhost:6379` |
 | Kafka      | `localhost:9092` |
 | MinIO      | `localhost:9000` (API), `localhost:9001` (console) — voir `MINIO_*` dans `.env.example` |
+
+PostgreSQL provisionne **5 bases dediees** au premier demarrage ([`infra/postgres/init.sql`](infra/postgres/init.sql)) : `aeronexis_auth`, `aeronexis_stock`, `aeronexis_commande`, `aeronexis_production`, `aeronexis_expedition`. Chaque microservice Prisma lit son URL via une variable dediee (`AUTH_DATABASE_URL`, `STOCK_DATABASE_URL`, etc. — voir `.env.example`).
 
 ### Scripts racine
 

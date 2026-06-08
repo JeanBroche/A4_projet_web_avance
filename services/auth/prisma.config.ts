@@ -13,6 +13,6 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts"
   },
   datasource: {
-    url: env("POSTGRES_URL")
+    url: env("AUTH_DATABASE_URL")
   }
 });
