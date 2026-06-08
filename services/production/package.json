@@ -37,7 +37,8 @@
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.0",
     "moleculer": "^0.15.0",
-    "pg": "^8.16.0"
+    "pg": "^8.16.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
