@@ -1,6 +1,6 @@
-import type { ProductStock, BOMProduct, BatchProduct } from "../generated/prisma/client.js";
+import type { ProductStock, BOMProduct, BatchProduct, Anomalies_Batch, Anomalies } from "../generated/prisma/client.js";
 import { prisma } from "../db.js";
-import { createError } from "./errors.js";
+import { createError, generateUniqueCode } from "@aeronexis/services-shared";
 
 export const PROD_STATUSES = {
   PENDING: "PENDING",
@@ -9,61 +9,29 @@ export const PROD_STATUSES = {
   CANCELLED: "CANCELLED"
 } as const;
 
-export const VALIDATION_ACTIONS = {
-  VALIDATE: "VALIDATE",
-  REJECT: "REJECT"
+export const VALIDATION_ANOMALIES = {
+  OPEN: "OPEN",
+  CLOSED: "CLOSED"
 } as const;
 
-type DbClient = Pick<typeof prisma, "productStock" | "bOMProduct" | "batchProduct">;
+type DbClient = Pick<typeof prisma, "productStock" | "bOMProduct" | "batchProduct" | "anomalies_Batch" | "anomalies">;
 
-export async function generateBatchCode(db: DbClient, year = new Date().getFullYear()) {
-    const prefix = `BATC-${year}-`;
+export async function generateBatchCode(db: DbClient) {
+    const code = `BATCH-${generateUniqueCode("BATCH", (code) => db.batchProduct.findFirst({ where: { batch_code: code } })!==null)}-`;
 
-    const latest = await db.batchProduct.findFirst({
-        where: {
-            batch_code: { startsWith: prefix },
-            deletedAt: null
-        },
-        orderBy: { batch_code: "desc" },
-        select: { batch_code: true }
-    });
-
-    let sequence = 1;
-
-    if (latest?.batch_code) {
-        const suffix = latest.batch_code.slice(prefix.length);
-        const parsed = Number.parseInt(suffix, 10);
-        if (!Number.isNaN(parsed)) {
-            sequence = parsed + 1;
-        }
-    }
-
-    return `${prefix}${String(sequence).padStart(5, "0")}`;
+    return code;
 }
 
-export async function generateBOMCode(db: DbClient, year = new Date().getFullYear()) {
-    const prefix = `BOM-${year}-`;
-    
-    const latest = await db.bOMProduct.findFirst({
-        where: {
-            bom_code: { startsWith: prefix },
-            deletedAt: null
-        },
-        orderBy: { bom_code: "desc" },
-        select: { bom_code: true }
-    });
+export async function generateBOMCode(db: DbClient) {
+    const code = `BOM-${generateUniqueCode("BOM", (code) => db.bOMProduct.findFirst({ where: { bom_code: code } })!==null)}-`;
 
-    let sequence = 1;
+    return code;
+}
 
-    if (latest?.bom_code) {
-        const suffix = latest.bom_code.slice(prefix.length);
-        const parsed = Number.parseInt(suffix, 10);
-        if (!Number.isNaN(parsed)) {
-            sequence = parsed + 1;
-        }
-    }
+export async function generateAnomalyCode(db: DbClient, batch_id: string) {
+    const code = `ANOMALY-${generateUniqueCode("ANOMALY", (code) => db.anomalies.findFirst({ where: { anomaly_code: code, batch_id } })!==null)}-`;
 
-    return `${prefix}${String(sequence).padStart(5, "0")}`;
+    return code;
 }
 
 export async function loadActiveBatch(db: DbClient, batch_code: string) {

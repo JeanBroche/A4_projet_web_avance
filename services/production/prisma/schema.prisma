@@ -42,7 +42,7 @@ model BOMProduct {
 }
 
 model BatchProduct {
-  id               String    @id @default(cuid())
+  batch_id               String    @id @default(cuid())
   batch_code       String
   bom_id           String
   command_id       String
@@ -51,7 +51,33 @@ model BatchProduct {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  @@index([batch_code])
+  anomalies        Anomalies_Batch[]
   @@schema("production")
 }
 
+model Anomalies_Batch {
+  anomaly_id       String    
+  batch_id         String
+
+  batch            BatchProduct @relation(fields: [batch_id], references: [batch_id])
+  anomaly          Anomalies @relation(fields: [anomaly_id], references: [anomaly_id])
+
+  @@id([batch_id, anomaly_id])
+
+  @@index([batch_id])
+  @@index([anomaly_id])
+  @@schema("production")
+}
+
+model Anomalies {
+  anomaly_id       String    @id @default(cuid())
+  batch_id         String
+  anomaly_code     String
+  description      String
+  status           String    @default("OPEN")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  batches          Anomalies_Batch[]
+
+  @@schema("production")
+}

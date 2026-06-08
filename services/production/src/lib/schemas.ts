@@ -4,6 +4,13 @@ const accessTokenSchema = z
   .object({ accessToken: z.string().min(1).optional() })
   .partial();
 
+export const anomalyLineSchema = z.object({
+  anomaly_code: z.string().min(1),
+  description: z.string().min(1),
+  status: z.string().min(1),
+  batch_id: z.string().min(1),
+});
+
 export const getBatchSchema = accessTokenSchema.extend({
   batch_code: z.string().min(1),
 });
@@ -24,6 +31,11 @@ export const deleteBatchSchema = accessTokenSchema.extend({
   batch_code: z.string().min(1),
 });
 
+export const updateBatchAnomalySchema = accessTokenSchema.extend({
+  anomaly: anomalyLineSchema,
+  batch_id: z.string().min(1),
+});
+
 export const getBomSchema = accessTokenSchema.extend({
   bom_code: z.string().min(1),
 });
@@ -31,7 +43,7 @@ export const getBomSchema = accessTokenSchema.extend({
 export const createBomSchema = accessTokenSchema.extend({
   bom_code: z.string().min(1),
   material_id: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().min(1).optional(),
   quantity: z.number().int().positive().default(1),
 });
 

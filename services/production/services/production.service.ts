@@ -1,19 +1,19 @@
 import type { ServiceSchema } from "moleculer";
 import { prisma } from "../src/db.js";
-import { createError, parseOrThrow } from "../src/lib/errors.js";
 import { publishProductionEvent } from "../src/lib/events.js";
 import type { ZodType } from "zod";
 
 import {
   PROD_STATUSES,
-  VALIDATION_ACTIONS,
+  VALIDATION_ANOMALIES,
   generateBatchCode,
   generateBOMCode,
   loadActiveBOM,
   loadActiveBatch,
   loadActiveProduct,
+  generateAnomalyCode
 } from "../src/lib/prod-helper.js";
-import { requireProduction } from "../src/lib/rbac.js";
+import { requireProduction, createError, parseOrThrow } from "@aeronexis/services-shared";
 import {
   getBatchSchema,
   createBatchSchema,
@@ -26,7 +26,9 @@ import {
   createProductSchema,
   updateProductSchema,
   deleteProductSchema,
-  getProductSchema
+  getProductSchema,
+  updateBatchAnomalySchema,
+  anomalyLineSchema,
 } from "../src/lib/schemas.js";
 
 function parseParams<T>(schema: ZodType<T>, raw: unknown): T {
@@ -172,7 +174,7 @@ const ProductionService: ServiceSchema = {
               batch_code: batch_code,
               bom_id: existingBom.id,
               command_id: params.command_id,
-              status: PROD_STATUSES.PENDING
+              status: PROD_STATUSES.PENDING,
             }
           });
         });
@@ -213,7 +215,7 @@ const ProductionService: ServiceSchema = {
             throw createError("NOT_FOUND", "Batch not found: " + params.batch_code);
           }
           return tx.batchProduct.update({
-            where: { id: existingBatch.id },
+            where: { batch_id: existingBatch.batch_id },
             data: {
               bom_id: params.bom_code ? (await loadActiveBOM(tx, params.bom_code)).id : undefined,
               status: params.status,
@@ -241,7 +243,7 @@ const ProductionService: ServiceSchema = {
             throw createError("NOT_FOUND", "Batch not found: " + params.batch_code);
           }
           return tx.batchProduct.update({
-            where: { id: existingBatch.id },
+            where: { batch_id: existingBatch.batch_id },
             data: {
               deletedAt: new Date()
             }
@@ -252,6 +254,71 @@ const ProductionService: ServiceSchema = {
         return deletedBatch;
       }
     },
+
+    "batch.addAnomalies": {
+      async handler(ctx){
+        const params = parseParams(updateBatchAnomalySchema, ctx.params);
+        const auth = requireProduction(ctx, params.accessToken);
+
+        if (!auth.roles.includes("production")) {
+          throw createError("FORBIDDEN");
+        }
+
+        const updatedBatch = await prisma.$transaction(async (tx) => {
+          const existingBatch = await loadActiveBatch(tx, params.batch_id);
+          if (!existingBatch) {
+            throw createError("NOT_FOUND", "Batch not found: " + params.batch_id);
+          }
+          
+          const anomaly = await tx.anomalies.create({
+            data: {
+              batch_id: existingBatch.batch_id,
+              anomaly_code: await generateAnomalyCode(tx, existingBatch.batch_id),
+              description: params.anomaly.description,
+              status: VALIDATION_ANOMALIES.OPEN
+            }
+          })
+
+          return anomaly;
+        });
+        }
+      },
+
+      "batch.updateAnomalies": {
+        async handler(ctx){
+          const params = parseParams(updateBatchAnomalySchema, ctx.params);
+          const auth = requireProduction(ctx, params.accessToken);
+
+          if (!auth.roles.includes("production")) {
+            throw createError("FORBIDDEN");
+          }
+
+          const updatedBatch = await prisma.$transaction(async (tx) => {
+            const existingBatch = await loadActiveBatch(tx, params.batch_id);
+            if (!existingBatch) {
+              throw createError("NOT_FOUND", "Batch not found: " + params.batch_id);
+            }
+            const existingAnomaly = await tx.anomalies.findFirst({
+              where: { anomaly_code: params.anomaly.anomaly_code, batch_id: existingBatch.batch_id }
+            });
+
+            if (!existingAnomaly) {
+              throw createError("NOT_FOUND", "Anomaly not found: " + params.anomaly.anomaly_code);
+            }
+
+            return tx.anomalies.update({
+              where: { anomaly_id: existingAnomaly.anomaly_id },
+              data: {
+                description: params.anomaly.description,
+                status: VALIDATION_ANOMALIES.CLOSED,
+              }
+            });
+          });
+
+          this.logger.info("Batch anomaly updated", { correlationId: ctx.meta.correlationId, batch_id: params.batch_id, anomaly_code: params.anomaly.anomaly_code });
+          return updatedBatch;
+        }
+      },
 
     "product.create": {
       async handler(ctx){
