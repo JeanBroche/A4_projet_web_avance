@@ -1,0 +1,23 @@
+{
+  "name": "@aeronexis/mongo-init",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Initialisation idempotente des collections MongoDB AERONEXIS (audit_logs, event_history).",
+  "scripts": {
+    "init": "node --import tsx init.ts",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "mongodb": "^6.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

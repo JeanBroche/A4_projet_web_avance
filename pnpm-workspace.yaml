@@ -2,6 +2,7 @@ packages:
   - "apps/*"
   - "services/*"
   - "packages/*"
+  - "infra/mongo"
 overrides:
   moleculer-cli>moleculer: "^0.15.0"
 allowBuilds:

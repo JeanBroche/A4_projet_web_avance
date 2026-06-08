@@ -20,6 +20,7 @@
     "build": "pnpm -r run build",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "mongo:init": "pnpm --filter @aeronexis/mongo-init run init",
     "db:migrate": "node packages/db/scripts/migrate-all.mjs deploy",
     "db:migrate:dev": "node packages/db/scripts/migrate-all.mjs dev",
     "db:seed": "node packages/db/scripts/seed-all.mjs",
