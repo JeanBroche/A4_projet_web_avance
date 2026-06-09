@@ -12,6 +12,7 @@
     "dev:auth": "pnpm --filter @aeronexis/auth dev",
     "dev:stock": "pnpm --filter @aeronexis/stock dev",
     "dev:commande": "pnpm --filter @aeronexis/commande dev",
+    "dev:production": "pnpm --filter @aeronexis/production dev",
     "dev:backend": "pnpm --parallel --filter @aeronexis/api --filter @aeronexis/auth --filter @aeronexis/stock --filter @aeronexis/commande dev",
     "dev:web": "pnpm --filter web dev",
     "lint": "pnpm -r run lint",
