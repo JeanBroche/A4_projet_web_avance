@@ -1,0 +1,110 @@
+services:
+  db-migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.migrate
+    container_name: aeronexis-db-migrate
+    env_file:
+      - ../../.env.docker
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      postgres-stock:
+        condition: service_healthy
+      postgres-commande:
+        condition: service_healthy
+      postgres-production:
+        condition: service_healthy
+      postgres-expedition:
+        condition: service_healthy
+    restart: "no"
+
+  auth:
+    build:
+      context: ../..
+      dockerfile: services/auth/Dockerfile
+    container_name: aeronexis-auth
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: auth
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  stock:
+    build:
+      context: ../..
+      dockerfile: services/stock/Dockerfile
+    container_name: aeronexis-stock
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: stock
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-stock:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  commande:
+    build:
+      context: ../..
+      dockerfile: services/commande/Dockerfile
+    container_name: aeronexis-commande
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: commande
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-commande:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  production:
+    build:
+      context: ../..
+      dockerfile: services/production/Dockerfile
+    container_name: aeronexis-production
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: production
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-production:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  expedition:
+    build:
+      context: ../..
+      dockerfile: services/expedition/Dockerfile
+    container_name: aeronexis-expedition
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: expedition
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      postgres-expedition:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped

@@ -7,7 +7,7 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 
-const prisma = createPrismaClient(PrismaClient);
+const prisma = createPrismaClient(PrismaClient, process.env.EXPEDITION_DATABASE_URL);
 
 async function main() {
   const pickList = await prisma.pickList.upsert({

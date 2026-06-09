@@ -7,7 +7,7 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 
-const prisma = createPrismaClient(PrismaClient);
+const prisma = createPrismaClient(PrismaClient, process.env.COMMANDE_DATABASE_URL);
 
 const ORDER_STATUSES = {
   DRAFT: "DRAFT",

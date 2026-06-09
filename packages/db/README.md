@@ -8,8 +8,8 @@ Outillage Prisma partage du monorepo AERONEXIS. **Aucune table metier** : chaque
 |---------|------|
 | `src/create-client.ts` | Factory `PrismaClient` + `@prisma/adapter-pg` (Prisma 7) |
 | `src/soft-delete-extension.ts` | Extension : `delete` -> `deletedAt`, lectures filtrees |
-| `scripts/migrate-all.mjs` | Applique les migrations des 5 MS M1 |
-| `scripts/seed-all.mjs` | Seeds auth → stock → commande → production → expedition |
+| `scripts/migrate-all.ts` | Orchestration CI/Docker : enchaine `db:migrate` de chaque MS |
+| `scripts/seed-all.ts` | Orchestration : enchaine `db:seed` de chaque MS |
 
 ## Usage dans un microservice
 
@@ -23,26 +23,43 @@ const client = createPrismaClient(PrismaClient, process.env.AUTH_DATABASE_URL);
 export const prisma = client.$extends(createSoftDeleteExtension(Prisma));
 ```
 
-## Scripts racine
+## Scripts Prisma par microservice
+
+Chaque MS Prisma expose les memes commandes **depuis son dossier** (`services/<ms>/`) :
 
 | Commande | Description |
 |----------|-------------|
-| `pnpm db:migrate` | `migrate deploy` sur les 5 MS |
-| `pnpm db:migrate:dev` | `migrate dev` sur les 5 MS |
-| `pnpm db:seed` | Seeds de reference |
-| `pnpm db:studio:auth` | Prisma Studio (auth) — idem `:stock`, `:commande`, `:production`, `:expedition` |
+| `pnpm db:migrate` | `prisma migrate deploy` |
+| `pnpm db:migrate:dev` | `prisma migrate dev` |
+| `pnpm db:seed` | `prisma db seed` |
+| `pnpm db:studio` | Prisma Studio (port fixe par MS, voir ci-dessous) |
+| `pnpm db:generate` | `prisma generate` |
 
-## Bases PostgreSQL (M1)
+Exemple — travailler uniquement sur auth :
 
-**1 container `aeronexis-postgres`**, **5 bases dediees** creees par [`infra/postgres/init.sql`](../../infra/postgres/init.sql) au premier `docker:up`. Chaque base contient le schema nomme du MS.
+```bash
+cd services/auth
+pnpm db:migrate
+pnpm db:seed
+pnpm db:studio    # http://localhost:5555, schema PG `auth`
+```
 
-| MS | Base PG | Schema PG | Env var | Modeles |
-|----|---------|-----------|---------|---------|
-| `services/auth` | `aeronexis_auth` | `auth` | `AUTH_DATABASE_URL` | Site, User, Role, UserRole, RefreshToken |
-| `services/stock` | `aeronexis_stock` | `stock` | `STOCK_DATABASE_URL` | Material |
-| `services/commande` | `aeronexis_commande` | `commande` | `COMMANDE_DATABASE_URL` | Client |
-| `services/production` | `aeronexis_production` | `production` | `PRODUCTION_DATABASE_URL` | ProductStock |
-| `services/expedition` | `aeronexis_expedition` | `expedition` | `EXPEDITION_DATABASE_URL` | PickList, Shipment |
+| MS | Port Studio | Schema PG | Env var |
+|----|-------------|-----------|---------|
+| `services/auth` | 5555 | `auth` | `AUTH_DATABASE_URL` |
+| `services/stock` | 5556 | `stock` | `STOCK_DATABASE_URL` |
+| `services/commande` | 5557 | `commande` | `COMMANDE_DATABASE_URL` |
+| `services/production` | 5558 | `production` | `PRODUCTION_DATABASE_URL` |
+| `services/expedition` | 5559 | `expedition` | `EXPEDITION_DATABASE_URL` |
+
+## Scripts racine (orchestration optionnelle)
+
+| Commande | Description |
+|----------|-------------|
+| `pnpm db:migrate` | `db:migrate` sur les 5 MS (ordre : auth → stock → commande → production → expedition) |
+| `pnpm db:migrate:dev` | `db:migrate:dev` sur les 5 MS |
+| `pnpm db:seed` | `db:seed` sur les 5 MS |
+| `pnpm db:studio:auth` | Raccourci vers `pnpm --filter @aeronexis/auth run db:studio` (idem `:stock`, etc.) |
 
 Services **sans Prisma M1** : `reporting` (PG M7), `notification` (Redis/Kafka), `audit` (MongoDB).
 

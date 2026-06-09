@@ -5,4 +5,6 @@ export const PRISMA_SERVICES = [
   "@aeronexis/commande",
   "@aeronexis/production",
   "@aeronexis/expedition"
-];
+] as const;
+
+export type PrismaService = (typeof PRISMA_SERVICES)[number];

@@ -14,8 +14,11 @@
   "scripts": {
     "prepare": "tsc",
     "build": "tsc",
-    "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit",
+    "migrate:all": "node --import tsx scripts/migrate-all.ts deploy",
+    "migrate:all:dev": "node --import tsx scripts/migrate-all.ts dev",
+    "seed:all": "node --import tsx scripts/seed-all.ts",
+    "lint": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "test": "node -e \"process.exit(0)\"",
     "dev": "node -e \"console.log('@aeronexis/db: tooling package')\""
   },
@@ -27,6 +30,7 @@
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/pg": "^8.15.2",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }

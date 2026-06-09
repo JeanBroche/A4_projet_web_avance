@@ -6,7 +6,7 @@ import { PrismaClient } from "../src/generated/prisma/client.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
-const prisma = createPrismaClient(PrismaClient);
+const prisma = createPrismaClient(PrismaClient, process.env.STOCK_DATABASE_URL);
 type MaterialSeed = {
   code: string;
   description: string;
