@@ -204,10 +204,55 @@ async function main() {
     }
   });
 
+  const directionEmail = "direction@aeronexis.local";
+  const directionHash = await bcrypt.hash(password, 10);
+  const existingDirection = await prisma.user.findFirst({
+    where: { email: directionEmail, deletedAt: null }
+  });
+  const direction = existingDirection
+    ? await prisma.user.update({
+        where: { id: existingDirection.id },
+        data: {
+          passwordHash: directionHash,
+          firstName: "Direction",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      })
+    : await prisma.user.create({
+        data: {
+          email: directionEmail,
+          passwordHash: directionHash,
+          firstName: "Direction",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      });
+
+  const directionRole = await prisma.role.findFirstOrThrow({
+    where: { code: "direction", deletedAt: null }
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: direction.id,
+        roleId: directionRole.id
+      }
+    },
+    update: {},
+    create: {
+      userId: direction.id,
+      roleId: directionRole.id
+    }
+  });
+
   console.log("Auth seed completed:", {
     sites: SITES.map((s) => s.code),
     roles: ROLES.length,
-    users: [admin.email, logistic.email, operateur.email]
+    users: [admin.email, logistic.email, operateur.email, direction.email]
   });
 }
 

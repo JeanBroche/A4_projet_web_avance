@@ -6,7 +6,9 @@ import {
   urgentOrdersCalculation,
   delayRiskOrdersCalculation,
   marginCalculation,
-  totalDelayCalculation
+  totalDelayCalculation,
+  avancementCalculation,
+  retardLotsCalculation
 } from "./actions/index.js";
 
 const ReportingService: ServiceSchema = {
@@ -19,19 +21,18 @@ const ReportingService: ServiceSchema = {
         return "pong";
       }
     },
-    
-    "calcul.logistique.rupture": ruptureStockCalculation,
 
+    "calcul.logistique.rupture": ruptureStockCalculation,
     "calcul.logistique.rotation": rotationStockCalculation,
 
     "calcul.commerciaux.urgentOrders": urgentOrdersCalculation,
-
     "calcul.commerciaux.delayRiskOrders": delayRiskOrdersCalculation,
 
     "calcul.finance.margin": marginCalculation,
-
     "calcul.finance.totalDelay": totalDelayCalculation,
-    
+
+    "calcul.production.avancement": avancementCalculation,
+    "calcul.production.retardLots": retardLotsCalculation
   }
 };
 

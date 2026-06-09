@@ -61,7 +61,8 @@ Chaque microservice Prisma lit son URL via une variable dediee (`AUTH_DATABASE_U
 | `pnpm dev:commande` | Microservice `commande` |
 | `pnpm dev:production` | Microservice `production` |
 | `pnpm dev:expedition` | Microservice `expedition` |
-| `pnpm dev:backend` | Lance les 5 MS metier (`auth`, `stock`, `commande`, `production`, `expedition`) en parallele |
+| `pnpm dev:reporting` | Microservice `reporting` (KPI direction, milestone M7) |
+| `pnpm dev:backend` | Lance les 6 MS metier (`auth`, `stock`, `commande`, `production`, `expedition`, `reporting`) en parallele |
 | `pnpm dev:web` | Lance le frontend Nuxt sur le port 3000 |
 | `pnpm lint` | Lint sur tous les workspaces |
 | `pnpm test` | Tests sur tous les workspaces |
@@ -118,6 +119,7 @@ Verification manuelle (Moleculer CLI, Redis requis) :
 cd services/auth && pnpm run call:ping
 cd ../stock && pnpm run call:ping
 cd ../production && pnpm run call:ping
+cd ../reporting && pnpm run call:ping
 ```
 
 L'exposition HTTP (`/health`, port 4000) sera disponible quand `apps/gateway` sera implemente (issue #5).

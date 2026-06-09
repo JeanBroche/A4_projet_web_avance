@@ -425,13 +425,28 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+      '@aeronexis/services-shared':
+        specifier: workspace:*
+        version: link:../../packages/services-shared
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       ioredis:
         specifier: ^5.11.0
         version: 5.11.0
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/node':
         specifier: ^22.15.0
         version: 22.19.19

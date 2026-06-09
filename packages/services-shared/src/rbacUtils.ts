@@ -77,5 +77,13 @@ export function requireAdmin(ctx: Context, accessToken: string | undefined | nul
 }
 
 export function requireProduction(ctx: Context, accessToken?: string | null): AccessTokenPayload {
-  return requireAnyRole(ctx, accessToken ?? null, ["operateur"]);
+  return requireAnyRole(ctx, accessToken ?? null, ["operateur", "direction"]);
+}
+
+export function requireDirection(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["direction"]);
+}
+
+export function requireLogistique(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["logistique"]);
 }
