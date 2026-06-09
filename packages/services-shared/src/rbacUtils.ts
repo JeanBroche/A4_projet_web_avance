@@ -75,3 +75,7 @@ export function requireRole(ctx: Context, accessToken: string | undefined | null
 export function requireAdmin(ctx: Context, accessToken: string | undefined | null) {
   return requireRole(ctx, accessToken, "admin");
 }
+
+export function requireProduction(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["operateur"]);
+}

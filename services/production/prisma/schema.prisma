@@ -25,3 +25,105 @@ model ProductStock {
   @@schema("production")
   @@map("product_stocks")
 }
+
+model BOMProduct {
+  id          String    @id @default(cuid())
+  bom_code    String
+  material_id String
+  description String?
+  quantity    Int       @default(1)
+  status      String    @default("PENDING")
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  batches BatchProduct[]
+
+  @@index([bom_code])
+  @@index([deletedAt])
+  @@schema("production")
+}
+
+model BatchProduct {
+  batch_id       String    @id @default(cuid())
+  batch_code     String
+  bom_id         String
+  command_id     String
+  status         String    @default("PENDING")
+  progress       Int       @default(0)
+  plannedStartAt DateTime?
+  plannedEndAt   DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  bom       BOMProduct           @relation(fields: [bom_id], references: [id])
+  anomalies Anomalies_Batch[]
+  steps     ProductionStep[]
+  history   BatchActionHistory[]
+
+  @@index([batch_code])
+  @@index([bom_id])
+  @@index([status])
+  @@index([deletedAt])
+  @@schema("production")
+}
+
+model ProductionStep {
+  id          String   @id @default(cuid())
+  batch_id    String
+  step_code   String
+  label       String
+  status      String   @default("PENDING")
+  order_index Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  batch BatchProduct @relation(fields: [batch_id], references: [batch_id])
+
+  @@index([batch_id])
+  @@schema("production")
+}
+
+model BatchActionHistory {
+  id          String   @id @default(cuid())
+  batch_id    String
+  action      String
+  details     String?
+  performedBy String?
+  createdAt   DateTime @default(now())
+
+  batch BatchProduct @relation(fields: [batch_id], references: [batch_id])
+
+  @@index([batch_id])
+  @@index([createdAt])
+  @@schema("production")
+}
+
+model Anomalies_Batch {
+  anomaly_id String
+  batch_id   String
+
+  batch   BatchProduct @relation(fields: [batch_id], references: [batch_id])
+  anomaly Anomalies    @relation(fields: [anomaly_id], references: [anomaly_id])
+
+  @@id([batch_id, anomaly_id])
+  @@index([batch_id])
+  @@index([anomaly_id])
+  @@schema("production")
+}
+
+model Anomalies {
+  anomaly_id   String   @id @default(cuid())
+  batch_id     String
+  anomaly_code String
+  description  String
+  status       String   @default("OPEN")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  batches      Anomalies_Batch[]
+
+  @@index([batch_id])
+  @@index([anomaly_code])
+  @@schema("production")
+}

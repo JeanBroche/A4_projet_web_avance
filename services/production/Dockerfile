@@ -7,11 +7,12 @@ WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.service.json ./
 COPY packages/moleculer-config packages/moleculer-config
 COPY packages/db packages/db
+COPY packages/services-shared packages/services-shared
 COPY services/production services/production
 
 RUN pnpm install --frozen-lockfile
 ENV PRODUCTION_DATABASE_URL=postgresql://aeronexis:aeronexis_dev@localhost:5432/aeronexis_production
-RUN pnpm --filter @aeronexis/production run build
+RUN pnpm --filter @aeronexis/production run db:generate
 
 FROM node:22-alpine AS runner
 

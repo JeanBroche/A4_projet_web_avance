@@ -55,10 +55,13 @@ Chaque microservice Prisma lit son URL via une variable dediee (`AUTH_DATABASE_U
 | Commande | Description |
 |----------|-------------|
 | `pnpm dev` | Lance les scripts `dev` de chaque workspace |
-| `pnpm dev:api` | Gateway Moleculer HTTP (`GET /health`, port 4000) |
-| `pnpm dev:auth` | Microservice `auth` (action `auth.ping`) |
-| `pnpm dev:stock` | Microservice `stock` (issue [#96](https://github.com/JeanBroche/A4_projet_web_avance/issues/96)) |
-| `pnpm dev:backend` | Lance `api` + `auth` + `stock` en parallele |
+| `pnpm dev:gateway` | Gateway HTTP (`apps/gateway`, issue [#5](https://github.com/JeanBroche/A4_projet_web_avance/issues/5) — placeholder) |
+| `pnpm dev:auth` | Microservice `auth` |
+| `pnpm dev:stock` | Microservice `stock` |
+| `pnpm dev:commande` | Microservice `commande` |
+| `pnpm dev:production` | Microservice `production` |
+| `pnpm dev:expedition` | Microservice `expedition` |
+| `pnpm dev:backend` | Lance les 5 MS metier (`auth`, `stock`, `commande`, `production`, `expedition`) en parallele |
 | `pnpm dev:web` | Lance le frontend Nuxt sur le port 3000 |
 | `pnpm lint` | Lint sur tous les workspaces |
 | `pnpm test` | Tests sur tous les workspaces |
@@ -109,13 +112,15 @@ pnpm docker:up
 pnpm dev:backend
 ```
 
-Verification manuelle :
+Verification manuelle (Moleculer CLI, Redis requis) :
 
 ```bash
-curl.exe http://localhost:4000/health
-curl.exe http://localhost:4000/api/health
 cd services/auth && pnpm run call:ping
+cd ../stock && pnpm run call:ping
+cd ../production && pnpm run call:ping
 ```
+
+L'exposition HTTP (`/health`, port 4000) sera disponible quand `apps/gateway` sera implemente (issue #5).
 
 Details : [`apps/gateway/README.md`](apps/gateway/README.md), [`services/auth/README.md`](services/auth/README.md).
 
