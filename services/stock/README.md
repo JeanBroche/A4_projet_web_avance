@@ -26,7 +26,7 @@ pnpm db:seed
 pnpm dev              # depuis ce dossier
 
 # ou depuis la racine :
-pnpm dev:stock        # pnpm dev:backend (api + auth + stock)
+pnpm dev:stock        # ou pnpm dev:backend (auth + stock + commande + production + expedition)
 ```
 
 ## Actions Moleculer
