@@ -14,7 +14,7 @@ Microservice Moleculer Commandes (issue parent [#97](https://github.com/JeanBroc
 | `pnpm db:migrate` | Appliquer les migrations (`schema commande`) |
 | `pnpm db:migrate:dev` | Creer / appliquer une migration en dev |
 | `pnpm db:seed` | Donnees de reference |
-| `pnpm db:studio` | Prisma Studio — http://localhost:5557 (schema `commande`) |
+| `pnpm db:studio` | Prisma Studio — <http://localhost:5557> (schema `commande`) |
 | `pnpm db:generate` | Regenerer le client |
 
 ## Lancer le service

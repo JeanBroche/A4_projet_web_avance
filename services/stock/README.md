@@ -14,7 +14,7 @@ Microservice Moleculer Stock (issue parent [#96](https://github.com/JeanBroche/A
 | `pnpm db:migrate` | Appliquer les migrations (`schema stock`) |
 | `pnpm db:migrate:dev` | Creer / appliquer une migration en dev |
 | `pnpm db:seed` | Donnees de reference |
-| `pnpm db:studio` | Prisma Studio — http://localhost:5556 (schema `stock`) |
+| `pnpm db:studio` | Prisma Studio — <http://localhost:5556> (schema `stock`) |
 | `pnpm db:generate` | Regenerer le client |
 
 ## Lancer le service
