@@ -4,11 +4,20 @@ Microservice d'authentification (issues [#5](https://github.com/JeanBroche/A4_pr
 
 ## Prerequis
 
-- Redis demarre : `pnpm docker:up`
-- PostgreSQL + migrations : `pnpm db:migrate` (schema `auth`)
-- Seed : `pnpm db:seed`
-- Client Prisma : `pnpm db:generate` (automatique via `pnpm build`)
+- Redis demarre : `pnpm docker:up` (depuis la racine)
 - Variables : `JWT_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL`, `SEED_ADMIN_PASSWORD` (voir [`.env.example`](../../.env.example))
+
+## Scripts Prisma (depuis `services/auth`)
+
+| Commande | Description |
+|----------|-------------|
+| `pnpm db:migrate` | Appliquer les migrations (`schema auth`) |
+| `pnpm db:migrate:dev` | Creer / appliquer une migration en dev |
+| `pnpm db:seed` | Donnees de reference (admin, sites, roles) |
+| `pnpm db:studio` | Prisma Studio — <http://localhost:5555> (choisir le schema `auth`) |
+| `pnpm db:generate` | Regenerer le client (automatique via `pnpm build`) |
+
+Orchestration globale (racine) : `pnpm db:migrate`, `pnpm db:seed` sur les 5 MS.
 
 ## Prisma (M1)
 

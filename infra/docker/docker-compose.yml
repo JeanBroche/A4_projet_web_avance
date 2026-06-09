@@ -1,19 +1,93 @@
+x-postgres-service: &postgres-service
+  image: postgres:16-alpine
+  restart: unless-stopped
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: aeronexis-postgres
-    restart: unless-stopped
+  postgres-auth:
+    <<: *postgres-service
+    container_name: aeronexis-postgres-auth
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-aeronexis}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aeronexis_dev}
-      POSTGRES_DB: ${POSTGRES_DB:-aeronexis}
+      POSTGRES_DB: aeronexis_auth
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${AUTH_PG_PORT:-5432}:5432"
     volumes:
-      - pg_data:/var/lib/postgresql/data
-      - ../postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pg_auth_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis"]
+      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_auth"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-stock:
+    <<: *postgres-service
+    container_name: aeronexis-postgres-stock
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aeronexis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aeronexis_dev}
+      POSTGRES_DB: aeronexis_stock
+    ports:
+      - "${STOCK_PG_PORT:-5433}:5432"
+    volumes:
+      - pg_stock_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_stock"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-commande:
+    <<: *postgres-service
+    container_name: aeronexis-postgres-commande
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aeronexis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aeronexis_dev}
+      POSTGRES_DB: aeronexis_commande
+    ports:
+      - "${COMMANDE_PG_PORT:-5434}:5432"
+    volumes:
+      - pg_commande_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_commande"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-production:
+    <<: *postgres-service
+    container_name: aeronexis-postgres-production
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aeronexis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aeronexis_dev}
+      POSTGRES_DB: aeronexis_production
+    ports:
+      - "${PRODUCTION_PG_PORT:-5435}:5432"
+    volumes:
+      - pg_production_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_production"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres-expedition:
+    <<: *postgres-service
+    container_name: aeronexis-postgres-expedition
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aeronexis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aeronexis_dev}
+      POSTGRES_DB: aeronexis_expedition
+    ports:
+      - "${EXPEDITION_PG_PORT:-5436}:5432"
+    volumes:
+      - pg_expedition_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_expedition"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -141,15 +215,13 @@ services:
     restart: "no"
 
 volumes:
-  pg_data:
-    driver: local
+  pg_auth_data:
+  pg_stock_data:
+  pg_commande_data:
+  pg_production_data:
+  pg_expedition_data:
   mongo_data:
-    driver: local
   mongo_init_modules:
-    driver: local
   redis_data:
-    driver: local
   kafka_data:
-    driver: local
   minio_data:
-    driver: local

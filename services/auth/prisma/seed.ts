@@ -18,7 +18,7 @@ function requireSeedPassword(): string {
 
 const password = requireSeedPassword();
 
-const prisma = createPrismaClient(PrismaClient);
+const prisma = createPrismaClient(PrismaClient, process.env.AUTH_DATABASE_URL);
 
 const ROLES = [
   { code: "operateur", label: "Operateur production" },

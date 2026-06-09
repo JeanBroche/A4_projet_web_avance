@@ -7,12 +7,26 @@ Microservice Moleculer Stock (issue parent [#96](https://github.com/JeanBroche/A
 - PostgreSQL local (`pnpm docker:up`)
 - Variables : `STOCK_DATABASE_URL`, `JWT_SECRET`, `SEED_ADMIN_PASSWORD` (voir [`.env.example`](../../.env.example))
 
+## Scripts Prisma (depuis `services/stock`)
+
+| Commande | Description |
+|----------|-------------|
+| `pnpm db:migrate` | Appliquer les migrations (`schema stock`) |
+| `pnpm db:migrate:dev` | Creer / appliquer une migration en dev |
+| `pnpm db:seed` | Donnees de reference |
+| `pnpm db:studio` | Prisma Studio — <http://localhost:5556> (schema `stock`) |
+| `pnpm db:generate` | Regenerer le client |
+
 ## Lancer le service
 
 ```bash
+cd services/stock
 pnpm db:migrate
 pnpm db:seed
-pnpm dev:stock        # ou pnpm dev:backend (api + auth + stock)
+pnpm dev              # depuis ce dossier
+
+# ou depuis la racine :
+pnpm dev:stock        # pnpm dev:backend (api + auth + stock)
 ```
 
 ## Actions Moleculer

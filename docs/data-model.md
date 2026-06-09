@@ -17,10 +17,11 @@ Cartographie architecture cible → microservices → persistance (M1).
 
 ## Organisation Prisma
 
-- **1 container PostgreSQL** Docker, **1 base dediee par MS** (`aeronexis_<service>`), provisionnees par [`infra/postgres/init.sql`](../infra/postgres/init.sql) au premier `docker:up`.
+- **5 conteneurs PostgreSQL** Docker (1 par MS Prisma), chacun avec sa base `aeronexis_<service>` via `POSTGRES_DB` au premier `docker:up` ([`infra/docker/docker-compose.yml`](../infra/docker/docker-compose.yml)).
 - Chaque base contient en plus un **schema PG nomme** (`@@schema("...")` Prisma) — tables exposees comme `aeronexis_auth.auth.users`, `aeronexis_stock.stock.materials`, etc.
 - Chaque service lit son URL via une env var dediee : `AUTH_DATABASE_URL`, `STOCK_DATABASE_URL`, `COMMANDE_DATABASE_URL`, `PRODUCTION_DATABASE_URL`, `EXPEDITION_DATABASE_URL`.
-- **`packages/db`** : outillage uniquement (`createPrismaClient`, `migrate-all`, `seed-all`).
+- **`packages/db`** : factory client + extension soft-delete ; orchestration optionnelle (`migrate-all`, `seed-all`).
+- **Chaque MS Prisma** : scripts locaux `db:migrate`, `db:seed`, `db:studio` dans `services/<ms>/`.
 - **Pas de FK inter-bases** ni inter-schemas : references metier via codes string (`siteCode`, `orderNumber`, `productCode`).
 
 ## Microservice Stock (M4)
@@ -77,9 +78,15 @@ Pas de collection `user_sessions` : les sessions utilisateur sont portees par `a
 ```bash
 pnpm docker:up      # demarre PG + Mongo (collections initialisees) + MinIO
 pnpm mongo:init     # re-init des collections Mongo (idempotent)
+
+# Par microservice (depuis services/auth, services/stock, etc.) :
 pnpm db:migrate
 pnpm db:seed
-pnpm db:studio:auth
+pnpm db:studio
+
+# Ou tout en une fois depuis la racine :
+pnpm db:migrate
+pnpm db:seed
 ```
 
 Voir [`packages/db/README.md`](../packages/db/README.md) et [`infra/docker/README.md`](../infra/docker/README.md).

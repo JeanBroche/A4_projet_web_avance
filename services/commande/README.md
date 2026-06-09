@@ -7,12 +7,26 @@ Microservice Moleculer Commandes (issue parent [#97](https://github.com/JeanBroc
 - PostgreSQL local (`pnpm docker:up`)
 - Variables : `COMMANDE_DATABASE_URL`, `JWT_SECRET` (voir [`.env.example`](../../.env.example))
 
+## Scripts Prisma (depuis `services/commande`)
+
+| Commande | Description |
+|----------|-------------|
+| `pnpm db:migrate` | Appliquer les migrations (`schema commande`) |
+| `pnpm db:migrate:dev` | Creer / appliquer une migration en dev |
+| `pnpm db:seed` | Donnees de reference |
+| `pnpm db:studio` | Prisma Studio — <http://localhost:5557> (schema `commande`) |
+| `pnpm db:generate` | Regenerer le client |
+
 ## Lancer le service
 
 ```bash
+cd services/commande
 pnpm db:migrate
 pnpm db:seed
-pnpm dev:commande        # ou pnpm dev:backend (api + auth + stock + commande)
+pnpm dev
+
+# ou depuis la racine :
+pnpm dev:commande
 ```
 
 ## Actions Moleculer

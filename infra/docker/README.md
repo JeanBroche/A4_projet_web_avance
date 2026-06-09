@@ -1,62 +1,71 @@
 # Docker Compose
 
-Environnement local reproductible : PostgreSQL, MongoDB, Kafka (KRaft), Redis, MinIO. Issue [#4](https://github.com/JeanBroche/A4_projet_web_avance/issues/4).
+Environnement local reproductible : 5 PostgreSQL (1 par microservice Prisma), MongoDB, Kafka (KRaft), Redis, MinIO, et optionnellement les microservices Moleculer containerises. Issue [#4](https://github.com/JeanBroche/A4_projet_web_avance/issues/4).
 
 ## Demarrage
+
+### Infra seule (dev hybride — MS sur l'hote)
 
 Depuis la racine du depot :
 
 ```bash
 cp .env.example .env   # si pas deja fait
 pnpm docker:up
-pnpm docker:down     # arreter et supprimer les conteneurs (volumes conserves)
+pnpm db:migrate        # tous les MS (ou cd services/<ms> && pnpm db:migrate)
+# pnpm docker:down     # arreter les conteneurs (volumes conserves)
 ```
 
-Fichier compose : [`docker-compose.yml`](docker-compose.yml).
+### Infra + microservices containerises
+
+```bash
+cp .env.example .env
+cp .env.docker.example .env.docker
+pnpm docker:apps:up
+pnpm docker:apps:down
+```
+
+Fichiers compose : [`docker-compose.yml`](docker-compose.yml) (infra), [`docker-compose.apps.yml`](docker-compose.apps.yml) (MS + migrations).
 
 ## Services et ports
 
-| Service    | Image              | Port(s) hote | Usage                          |
-| ---------- | ------------------ | ------------ | ------------------------------ |
-| postgres   | postgres:16-alpine | 5432         | Donnees relationnelles ERP     |
-| mongo      | mongo:7            | 27017        | Logs / audit                   |
-| redis      | redis:7-alpine     | 6379         | Cache / sessions               |
-| kafka      | apache/kafka:3.8.1 | 9092         | Bus d evenements (KRaft)       |
-| minio      | minio/minio        | 9000, 9001   | Stockage S3 (API + console)    |
+| Service | Image | Port(s) hote | Usage |
+| ------- | ----- | ------------ | ----- |
+| postgres-auth | postgres:16-alpine | 5432 | Base `aeronexis_auth` |
+| postgres-stock | postgres:16-alpine | 5433 | Base `aeronexis_stock` |
+| postgres-commande | postgres:16-alpine | 5434 | Base `aeronexis_commande` |
+| postgres-production | postgres:16-alpine | 5435 | Base `aeronexis_production` |
+| postgres-expedition | postgres:16-alpine | 5436 | Base `aeronexis_expedition` |
+| mongo | mongo:7 | 27017 | Logs / audit |
+| redis | redis:7-alpine | 6379 | Cache / transporter Moleculer |
+| kafka | apache/kafka:3.8.1 | 9092 | Bus d evenements (KRaft) |
+| minio | minio/minio | 9000, 9001 | Stockage S3 (API + console) |
 
-Volumes nommes : `pg_data`, `mongo_data`, `mongo_init_modules`, `redis_data`, `kafka_data`, `minio_data`.
+Avec `docker:apps:up`, conteneurs supplementaires : `db-migrate` (one-shot), `auth`, `stock`, `commande`, `production`, `expedition`.
 
-Initialisation au premier demarrage :
+Volumes nommes : `pg_auth_data`, `pg_stock_data`, `pg_commande_data`, `pg_production_data`, `pg_expedition_data`, `mongo_data`, `mongo_init_modules`, `redis_data`, `kafka_data`, `minio_data`.
 
-- `postgres` execute [`infra/postgres/init.sql`](../postgres/init.sql) qui cree 5 bases dediees (`aeronexis_auth`, `aeronexis_stock`, `aeronexis_commande`, `aeronexis_production`, `aeronexis_expedition`). La base admin `aeronexis` reste disponible pour `psql -l`, `pg_dump`, etc.
+Chaque conteneur PostgreSQL cree sa base via `POSTGRES_DB` au premier demarrage (volume vide).
 
-Conteneurs d initialisation one-shot (executes apres healthcheck) :
+Conteneurs d initialisation one-shot :
 
 - `minio-init` cree le bucket `aeronexis-docs`.
-- `mongo-init` execute `infra/mongo/init.ts` (driver `mongodb` + `tsx`) pour creer les collections `audit_logs`, `event_history` et leurs index (issue [#9](https://github.com/JeanBroche/A4_projet_web_avance/issues/9)). Script idempotent : rejouable via `pnpm mongo:init` depuis l hote sans supprimer le volume `mongo_data`.
+- `mongo-init` execute `infra/mongo/init.ts` (issue [#9](https://github.com/JeanBroche/A4_projet_web_avance/issues/9)).
+- `db-migrate` applique les migrations Prisma sur les 5 bases (avec `docker:apps:up`).
 
 ## Verification manuelle
 
 ### PostgreSQL
 
 ```bash
-docker exec -it aeronexis-postgres psql -U aeronexis -d aeronexis -c "SELECT 1;"
-docker exec -it aeronexis-postgres psql -U aeronexis -l
-# Attendu : aeronexis, aeronexis_auth, aeronexis_stock, aeronexis_commande, aeronexis_production, aeronexis_expedition
+docker exec -it aeronexis-postgres-auth psql -U aeronexis -d aeronexis_auth -c "SELECT 1;"
+docker exec -it aeronexis-postgres-stock psql -U aeronexis -d aeronexis_stock -c "SELECT 1;"
+# idem : postgres-commande, postgres-production, postgres-expedition
 ```
 
-Re-init des bases (devs ayant deja le volume `pg_data`) : le script `init.sql` ne s execute qu au PREMIER demarrage. Pour le rejouer, soit :
+### Microservices (stack apps)
 
-```powershell
-pnpm docker:down
-docker volume rm docker_pg_data    # ATTENTION : perte des donnees PG
-pnpm docker:up
-```
-
-Soit manuellement sans destruction :
-
-```powershell
-docker exec -i aeronexis-postgres psql -U aeronexis -d aeronexis -f /docker-entrypoint-initdb.d/init.sql
+```bash
+docker exec -it aeronexis-auth pnpm call:ping
 ```
 
 ### MongoDB
@@ -64,12 +73,11 @@ docker exec -i aeronexis-postgres psql -U aeronexis -d aeronexis -f /docker-entr
 ```bash
 docker exec -it aeronexis-mongo mongosh --eval "db.adminCommand('ping')"
 docker exec -it aeronexis-mongo mongosh aeronexis --eval "db.getCollectionNames()"
-docker exec -it aeronexis-mongo mongosh aeronexis --eval "db.audit_logs.getIndexes()"
 ```
 
 Collections attendues apres `pnpm docker:up` : `audit_logs`, `event_history`.
 
-Re-init manuelle (sans recreer le volume Mongo) :
+Re-init manuelle Mongo :
 
 ```bash
 pnpm mongo:init
@@ -89,9 +97,21 @@ docker exec -it aeronexis-redis redis-cli ping
 
 ### MinIO
 
-- API : port `9000` sur `localhost` (voir `MINIO_ENDPOINT` dans `.env.example`)
-- Console : port `9001` sur `localhost` (identifiants `minioadmin` / `minioadmin` par defaut)
+- API : port `9000` sur `localhost`
+- Console : port `9001` (identifiants `minioadmin` / `minioadmin` par defaut)
+
+## Migration depuis l ancien conteneur unique
+
+Si vous aviez le volume `docker_pg_data` :
+
+```powershell
+pnpm docker:down
+docker volume rm docker_pg_data
+pnpm docker:up
+pnpm db:migrate
+```
 
 ## Variables d environnement
 
-Les identifiants et ports par defaut sont definis dans [`.env.example`](../../.env.example) a la racine. Docker Compose les lit depuis un fichier `.env` a la racine du projet.
+- Dev hybride (MS sur l hote) : [`.env.example`](../../.env.example) — ports PG `5432` a `5436` sur `localhost`.
+- MS containerises : [`.env.docker.example`](../../.env.docker.example) copie vers `.env.docker` — hostnames Compose (`postgres-auth`, `redis`, etc.).

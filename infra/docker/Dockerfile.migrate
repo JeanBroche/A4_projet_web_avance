@@ -1,0 +1,22 @@
+FROM node:22-alpine
+
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
+
+WORKDIR /app
+
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY packages/db packages/db
+COPY services/auth/package.json services/auth/prisma.config.ts ./services/auth/
+COPY services/auth/prisma ./services/auth/prisma
+COPY services/stock/package.json services/stock/prisma.config.ts ./services/stock/
+COPY services/stock/prisma ./services/stock/prisma
+COPY services/commande/package.json services/commande/prisma.config.ts ./services/commande/
+COPY services/commande/prisma ./services/commande/prisma
+COPY services/production/package.json services/production/prisma.config.ts ./services/production/
+COPY services/production/prisma ./services/production/prisma
+COPY services/expedition/package.json services/expedition/prisma.config.ts ./services/expedition/
+COPY services/expedition/prisma ./services/expedition/prisma
+
+RUN pnpm install --frozen-lockfile
+
+CMD ["pnpm", "--filter", "@aeronexis/db", "run", "migrate:all"]
