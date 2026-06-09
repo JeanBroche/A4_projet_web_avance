@@ -71,7 +71,6 @@ apps/
   web/              # Nuxt (issue #6)
   gateway/          # API Gateway (issue #5)
 services/
-  api/              # Gateway HTTP Moleculer (issue #5)
   auth/             # Microservices Moleculer (issue #5)
   production/
   stock/
@@ -108,7 +107,7 @@ curl.exe http://localhost:4000/api/health
 cd services/auth && pnpm run call:ping
 ```
 
-Details : [`services/api/README.md`](services/api/README.md), [`services/auth/README.md`](services/auth/README.md).
+Details : [`apps/gateway/README.md`](apps/gateway/README.md), [`services/auth/README.md`](services/auth/README.md).
 
 ## Integration continue
 

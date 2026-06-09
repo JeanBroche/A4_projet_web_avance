@@ -13,7 +13,7 @@ Cartographie architecture cible → microservices → persistance (M1).
 | Expedition | `services/expedition` | `aeronexis_expedition` | `expedition` | PickList, Shipment |
 | Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` | KPI_Dashboard (pas de migration M1) |
 | Notification | `services/notification` | Redis + Kafka | -- | Pas de Prisma M1 |
-| Audit | `services/audit` | MongoDB | -- | Collections `audit_logs` (issue M0 #9) |
+| Audit | `services/audit` | MongoDB | -- | Collections `audit_logs`, `event_history` provisionnees par [`@aeronexis/mongo-init`](../infra/mongo/init.ts) (issue M0 #9) |
 
 ## Organisation Prisma
 
@@ -61,12 +61,25 @@ Extension `@aeronexis/db` : `createSoftDeleteExtension(Prisma)` — `delete` / `
 | `productCode` | production | Product (M3) |
 | `orderNumber` | expedition | Order (M5) |
 
+## MongoDB (audit, M0 #9)
+
+Collections provisionnees automatiquement au `docker:up` par le conteneur `mongo-init` ([`infra/mongo/init.ts`](../infra/mongo/init.ts), package `@aeronexis/mongo-init`). Script idempotent, rejouable via `pnpm mongo:init`.
+
+| Collection | Champs documentes | Index |
+|------------|-------------------|-------|
+| `audit_logs` | `userId`, `action`, `entity`, `entityId`, `diff`, `ip`, `timestamp` | `{ userId: 1, timestamp: -1 }`, `{ entity: 1, entityId: 1 }` |
+| `event_history` | `type`, `payload`, `correlationId`, `timestamp` | `{ correlationId: 1 }`, `{ timestamp: -1 }` |
+
+Pas de collection `user_sessions` : les sessions utilisateur sont portees par `auth.refresh_tokens` (PostgreSQL).
+
 ## Commandes
 
 ```bash
+pnpm docker:up      # demarre PG + Mongo (collections initialisees) + MinIO
+pnpm mongo:init     # re-init des collections Mongo (idempotent)
 pnpm db:migrate
 pnpm db:seed
 pnpm db:studio:auth
 ```
 
-Voir [`packages/db/README.md`](../packages/db/README.md).
+Voir [`packages/db/README.md`](../packages/db/README.md) et [`infra/docker/README.md`](../infra/docker/README.md).

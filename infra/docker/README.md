@@ -24,12 +24,16 @@ Fichier compose : [`docker-compose.yml`](docker-compose.yml).
 | kafka      | apache/kafka:3.8.1 | 9092         | Bus d evenements (KRaft)       |
 | minio      | minio/minio        | 9000, 9001   | Stockage S3 (API + console)    |
 
-Volumes nommes : `pg_data`, `mongo_data`, `redis_data`, `kafka_data`, `minio_data`.
+Volumes nommes : `pg_data`, `mongo_data`, `mongo_init_modules`, `redis_data`, `kafka_data`, `minio_data`.
 
 Initialisation au premier demarrage :
 
 - `postgres` execute [`infra/postgres/init.sql`](../postgres/init.sql) qui cree 5 bases dediees (`aeronexis_auth`, `aeronexis_stock`, `aeronexis_commande`, `aeronexis_production`, `aeronexis_expedition`). La base admin `aeronexis` reste disponible pour `psql -l`, `pg_dump`, etc.
+
+Conteneurs d initialisation one-shot (executes apres healthcheck) :
+
 - `minio-init` cree le bucket `aeronexis-docs`.
+- `mongo-init` execute `infra/mongo/init.ts` (driver `mongodb` + `tsx`) pour creer les collections `audit_logs`, `event_history` et leurs index (issue [#9](https://github.com/JeanBroche/A4_projet_web_avance/issues/9)). Script idempotent : rejouable via `pnpm mongo:init` depuis l hote sans supprimer le volume `mongo_data`.
 
 ## Verification manuelle
 
@@ -59,6 +63,16 @@ docker exec -i aeronexis-postgres psql -U aeronexis -d aeronexis -f /docker-entr
 
 ```bash
 docker exec -it aeronexis-mongo mongosh --eval "db.adminCommand('ping')"
+docker exec -it aeronexis-mongo mongosh aeronexis --eval "db.getCollectionNames()"
+docker exec -it aeronexis-mongo mongosh aeronexis --eval "db.audit_logs.getIndexes()"
+```
+
+Collections attendues apres `pnpm docker:up` : `audit_logs`, `event_history`.
+
+Re-init manuelle (sans recreer le volume Mongo) :
+
+```bash
+pnpm mongo:init
 ```
 
 ### Kafka
