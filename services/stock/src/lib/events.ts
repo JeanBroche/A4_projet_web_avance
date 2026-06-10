@@ -1,8 +1,6 @@
 import type { Service } from "moleculer";
 
 export function publishStockEvent(service: Service, topic: string, payload: object) {
-  service.logger.info("stock.event.pending", {
-    topic,
-    payload
-  });
+  service.broker.emit(topic, payload);
+  service.logger.info("stock.event.emitted", { topic });
 }

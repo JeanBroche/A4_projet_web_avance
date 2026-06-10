@@ -11,6 +11,10 @@ import {
   orderHistoryAction,
   orderValidateAction,
   orderRejectAction,
+  orderStartProductionAction,
+  orderFinishAction,
+  orderMarkShippedAction,
+  orderMarkDeliveredAction,
  } from "./actions/index.js"
 
 const OrderService: ServiceSchema = {
@@ -47,6 +51,14 @@ const OrderService: ServiceSchema = {
     "order.validate": orderValidateAction,
 
     "order.reject": orderRejectAction,
+
+    "order.startProduction": orderStartProductionAction,
+
+    "order.finish": orderFinishAction,
+
+    "order.markShipped": orderMarkShippedAction,
+
+    "order.markDelivered": orderMarkDeliveredAction,
   }
 };
 

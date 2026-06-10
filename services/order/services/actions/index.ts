@@ -8,3 +8,7 @@ export { clientStatsAction } from "./clientStatsAction.js";
 export { orderHistoryAction } from "./orderHistoryAction.js";
 export { orderValidateAction } from "./orderValidateAction.js";
 export { orderRejectAction } from "./orderRejectAction.js";
+export { orderStartProductionAction } from "./orderStartProductionAction.js";
+export { orderFinishAction } from "./orderFinishAction.js";
+export { orderMarkShippedAction } from "./orderMarkShippedAction.js";
+export { orderMarkDeliveredAction } from "./orderMarkDeliveredAction.js";

@@ -12,7 +12,6 @@ Cartographie architecture cible → microservices → persistance (M1).
 | Order | `services/order` | `aeronexis_order` | `order` | Client (+ Order/OrderLine en M5) |
 | Shipment | `services/shipment` | `aeronexis_shipment` | `shipment` | PickList, Shipment |
 | Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` | KPI_Dashboard (pas de migration M1) |
-| Notification | `services/notification` | Redis + Kafka | -- | Pas de Prisma M1 |
 | Audit | `services/audit` | MongoDB | -- | Collections `audit_logs`, `event_history` provisionnees par [`@aeronexis/mongo-init`](../infra/mongo/init.ts) (issue M0 #9) |
 
 ## Organisation Prisma

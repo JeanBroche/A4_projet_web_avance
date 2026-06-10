@@ -128,20 +128,83 @@ export async function loadActiveClient(db: DbClient, clientId: string) {
   return client;
 }
 
+const ALLOWED_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  [ORDER_STATUSES.DRAFT]: [ORDER_STATUSES.VALIDATED, ORDER_STATUSES.REJECTED],
+  [ORDER_STATUSES.VALIDATED]: [ORDER_STATUSES.IN_PRODUCTION],
+  [ORDER_STATUSES.IN_PRODUCTION]: [ORDER_STATUSES.SHIPPED],
+  [ORDER_STATUSES.SHIPPED]: [ORDER_STATUSES.DELIVERED]
+};
+
 export function assertStatusTransition(currentStatus: string, nextStatus: string) {
-  if (currentStatus === ORDER_STATUSES.DRAFT) {
-    if (
-      nextStatus === ORDER_STATUSES.VALIDATED ||
-      nextStatus === ORDER_STATUSES.REJECTED
-    ) {
-      return;
-    }
+  const allowed = ALLOWED_STATUS_TRANSITIONS[currentStatus];
+  if (allowed?.includes(nextStatus)) {
+    return;
   }
 
   throw createError(
     "ORDER_INVALID_STATUS_TRANSITION",
     `Cannot transition from ${currentStatus} to ${nextStatus}`
   );
+}
+
+export type OrderFinishedPayload = {
+  orderNumber: string;
+  siteCode: string;
+  clientCode?: string;
+  ofId?: string;
+  lines: Array<{ lineNumber: number; productCode: string; quantity: number }>;
+};
+
+export function buildOrderFinishedPayload(order: OrderWithRelations): OrderFinishedPayload {
+  const lines = order.lines ?? [];
+  const ofId = lines.find((line) => line.ofId)?.ofId ?? undefined;
+
+  return {
+    orderNumber: order.orderNumber,
+    siteCode: order.siteCode,
+    clientCode: order.client?.code,
+    ofId,
+    lines: lines.map((line) => ({
+      lineNumber: line.lineNumber,
+      productCode: line.productCode,
+      quantity: line.quantity
+    }))
+  };
+}
+
+type OrderTxClient = typeof prisma;
+
+export async function applyOrderStatusTransition(
+  db: OrderTxClient,
+  order: OrderWithRelations,
+  nextStatus: string,
+  changedBy: string,
+  notes?: string
+) {
+  assertStatusTransition(order.status, nextStatus);
+
+  return db.$transaction(async (tx) => {
+    const updated = await tx.customerOrder.update({
+      where: { id: order.id },
+      data: { status: nextStatus },
+      include: {
+        client: true,
+        lines: { where: { deletedAt: null }, orderBy: { lineNumber: "asc" } }
+      }
+    });
+
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        fromStatus: order.status,
+        toStatus: nextStatus,
+        changedBy,
+        notes
+      }
+    });
+
+    return updated;
+  });
 }
 
 export function computeDelayRisk(order: OrderWithRelations) {

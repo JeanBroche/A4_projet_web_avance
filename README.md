@@ -91,7 +91,6 @@ services/
   order/
   shipment/
   reporting/
-  notification/
   audit/
 packages/
   shared/           # Types et constantes partages

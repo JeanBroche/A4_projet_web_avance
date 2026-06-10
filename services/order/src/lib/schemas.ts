@@ -66,3 +66,26 @@ export const orderRejectSchema = accessTokenSchema.extend({
   orderId: cuidLikeSchema,
   reason: z.string().min(1)
 });
+
+export const orderStartProductionSchema = accessTokenSchema.extend({
+  orderId: cuidLikeSchema,
+  bom_code: z.string().min(1).optional(),
+  plannedStartAt: z.coerce.date().optional(),
+  plannedEndAt: z.coerce.date().optional(),
+  notes: z.string().min(1).optional()
+});
+
+export const orderFinishSchema = accessTokenSchema.extend({
+  orderId: cuidLikeSchema,
+  notes: z.string().min(1).optional()
+});
+
+export const orderMarkShippedSchema = accessTokenSchema.extend({
+  orderId: cuidLikeSchema,
+  notes: z.string().min(1).optional()
+});
+
+export const orderMarkDeliveredSchema = accessTokenSchema.extend({
+  orderId: cuidLikeSchema,
+  notes: z.string().min(1).optional()
+});

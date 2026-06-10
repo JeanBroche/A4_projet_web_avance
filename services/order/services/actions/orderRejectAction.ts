@@ -13,6 +13,7 @@ import {
   assertStatusTransition,
 } from '../../src/lib/order-helpers.js';
 import { logOrderAudit } from '../../src/lib/audit.js';
+import { publishOrderEvent } from '../../src/lib/events.js';
 
 type OrderRejectParams = z.infer<typeof orderRejectSchema>;
 type AuthContextMeta = {
@@ -58,6 +59,13 @@ export const orderRejectAction = {
       });
 
       return next;
+    });
+
+    publishOrderEvent(ctx.service!, 'order.rejected', {
+      orderId: updated.id,
+      orderNumber: updated.orderNumber,
+      siteCode: updated.siteCode,
+      reason: params.reason,
     });
 
     await logOrderAudit({

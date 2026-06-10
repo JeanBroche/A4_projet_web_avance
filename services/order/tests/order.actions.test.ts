@@ -24,7 +24,7 @@ const broker = new ServiceBroker({
 
 let dbAvailable = false;
 
-const tokens = { admin: "", logistique: "", commercial: "", expired: "" };
+const tokens = { admin: "", logistique: "", commercial: "", operateur: "", expired: "" };
 
 let clientId: string | null = null;
 let draftOrderId: string | null = null;
@@ -96,6 +96,7 @@ before(async () => {
   tokens.admin = signTestToken(["admin"]);
   tokens.logistique = signTestToken(["logistique"]);
   tokens.commercial = signTestToken(["commercial"]);
+  tokens.operateur = signTestToken(["operateur"]);
   tokens.expired = signTestToken(["commercial"], { expiresIn: -1 });
 });
 
@@ -412,6 +413,98 @@ describe("order auth edge cases", () => {
           orderId: "x"
         }),
       (error) => getErrorCode(error) === "TOKEN_EXPIRED"
+    );
+  });
+});
+
+describe("order lifecycle", () => {
+  it("runs full status transitions VALIDATED → DELIVERED", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const created = await callAction<{ id: string }>("order.order.create", {
+      accessToken: tokens.commercial,
+      clientId,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-LIFE", quantity: 2, unitPrice: 1000 }]
+    });
+
+    await callAction("order.order.validate", {
+      accessToken: tokens.commercial,
+      orderId: created.id
+    });
+
+    const inProduction = await callAction<{ status: string }>("order.order.startProduction", {
+      accessToken: tokens.operateur,
+      orderId: created.id
+    });
+    assert.equal(inProduction.status, "IN_PRODUCTION");
+
+    const finished = await callAction<{ status: string; orderNumber: string }>(
+      "order.order.finish",
+      {
+        accessToken: tokens.operateur,
+        orderId: created.id
+      }
+    );
+    assert.equal(finished.status, "IN_PRODUCTION");
+
+    const shipped = await callAction<{ status: string }>("order.order.markShipped", {
+      accessToken: tokens.logistique,
+      orderId: created.id
+    });
+    assert.equal(shipped.status, "SHIPPED");
+
+    const delivered = await callAction<{ status: string }>("order.order.markDelivered", {
+      accessToken: tokens.logistique,
+      orderId: created.id
+    });
+    assert.equal(delivered.status, "DELIVERED");
+
+    await assert.rejects(
+      () =>
+        callAction("order.order.markDelivered", {
+          accessToken: tokens.logistique,
+          orderId: created.id
+        }),
+      (error) => getErrorCode(error) === "ORDER_INVALID_STATUS_TRANSITION"
+    );
+  });
+
+  it("refuses startProduction from DRAFT", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    await assert.rejects(
+      () =>
+        callAction("order.order.startProduction", {
+          accessToken: tokens.operateur,
+          orderId: draftOrderId
+        }),
+      (error) => getErrorCode(error) === "ORDER_INVALID_STATUS_TRANSITION"
+    );
+  });
+
+  it("refuses finish from VALIDATED", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const created = await callAction<{ id: string }>("order.order.create", {
+      accessToken: tokens.commercial,
+      clientId,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-FIN", quantity: 1 }]
+    });
+
+    await callAction("order.order.validate", {
+      accessToken: tokens.commercial,
+      orderId: created.id
+    });
+
+    await assert.rejects(
+      () =>
+        callAction("order.order.finish", {
+          accessToken: tokens.operateur,
+          orderId: created.id
+        }),
+      (error) => getErrorCode(error) === "ORDER_INVALID_STATUS_TRANSITION"
     );
   });
 });
