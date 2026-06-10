@@ -19,7 +19,7 @@ const broker = new ServiceBroker({
   transporter: null
 });
 let dbAvailable = false;
-const tokens = { admin: "", logistique: "", commercial: "", expired: "" };
+const tokens = { admin: "", logistique: "", commercial: "", direction: "", expired: "" };
 let materialAcierId: string | null = null;
 let materialTitaneId: string | null = null;
 function getErrorCode(error: unknown) {
@@ -75,6 +75,7 @@ before(async () => {
   tokens.admin = signTestToken(["admin"]);
   tokens.logistique = signTestToken(["logistique"]);
   tokens.commercial = signTestToken(["commercial"]);
+  tokens.direction = signTestToken(["direction"]);
   tokens.expired = signTestToken(["logistique"], { expiresIn: -1 });
 });
 after(async () => {
@@ -238,6 +239,25 @@ describe("stock.alert and threshold", () => {
       siteCode: "SITE-LYO"
     })) as Array<{ material?: { code: string } }>;
     assert.ok(alerts.some((alert) => alert.material?.code === "MAT-002"));
+  });
+  it("alert.list allows direction role", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const alerts = await broker.call("stock.alert.list", {
+      accessToken: tokens.direction,
+      siteCode: "SITE-LYO"
+    });
+    assert.ok(Array.isArray(alerts));
+  });
+  it("alert.list rejects commercial role", async (t) => {
+    if (skipIfNoDb(t)) return;
+    await assert.rejects(
+      () =>
+        broker.call("stock.alert.list", {
+          accessToken: tokens.commercial,
+          siteCode: "SITE-LYO"
+        }),
+      (error) => getErrorCode(error) === "FORBIDDEN"
+    );
   });
   it("threshold.upsert updates minimumStock", async (t) => {
     if (skipIfNoDb(t)) return;

@@ -8,6 +8,16 @@ Pas de schema Prisma dedie : les indicateurs sont calcules a la volee en agregan
 
 Toutes les actions `calcul.*` requierent le role `direction` (le role `admin` continue de passer via `requireAnyRole`). L authentification est portee par le parametre `accessToken` ou par les meta Moleculer (`ctx.meta.authorization`).
 
+`callDownstream` relaye le JWT direction vers les MS appeles. Chaque MS applique ses propres regles de lecture :
+
+| MS | Actions KPI | Roles autorises |
+|----|-------------|-----------------|
+| stock | `alert.list`, `forecast.rupture` | `logistique`, `direction` |
+| commande | `order.listUrgent`, `order.history` | `commercial`, `direction` |
+| production | `batch.list` (lecture seule) | `operateur`, `direction` |
+
+Les ecritures production restent reservees a `operateur` : la direction peut lire les lots pour les KPI, pas les modifier.
+
 Seed test : `direction@aeronexis.local` (cf. [`services/auth/prisma/seed.ts`](../auth/prisma/seed.ts), mot de passe `SEED_ADMIN_PASSWORD`).
 
 ## Actions
@@ -42,7 +52,7 @@ Le helper `withCache` ([`src/lib/cache.ts`](src/lib/cache.ts)) memorise les resu
 ## Helpers partages
 
 - [`src/lib/schemas.ts`](src/lib/schemas.ts) : `baseKpiSchema`, `windowedKpiSchema` Zod.
-- [`src/lib/downstream.ts`](src/lib/downstream.ts) : `callDownstream(ctx, action, params, accessToken)` propage le token vers les MS appeles.
+- [`src/lib/downstream.ts`](src/lib/downstream.ts) : `callDownstream(ctx, action, params, accessToken)` propage le JWT vers les MS appeles.
 - [`src/lib/cache.ts`](src/lib/cache.ts) : `withCache(service, action, params, compute)`.
 
 ## Demarrage

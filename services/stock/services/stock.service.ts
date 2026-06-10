@@ -3,6 +3,7 @@ import type { ZodType } from "zod";
 import { prisma } from "../src/db.js";
 import { createError, parseOrThrow } from "../src/lib/errors.js";
 import { publishStockEvent } from "../src/lib/events.js";
+import { requireStockRead } from "@aeronexis/services-shared";
 import { requireAuth, requireLogistique } from "../src/lib/rbac.js";
 import {
   alertListSchema,
@@ -256,7 +257,7 @@ const StockService: ServiceSchema = {
     "alert.list": {
       async handler(ctx) {
         const params = parseParams(alertListSchema, ctx.params);
-        requireAuth(ctx, params.accessToken);
+        requireStockRead(ctx, params.accessToken);
         const materials = await prisma.material.findMany({
           where: {
             deletedAt: null,
@@ -298,7 +299,7 @@ const StockService: ServiceSchema = {
     "forecast.rupture": {
       async handler(ctx) {
         const params = parseParams(forecastRuptureSchema, ctx.params);
-        requireAuth(ctx, params.accessToken);
+        requireStockRead(ctx, params.accessToken);
         const windowDays = params.windowDays ?? 30;
         const windowStart = new Date();
         windowStart.setDate(windowStart.getDate() - windowDays);

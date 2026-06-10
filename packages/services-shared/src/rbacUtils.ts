@@ -1,5 +1,5 @@
 import type { Context } from "moleculer";
-import { createError } from "./errorUtils.js"
+import { createError } from "./errorUtils.js";
 import { verifyAccessToken, type AccessTokenPayload } from "./jwtUtils.js";
 
 export function resolveAccessToken(accessToken: string | undefined | null, ctx: Context) {
@@ -77,7 +77,7 @@ export function requireAdmin(ctx: Context, accessToken: string | undefined | nul
 }
 
 export function requireProduction(ctx: Context, accessToken?: string | null): AccessTokenPayload {
-  return requireAnyRole(ctx, accessToken ?? null, ["operateur", "direction"]);
+  return requireAnyRole(ctx, accessToken ?? null, ["operateur"]);
 }
 
 export function requireDirection(ctx: Context, accessToken?: string | null): AccessTokenPayload {
@@ -86,4 +86,28 @@ export function requireDirection(ctx: Context, accessToken?: string | null): Acc
 
 export function requireLogistique(ctx: Context, accessToken?: string | null): AccessTokenPayload {
   return requireAnyRole(ctx, accessToken ?? null, ["logistique"]);
+}
+
+/** Lecture stock : logistique ou direction. */
+export function requireStockRead(
+  ctx: Context,
+  accessToken?: string | null
+): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["logistique", "direction"]);
+}
+
+/** Lecture commande : commercial ou direction. */
+export function requireCommandeRead(
+  ctx: Context,
+  accessToken?: string | null
+): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["commercial", "direction"]);
+}
+
+/** Lecture production (lots) : operateur ou direction. */
+export function requireProductionRead(
+  ctx: Context,
+  accessToken?: string | null
+): AccessTokenPayload {
+  return requireAnyRole(ctx, accessToken ?? null, ["operateur", "direction"]);
 }

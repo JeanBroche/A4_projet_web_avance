@@ -22,7 +22,7 @@ const broker = new ServiceBroker({
 });
 
 let dbAvailable = false;
-const tokens = { admin: "", operateur: "", logistique: "", expired: "" };
+const tokens = { admin: "", operateur: "", logistique: "", direction: "", expired: "" };
 
 let seedBomCode = "BOM-SEED-001";
 let seedBatchCode = "BATCH-SEED-001";
@@ -89,6 +89,7 @@ before(async () => {
   tokens.admin = signTestToken(["admin"]);
   tokens.operateur = signTestToken(["operateur"]);
   tokens.logistique = signTestToken(["logistique"]);
+  tokens.direction = signTestToken(["direction"]);
   tokens.expired = signTestToken(["operateur"], { expiresIn: -1 });
 });
 
@@ -142,6 +143,28 @@ describe("production.batch.list", () => {
     );
     assert.ok(result.total >= 1);
     assert.ok(result.items.some((item) => item.batch_code === seedBatchCode));
+  });
+
+  it("lists batches for direction read-only role", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const result = await callAction<{ total: number }>("production.batch.list", {
+      accessToken: tokens.direction
+    });
+    assert.ok(result.total >= 0);
+  });
+
+  it("rejects direction on write actions", async (t) => {
+    if (skipIfNoDb(t)) return;
+    try {
+      await callAction("production.batch.progress", {
+        accessToken: tokens.direction,
+        batch_code: seedBatchCode,
+        percent: 10
+      });
+      assert.fail("expected FORBIDDEN");
+    } catch (error) {
+      assert.equal(getErrorCode(error), "FORBIDDEN");
+    }
   });
 });
 

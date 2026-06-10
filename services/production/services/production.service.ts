@@ -17,7 +17,7 @@ import {
   recordBatchHistory,
   createDefaultSteps
 } from "../src/lib/prod-helper.js";
-import { requireProduction, createError, parseOrThrow } from "@aeronexis/services-shared";
+import { requireProduction, requireProductionRead, createError, parseOrThrow } from "@aeronexis/services-shared";
 import {
   getBatchSchema,
   createBatchSchema,
@@ -232,7 +232,7 @@ const ProductionService: ServiceSchema = {
     "batch.list": {
       async handler(ctx) {
         const params = parseParams(listBatchSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        requireProductionRead(ctx, params.accessToken);
 
         let bom_id: string | undefined;
         if (params.bom_code) {

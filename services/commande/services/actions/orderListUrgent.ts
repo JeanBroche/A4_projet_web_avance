@@ -3,7 +3,7 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { resolveSiteCode, requireAuth, createError, parseParams } from '@aeronexis/services-shared';
+import { resolveSiteCode, requireCommandeRead, createError, parseParams } from '@aeronexis/services-shared';
 import { orderListUrgentSchema } from '../../src/lib/schemas.js';
 import {
   toOrderSummary,
@@ -19,7 +19,7 @@ type AuthContextMeta = {
 export const orderListUrgentAction = {
   async handler(ctx: Context<OrderListUrgentParams, AuthContextMeta>) {
     const params = parseParams(orderListUrgentSchema, ctx.params);
-    const auth = requireAuth(ctx, params.accessToken);
+    const auth = requireCommandeRead(ctx, params.accessToken);
 
     const siteCode = resolveSiteCode(params);
     if (auth.siteId && siteCode && auth.siteId !== siteCode) {
