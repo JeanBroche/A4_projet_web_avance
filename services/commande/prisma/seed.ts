@@ -44,9 +44,40 @@ async function upsertClient() {
   });
 }
 
+async function upsertParisClient() {
+  const existing = await prisma.client.findFirst({
+    where: { code: "CLI-PAR-001", deletedAt: null }
+  });
+
+  if (existing) {
+    return prisma.client.update({
+      where: { id: existing.id },
+      data: {
+        name: "Paris Aero Components",
+        country: "FR",
+        type: "industrial",
+        status: "active",
+        siteCode: "SITE-PAR"
+      }
+    });
+  }
+
+  return prisma.client.create({
+    data: {
+      code: "CLI-PAR-001",
+      name: "Paris Aero Components",
+      country: "FR",
+      type: "industrial",
+      status: "active",
+      siteCode: "SITE-PAR"
+    }
+  });
+}
+
 async function upsertOrder(
   orderNumber: string,
   clientId: string,
+  siteCode: string,
   data: {
     status: string;
     isUrgent: boolean;
@@ -79,7 +110,7 @@ async function upsertOrder(
         dueDate: data.dueDate,
         promisedDeliveryDate: data.promisedDeliveryDate,
         totalAmount: data.totalAmount,
-        siteCode: "SITE-LYO",
+        siteCode,
         lines: {
           create: data.lines.map((line) => ({
             lineNumber: line.lineNumber,
@@ -107,7 +138,7 @@ async function upsertOrder(
     data: {
       orderNumber,
       clientId,
-      siteCode: "SITE-LYO",
+      siteCode,
       status: data.status,
       isUrgent: data.isUrgent,
       dueDate: data.dueDate,
@@ -143,7 +174,9 @@ async function main() {
   const urgentDueDate = new Date();
   urgentDueDate.setDate(urgentDueDate.getDate() + 3);
 
-  await upsertOrder("CMD-2025-00001", client.id, {
+  const parisClient = await upsertParisClient();
+
+  await upsertOrder("CMD-2025-00001", client.id, "SITE-LYO", {
     status: ORDER_STATUSES.DRAFT,
     isUrgent: false,
     promisedDeliveryDate: promisedDate,
@@ -159,7 +192,7 @@ async function main() {
     ]
   });
 
-  await upsertOrder("CMD-2025-00002", client.id, {
+  await upsertOrder("CMD-2025-00002", client.id, "SITE-LYO", {
     status: ORDER_STATUSES.DRAFT,
     isUrgent: true,
     dueDate: urgentDueDate,
@@ -176,10 +209,26 @@ async function main() {
     ]
   });
 
+  await upsertOrder("CMD-PAR-00001", parisClient.id, "SITE-PAR", {
+    status: ORDER_STATUSES.DRAFT,
+    isUrgent: false,
+    promisedDeliveryDate: promisedDate,
+    totalAmount: 45000,
+    lines: [
+      {
+        lineNumber: 1,
+        productCode: "PROD-PAR-001",
+        description: "Piece site Paris",
+        quantity: 1,
+        unitPrice: 45000
+      }
+    ]
+  });
+
   console.log("Commande seed completed:", {
     client: client.code,
-    orders: ["CMD-2025-00001", "CMD-2025-00002"],
-    siteCode: "SITE-LYO"
+    parisClient: parisClient.code,
+    orders: ["CMD-2025-00001", "CMD-2025-00002", "CMD-PAR-00001"]
   });
 }
 

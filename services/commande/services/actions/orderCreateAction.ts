@@ -3,10 +3,9 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { createError, parseParams, requireCommercial } from '@aeronexis/services-shared';
+import { assertSiteAccess, createError, parseParams, requireCommercial } from '@aeronexis/services-shared';
 import { orderCreateSchema } from '../../src/lib/schemas.js';
 import {
-  assertSiteAccess,
   loadActiveClient,
   computeTotalAmount,
   generateOrderNumber,
@@ -34,7 +33,7 @@ export const orderCreateAction = {
       );
     }
 
-    assertSiteAccess(auth.siteId, params.siteCode);
+    assertSiteAccess(auth, params.siteCode);
 
     const totalAmount = computeTotalAmount(params.lines);
 

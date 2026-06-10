@@ -36,12 +36,6 @@ export type ShipmentWithRelations = Shipment & {
   pickList?: PickListWithLines | null;
 };
 
-export function assertSiteAccess(jwtSiteId: string | null | undefined, resourceSiteCode: string) {
-  if (jwtSiteId && jwtSiteId !== resourceSiteCode) {
-    throw createError("FORBIDDEN", "Resource belongs to a different site");
-  }
-}
-
 export function resolveSiteCode(params: { siteCode?: string; siteId?: string }) {
   return params.siteCode || params.siteId || null;
 }

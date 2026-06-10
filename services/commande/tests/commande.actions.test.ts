@@ -28,6 +28,7 @@ const tokens = { admin: "", logistique: "", commercial: "", expired: "" };
 let clientId: string | null = null;
 let draftOrderId: string | null = null;
 let urgentOrderId: string | null = null;
+let parisDraftOrderId: string | null = null;
 
 async function callAction<T>(action: string, params?: Record<string, unknown>): Promise<T> {
   return broker.call(action, params) as Promise<T>;
@@ -77,11 +78,15 @@ before(async () => {
     const urgentOrder = await prisma.customerOrder.findFirst({
       where: { orderNumber: "CMD-2025-00002", deletedAt: null }
     });
+    const parisOrder = await prisma.customerOrder.findFirst({
+      where: { orderNumber: "CMD-PAR-00001", deletedAt: null }
+    });
 
-    if (client && draftOrder && urgentOrder) {
+    if (client && draftOrder && urgentOrder && parisOrder) {
       clientId = client.id;
       draftOrderId = draftOrder.id;
       urgentOrderId = urgentOrder.id;
+      parisDraftOrderId = parisOrder.id;
       dbAvailable = true;
     } else {
       console.warn("Skipping commande tests: seed data missing.");
@@ -291,6 +296,19 @@ describe("commande.order.validate and reject", () => {
         callAction("commande.order.validate", {
           accessToken: tokens.logistique,
           orderId: draftOrderId
+        }),
+      (error) => getErrorCode(error) === "FORBIDDEN"
+    );
+  });
+
+  it("validate refuses cross-site access for commercial", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    await assert.rejects(
+      () =>
+        callAction("commande.order.validate", {
+          accessToken: tokens.commercial,
+          orderId: parisDraftOrderId
         }),
       (error) => getErrorCode(error) === "FORBIDDEN"
     );

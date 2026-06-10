@@ -3,8 +3,13 @@ import type { ZodType } from "zod";
 import { prisma } from "../src/db.js";
 import { createError, parseOrThrow } from "../src/lib/errors.js";
 import { publishStockEvent } from "../src/lib/events.js";
-import { requireStockRead } from "@aeronexis/services-shared";
-import { requireAuth, requireLogistique } from "../src/lib/rbac.js";
+import {
+  assertSiteAccess,
+  requireAuth,
+  requireLogistique,
+  requireStockRead,
+  resolveEffectiveSite
+} from "@aeronexis/services-shared";
 import {
   alertListSchema,
   forecastRuptureSchema,
@@ -18,12 +23,14 @@ import {
   supplierDelayNotifySchema,
   thresholdUpsertSchema
 } from "../src/lib/schemas.js";
+import type { StockReservation } from "../src/generated/prisma/client.js";
 import {
   computeAvailable,
   consolidateByCode,
   evaluateThreshold,
   loadActiveMaterial,
-  toStockLevel
+  toStockLevel,
+  type DbClient
 } from "../src/lib/stock-helpers.js";
 
 function parseParams<T>(schema: ZodType<T>, raw: unknown): T {
@@ -34,18 +41,13 @@ function parseParams<T>(schema: ZodType<T>, raw: unknown): T {
   }
 }
 
-function buildSiteFilter(params: { siteCode?: string; siteId?: string }) {
-  const siteCode = params.siteCode || params.siteId;
-  return siteCode ? { siteCode } : {};
-}
-
 async function releaseOrCancel(
   this: Service,
   ctx: Context,
   finalStatus: "RELEASED" | "CANCELLED"
 ) {
   const params = parseParams(reservationByIdSchema, ctx.params);
-  requireLogistique(ctx, params.accessToken);
+  const auth = requireLogistique(ctx, params.accessToken);
   const reservation = await prisma.stockReservation.findUnique({
     where: { id: params.id }
   });
@@ -55,7 +57,8 @@ async function releaseOrCancel(
   if (reservation.status !== "ACTIVE") {
     throw createError("RESERVATION_INACTIVE");
   }
-  const updated = await prisma.$transaction(async (tx) => {
+  assertSiteAccess(auth, reservation.siteCode);
+  const updated = await prisma.$transaction(async (tx: DbClient) => {
     const next = await tx.stockReservation.update({
       where: { id: reservation.id },
       data: { status: finalStatus, releasedAt: new Date() }
@@ -96,10 +99,11 @@ const StockService: ServiceSchema = {
     "level.list": {
       async handler(ctx) {
         const params = parseParams(levelListSchema, ctx.params);
-        requireAuth(ctx, params.accessToken);
+        const auth = requireAuth(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
         const where = {
           deletedAt: null,
-          ...buildSiteFilter(params),
+          ...(effectiveSite ? { siteCode: effectiveSite } : {}),
           ...(params.code ? { code: params.code } : {})
         };
         const materials = await prisma.material.findMany({
@@ -112,10 +116,12 @@ const StockService: ServiceSchema = {
     "level.consolidate": {
       async handler(ctx) {
         const params = parseParams(levelConsolidateSchema, ctx.params);
-        requireAuth(ctx, params.accessToken);
+        const auth = requireAuth(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
         const materials = await prisma.material.findMany({
           where: {
             deletedAt: null,
+            ...(effectiveSite ? { siteCode: effectiveSite } : {}),
             ...(params.code ? { code: params.code } : {})
           },
           orderBy: [{ code: "asc" }, { siteCode: "asc" }]
@@ -127,8 +133,9 @@ const StockService: ServiceSchema = {
     "movement.create": {
       async handler(ctx) {
         const params = parseParams(movementCreateSchema, ctx.params);
-        requireLogistique(ctx, params.accessToken);
+        const auth = requireLogistique(ctx, params.accessToken);
         const material = await loadActiveMaterial(prisma, params.materialId);
+        assertSiteAccess(auth, material.siteCode);
         if (material.siteCode !== params.siteCode) {
           throw createError(
             "VALIDATION_ERROR",
@@ -146,7 +153,7 @@ const StockService: ServiceSchema = {
         if (newCurrent < 0) {
           throw createError("INSUFFICIENT_STOCK");
         }
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: DbClient) => {
           const movement = await tx.stockMovement.create({
             data: {
               materialId: material.id,
@@ -185,9 +192,10 @@ const StockService: ServiceSchema = {
     "movement.list": {
       async handler(ctx) {
         const params = parseParams(movementListSchema, ctx.params);
-        requireAuth(ctx, params.accessToken);
+        const auth = requireAuth(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
         const where = {
-          ...(params.siteCode ? { siteCode: params.siteCode } : {}),
+          ...(effectiveSite ? { siteCode: effectiveSite } : {}),
           ...(params.materialId ? { materialId: params.materialId } : {}),
           ...(params.type ? { type: params.type } : {})
         };
@@ -202,11 +210,12 @@ const StockService: ServiceSchema = {
     "reservation.create": {
       async handler(ctx) {
         const params = parseParams(reservationCreateSchema, ctx.params);
-        requireLogistique(ctx, params.accessToken);
-        const reservations = await prisma.$transaction(async (tx) => {
-          const created = [];
+        const auth = requireLogistique(ctx, params.accessToken);
+        const reservations = await prisma.$transaction(async (tx: DbClient) => {
+          const created: StockReservation[] = [];
           for (const line of params.lines) {
             const material = await loadActiveMaterial(tx, line.materialId);
+            assertSiteAccess(auth, material.siteCode);
             const available = computeAvailable(material);
             if (line.qty > available) {
               throw createError(
@@ -234,7 +243,7 @@ const StockService: ServiceSchema = {
         });
         publishStockEvent(this, "stock.reserved", {
           ofId: params.ofId,
-          reservationIds: reservations.map((r) => r.id)
+          reservationIds: reservations.map((r: StockReservation) => r.id)
         });
         this.logger.info("Reservations created", {
           correlationId: (ctx.meta as { correlationId?: string }).correlationId,
@@ -257,21 +266,22 @@ const StockService: ServiceSchema = {
     "alert.list": {
       async handler(ctx) {
         const params = parseParams(alertListSchema, ctx.params);
-        requireStockRead(ctx, params.accessToken);
+        const auth = requireStockRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
         const materials = await prisma.material.findMany({
           where: {
             deletedAt: null,
-            ...(params.siteCode ? { siteCode: params.siteCode } : {})
+            ...(effectiveSite ? { siteCode: effectiveSite } : {})
           }
         });
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: DbClient) => {
           for (const material of materials) {
             await evaluateThreshold(tx, material.id);
           }
         });
         return prisma.stockAlert.findMany({
           where: {
-            ...(params.siteCode ? { siteCode: params.siteCode } : {}),
+            ...(effectiveSite ? { siteCode: effectiveSite } : {}),
             ...(params.includeResolved ? {} : { resolvedAt: null })
           },
           orderBy: { createdAt: "desc" },
@@ -286,8 +296,9 @@ const StockService: ServiceSchema = {
     "threshold.upsert": {
       async handler(ctx) {
         const params = parseParams(thresholdUpsertSchema, ctx.params);
-        requireLogistique(ctx, params.accessToken);
+        const auth = requireLogistique(ctx, params.accessToken);
         const material = await loadActiveMaterial(prisma, params.materialId);
+        assertSiteAccess(auth, material.siteCode);
         const updated = await prisma.material.update({
           where: { id: material.id },
           data: { minimumStock: params.minimumStock }
@@ -299,14 +310,15 @@ const StockService: ServiceSchema = {
     "forecast.rupture": {
       async handler(ctx) {
         const params = parseParams(forecastRuptureSchema, ctx.params);
-        requireStockRead(ctx, params.accessToken);
+        const auth = requireStockRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
         const windowDays = params.windowDays ?? 30;
         const windowStart = new Date();
         windowStart.setDate(windowStart.getDate() - windowDays);
         const materials = await prisma.material.findMany({
           where: {
             deletedAt: null,
-            ...(params.siteCode ? { siteCode: params.siteCode } : {})
+            ...(effectiveSite ? { siteCode: effectiveSite } : {})
           }
         });
         const results = [];
@@ -367,8 +379,9 @@ const StockService: ServiceSchema = {
     "supplier.delay.notify": {
       async handler(ctx) {
         const params = parseParams(supplierDelayNotifySchema, ctx.params);
-        requireLogistique(ctx, params.accessToken);
-        await loadActiveMaterial(prisma, params.materialId);
+        const auth = requireLogistique(ctx, params.accessToken);
+        const material = await loadActiveMaterial(prisma, params.materialId);
+        assertSiteAccess(auth, material.siteCode);
         const delay = await prisma.supplierDelay.create({
           data: {
             materialId: params.materialId,

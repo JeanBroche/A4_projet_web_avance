@@ -1,9 +1,9 @@
 import type { Context, Service, ServiceSchema } from "moleculer";
 import type { ZodType } from "zod";
 import { prisma } from "../src/db.js";
+import { assertSiteAccess, requireAuth, requireLogistique } from "@aeronexis/services-shared";
 import { createError, parseOrThrow } from "../src/lib/errors.js";
 import {
-  assertSiteAccess,
   assertShipmentTransition,
   buildHistoryFilter,
   generatePickListCode,
@@ -19,7 +19,6 @@ import {
   verifyStockReservations
 } from "../src/lib/expedition-helpers.js";
 import { publishExpeditionEvent } from "../src/lib/events.js";
-import { requireAuth, requireLogistique } from "../src/lib/rbac.js";
 import {
   pickListCompleteSchema,
   pickListCreateSchema,
@@ -60,7 +59,7 @@ const ExpeditionService: ServiceSchema = {
       async handler(ctx: Context) {
         const params = parseParams(pickListCreateSchema, ctx.params);
         const auth = requireLogistique(ctx, params.accessToken);
-        assertSiteAccess(auth.siteId, params.siteCode);
+        assertSiteAccess(auth, params.siteCode);
 
         await verifyStockReservations(ctx, {
           ofId: params.ofId,
@@ -108,7 +107,7 @@ const ExpeditionService: ServiceSchema = {
         const auth = requireLogistique(ctx, params.accessToken);
 
         const pickList = await loadActivePickList(params.id);
-        assertSiteAccess(auth.siteId, pickList.siteCode);
+        assertSiteAccess(auth, pickList.siteCode);
 
         if (pickList.status === PICKLIST_STATUS.COMPLETED) {
           throw createError("PICKLIST_ALREADY_COMPLETED");
@@ -164,7 +163,7 @@ const ExpeditionService: ServiceSchema = {
         const auth = requireLogistique(ctx, params.accessToken);
 
         const pickList = await loadActivePickList(params.pickListId);
-        assertSiteAccess(auth.siteId, pickList.siteCode);
+        assertSiteAccess(auth, pickList.siteCode);
 
         if (pickList.status !== PICKLIST_STATUS.COMPLETED) {
           throw createError("PICKLIST_NOT_COMPLETED");
@@ -224,7 +223,7 @@ const ExpeditionService: ServiceSchema = {
         const auth = requireAuth(ctx, params.accessToken);
 
         const shipment = await loadActiveShipment(params.id);
-        assertSiteAccess(auth.siteId, shipment.siteCode);
+        assertSiteAccess(auth, shipment.siteCode);
 
         return {
           shipment: {
@@ -241,7 +240,7 @@ const ExpeditionService: ServiceSchema = {
         const auth = requireAuth(ctx, params.accessToken);
 
         const shipment = await loadActiveShipment(params.id);
-        assertSiteAccess(auth.siteId, shipment.siteCode);
+        assertSiteAccess(auth, shipment.siteCode);
 
         return {
           shipmentId: shipment.id,
@@ -258,7 +257,7 @@ const ExpeditionService: ServiceSchema = {
         const auth = requireLogistique(ctx, params.accessToken);
 
         const shipment = await loadActiveShipment(params.id);
-        assertSiteAccess(auth.siteId, shipment.siteCode);
+        assertSiteAccess(auth, shipment.siteCode);
         assertShipmentTransition(shipment.status, params.status);
 
         const sideEffects = shipmentStatusSideEffects(params.status);
@@ -317,7 +316,7 @@ const ExpeditionService: ServiceSchema = {
 
         const effectiveSite = resolveSiteCode(params) || auth.siteId || undefined;
         if (effectiveSite) {
-          assertSiteAccess(auth.siteId, effectiveSite);
+          assertSiteAccess(auth, effectiveSite);
         }
 
         const page = params.page ?? 1;

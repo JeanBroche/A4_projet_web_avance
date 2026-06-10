@@ -3,14 +3,14 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { resolveSiteCode, createError, requireCommandeRead } from '@aeronexis/services-shared';
-import { orderHistorySchema } from '../../src/lib/schemas.js';
-import { parseParams } from '@aeronexis/services-shared';
 import {
-  loadActiveClient,
-  toOrderSummary,
   assertSiteAccess,
-} from '../../src/lib/order-helpers.js';
+  parseParams,
+  requireCommandeRead,
+  resolveEffectiveSite,
+} from '@aeronexis/services-shared';
+import { orderHistorySchema } from '../../src/lib/schemas.js';
+import { loadActiveClient, toOrderSummary } from '../../src/lib/order-helpers.js';
 
 type OrderHistoryParams = z.infer<typeof orderHistorySchema>;
 type AuthContextMeta = {
@@ -22,16 +22,11 @@ export const orderHistoryAction = {
     const params = parseParams(orderHistorySchema, ctx.params);
     const auth = requireCommandeRead(ctx, params.accessToken);
 
-    const siteCode = resolveSiteCode(params);
-    if (auth.siteId && siteCode && auth.siteId !== siteCode) {
-      throw createError('FORBIDDEN');
-    }
-
-    const effectiveSite = auth.siteId || siteCode;
+    const effectiveSite = resolveEffectiveSite(auth, params);
 
     if (params.clientId) {
       const client = await loadActiveClient(prisma, params.clientId);
-      assertSiteAccess(auth.siteId, client.siteCode);
+      assertSiteAccess(auth, client.siteCode);
     }
 
     const where = {

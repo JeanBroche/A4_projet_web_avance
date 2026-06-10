@@ -22,6 +22,7 @@ let dbAvailable = false;
 const tokens = { admin: "", logistique: "", commercial: "", direction: "", expired: "" };
 let materialAcierId: string | null = null;
 let materialTitaneId: string | null = null;
+let materialParisAcierId: string | null = null;
 function getErrorCode(error: unknown) {
   const err = error as { data?: { error?: { code?: string } }; code?: string };
   return err?.data?.error?.code || err?.code;
@@ -60,9 +61,13 @@ before(async () => {
     const titane = await prisma.material.findFirst({
       where: { siteCode: "SITE-LYO", code: "MAT-002", deletedAt: null }
     });
-    if (acier && titane) {
+    const parisAcier = await prisma.material.findFirst({
+      where: { siteCode: "SITE-PAR", code: "MAT-001", deletedAt: null }
+    });
+    if (acier && titane && parisAcier) {
       materialAcierId = acier.id;
       materialTitaneId = titane.id;
+      materialParisAcierId = parisAcier.id;
       dbAvailable = true;
     } else {
       console.warn("Skipping stock tests: seed materials missing.");
@@ -73,7 +78,7 @@ before(async () => {
     dbAvailable = false;
   }
   tokens.admin = signTestToken(["admin"]);
-  tokens.logistique = signTestToken(["logistique"]);
+  tokens.logistique = signTestToken(["logistique"], { siteId: "SITE-LYO" });
   tokens.commercial = signTestToken(["commercial"]);
   tokens.direction = signTestToken(["direction"]);
   tokens.expired = signTestToken(["logistique"], { expiresIn: -1 });
@@ -110,7 +115,7 @@ describe("stock.level", () => {
   it("level.consolidate aggregates across sites", async (t) => {
     if (skipIfNoDb(t)) return;
     const result = (await broker.call("stock.level.consolidate", {
-      accessToken: tokens.logistique
+      accessToken: tokens.admin
     })) as Array<{ code: string; sites: unknown[] }>;
     const acier = result.find((row) => row.code === "MAT-001");
     assert.ok(acier, "MAT-001 should be consolidated");
@@ -166,6 +171,20 @@ describe("stock.movement", () => {
           quantity: 999_999
         }),
       (error) => getErrorCode(error) === "INSUFFICIENT_STOCK"
+    );
+  });
+  it("movement.create refuses cross-site access for logistique", async (t) => {
+    if (skipIfNoDb(t)) return;
+    await assert.rejects(
+      () =>
+        broker.call("stock.movement.create", {
+          accessToken: tokens.logistique,
+          materialId: materialParisAcierId,
+          siteCode: "SITE-PAR",
+          type: "IN",
+          quantity: 1
+        }),
+      (error) => getErrorCode(error) === "FORBIDDEN"
     );
   });
 });

@@ -3,7 +3,7 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { parseParams, requireCommercial } from '@aeronexis/services-shared';
+import { assertSiteAccess, parseParams, requireCommercial } from '@aeronexis/services-shared';
 import { orderValidateSchema } from '../../src/lib/schemas.js';
 import {
   toOrderSummary,
@@ -26,6 +26,7 @@ export const orderValidateAction = {
     const auth = requireCommercial(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
+    assertSiteAccess(auth, order.siteCode);
     assertStatusTransition(order.status, ORDER_STATUSES.VALIDATED);
 
     const updated = await prisma.$transaction(async (tx) => {

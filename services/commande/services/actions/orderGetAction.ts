@@ -3,11 +3,14 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { resolveSiteCode, requireAuth } from '@aeronexis/services-shared';
-import { orderByIdSchema } from '../../src/lib/schemas.js';
-import { createError, parseParams } from '@aeronexis/services-shared';
 import {
-  assertSiteAccess,
+  parseParams,
+  requireAuth,
+  resolveEffectiveSite,
+  createError,
+} from '@aeronexis/services-shared';
+import { orderByIdSchema } from '../../src/lib/schemas.js';
+import {
   toOrderSummary,
   loadActiveOrder,
 } from '../../src/lib/order-helpers.js';
@@ -23,14 +26,12 @@ export const orderGetAction = {
     const params = parseParams(orderByIdSchema, ctx.params);
     const auth = requireAuth(ctx, params.accessToken);
 
+    const effectiveSite = resolveEffectiveSite(auth, params);
     const order = await loadActiveOrder(prisma, params.orderId);
-    assertSiteAccess(auth.siteId, order.siteCode);
-
-    const siteCode = resolveSiteCode(params);
-    if (siteCode && order.siteCode !== siteCode) {
-      throw createError('NOT_FOUND', `Order not found: ${params.orderId}`);
+    if (effectiveSite && order.siteCode !== effectiveSite) {
+      throw createError("NOT_FOUND", `Order not found: ${params.orderId}`);
     }
 
     return toOrderSummary(order);
-  },
+  }
 };

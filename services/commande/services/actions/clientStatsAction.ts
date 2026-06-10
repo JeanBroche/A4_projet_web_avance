@@ -3,13 +3,9 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { parseParams, requireAuth } from '@aeronexis/services-shared';
+import { assertSiteAccess, parseParams, requireAuth } from '@aeronexis/services-shared';
 import { clientStatsSchema } from '../../src/lib/schemas.js';
-import {
-  loadActiveClient,
-  computeClientStats,
-  assertSiteAccess,
-} from '../../src/lib/order-helpers.js';
+import { loadActiveClient, computeClientStats } from '../../src/lib/order-helpers.js';
 
 type ClientStatsParams = z.infer<typeof clientStatsSchema>;
 type AuthContextMeta = {
@@ -22,7 +18,7 @@ export const clientStatsAction = {
     const auth = requireAuth(ctx, params.accessToken);
 
     const client = await loadActiveClient(prisma, params.clientId);
-    assertSiteAccess(auth.siteId, client.siteCode);
+    assertSiteAccess(auth, client.siteCode);
 
     const orders = await prisma.customerOrder.findMany({
       where: {

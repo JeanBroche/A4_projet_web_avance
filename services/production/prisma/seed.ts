@@ -1,18 +1,15 @@
 import { config } from "dotenv";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { createPrismaClient } from "@aeronexis/db";
-import { PrismaClient } from "../src/generated/prisma/client.js";
 import {
   PROD_STATUSES,
   createDefaultSteps,
   recordBatchHistory
 } from "../src/lib/prod-helper.js";
+import { prisma } from "../src/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
-
-const prisma = createPrismaClient(PrismaClient, process.env.PRODUCTION_DATABASE_URL);
 
 async function upsertProduct() {
   const existing = await prisma.productStock.findFirst({
@@ -75,6 +72,7 @@ async function upsertDemoBomAndBatch() {
         batch_code: "BATCH-SEED-001",
         bom_id: bom.id,
         command_id: "CMD-2025-00001",
+        siteCode: "SITE-LYO",
         status: PROD_STATUSES.IN_PROGRESS,
         progress: 25,
         plannedStartAt: plannedStart,
@@ -97,20 +95,75 @@ async function upsertDemoBomAndBatch() {
       "Avancement 25%",
       "seed"
     );
+  } else {
+    batch = await prisma.batchProduct.update({
+      where: { batch_id: batch.batch_id },
+      data: { siteCode: "SITE-LYO" }
+    });
   }
 
   return { bom, batch };
 }
 
+async function upsertParisProduct() {
+  const existing = await prisma.productStock.findFirst({
+    where: {
+      siteCode: "SITE-PAR",
+      productCode: "PROD-PAR-001",
+      deletedAt: null
+    }
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  return prisma.productStock.create({
+    data: {
+      productCode: "PROD-PAR-001",
+      description: "Composant site Paris",
+      quantity: 5,
+      siteCode: "SITE-PAR"
+    }
+  });
+}
+
+async function upsertParisBatch(bomId: string) {
+  const existing = await prisma.batchProduct.findFirst({
+    where: { batch_code: "BATCH-SEED-PAR-001", deletedAt: null }
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  const batch = await prisma.batchProduct.create({
+    data: {
+      batch_code: "BATCH-SEED-PAR-001",
+      bom_id: bomId,
+      command_id: "CMD-PAR-00001",
+      siteCode: "SITE-PAR",
+      status: PROD_STATUSES.PENDING
+    }
+  });
+
+  await createDefaultSteps(prisma, batch.batch_id);
+  return batch;
+}
+
 async function main() {
   const product = await upsertProduct();
+  const parisProduct = await upsertParisProduct();
   const { bom, batch } = await upsertDemoBomAndBatch();
+  const parisBatch = await upsertParisBatch(bom.id);
 
   console.log("Production seed completed:", {
     productCode: product.productCode,
     siteCode: product.siteCode,
+    parisProductCode: parisProduct.productCode,
     bom_code: bom.bom_code,
-    batch_code: batch.batch_code
+    batch_code: batch.batch_code,
+    parisBatchCode: parisBatch.batch_code
   });
 }
 

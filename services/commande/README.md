@@ -38,14 +38,14 @@ pnpm dev:commande
 | `commande.order.get` | auth | Detail commande + lignes + client |
 | `commande.order.status` | auth | Timeline historique statuts |
 | `commande.order.setPriority` | commercial | Marque urgent + date limite |
-| `commande.order.listUrgent` | auth | File prioritaire (urgent=true) |
+| `commande.order.listUrgent` | commercial, direction | File prioritaire (urgent=true) |
 | `commande.order.delayRisk` | auth | Score 0-100 + facteurs de retard (V1 sans M3) |
 | `commande.client.stats` | auth | CA, nb commandes, delai moyen |
-| `commande.order.history` | auth | Historique pagine par client/site |
+| `commande.order.history` | commercial, direction | Historique pagine par client/site |
 | `commande.order.validate` | commercial | DRAFT -> VALIDATED + historique |
 | `commande.order.reject` | commercial | DRAFT -> REJECTED (motif obligatoire) |
 
-Toutes les ecritures exigent le role `commercial` (le role `admin` passe partout). Les lectures exigent un JWT valide quel que soit le role. Le token est lu depuis `ctx.params.accessToken` ou `ctx.meta.authorization` (`Bearer <token>`).
+Toutes les ecritures exigent le role `commercial` (le role `admin` passe partout). Les lectures `listUrgent` et `history` exigent `commercial` ou `direction` ; les autres lectures exigent un JWT valide. Isolation multi-site via le code site embarque dans le JWT (`siteId`). Le token est lu depuis `ctx.params.accessToken` ou `ctx.meta.authorization` (`Bearer <token>`).
 
 ### Workflow statuts
 

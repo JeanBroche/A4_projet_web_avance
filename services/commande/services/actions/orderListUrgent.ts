@@ -3,7 +3,7 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { resolveSiteCode, requireCommandeRead, createError, parseParams } from '@aeronexis/services-shared';
+import { parseParams, requireCommandeRead, resolveEffectiveSite } from '@aeronexis/services-shared';
 import { orderListUrgentSchema } from '../../src/lib/schemas.js';
 import {
   toOrderSummary,
@@ -21,12 +21,7 @@ export const orderListUrgentAction = {
     const params = parseParams(orderListUrgentSchema, ctx.params);
     const auth = requireCommandeRead(ctx, params.accessToken);
 
-    const siteCode = resolveSiteCode(params);
-    if (auth.siteId && siteCode && auth.siteId !== siteCode) {
-      throw createError('FORBIDDEN');
-    }
-
-    const effectiveSite = auth.siteId || siteCode;
+    const effectiveSite = resolveEffectiveSite(auth, params);
 
     const orders = await prisma.customerOrder.findMany({
       where: {

@@ -41,13 +41,13 @@ pnpm dev:stock        # ou pnpm dev:backend (auth + stock + commande + productio
 | `stock.reservation.create` | logistique | Reserve un OF, transaction atomique |
 | `stock.reservation.release` | logistique | Libere une reservation active |
 | `stock.reservation.cancel` | logistique | Annule une reservation active |
-| `stock.alert.list` | auth | Alertes seuil (re-evalue avant retour) |
+| `stock.alert.list` | logistique, direction | Alertes seuil (re-evalue avant retour) |
 | `stock.threshold.upsert` | logistique | Met a jour `Material.minimumStock` |
-| `stock.forecast.rupture` | auth | Score 0-100 de risque rupture (fenetre 30j par defaut) |
+| `stock.forecast.rupture` | logistique, direction | Score 0-100 de risque rupture (fenetre 30j par defaut) |
 | `stock.supplier.delay.list` | auth | Retards fournisseur declares |
 | `stock.supplier.delay.notify` | logistique | Declare un retard |
 
-Toutes les ecritures exigent le role `logistique` (le role `admin` passe partout). Les lectures exigent un JWT valide quel que soit le role. Le token est lu depuis `ctx.params.accessToken` ou `ctx.meta.authorization` (`Bearer <token>`).
+Toutes les ecritures exigent le role `logistique` (le role `admin` passe partout). Les lectures `alert.list` et `forecast.rupture` exigent `logistique` ou `direction` ; les autres lectures exigent un JWT valide. Isolation multi-site via le code site embarque dans le JWT (`siteId`). Le token est lu depuis `ctx.params.accessToken` ou `ctx.meta.authorization` (`Bearer <token>`).
 
 ## Validation manuelle
 

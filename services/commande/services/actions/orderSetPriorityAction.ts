@@ -3,7 +3,7 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { createError, parseParams, requireCommercial } from '@aeronexis/services-shared';
+import { assertSiteAccess, createError, parseParams, requireCommercial } from '@aeronexis/services-shared';
 import { orderSetPrioritySchema } from '../../src/lib/schemas.js';
 import {
   toOrderSummary,
@@ -21,9 +21,10 @@ type AuthContextMeta = {
 export const orderSetPriorityAction = {
   async handler(ctx: Context<OrderSetPriorityParams, AuthContextMeta>) {
     const params = parseParams(orderSetPrioritySchema, ctx.params);
-    requireCommercial(ctx, params.accessToken);
+    const auth = requireCommercial(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
+    assertSiteAccess(auth, order.siteCode);
 
     if (order.status === ORDER_STATUSES.REJECTED) {
       throw createError('ORDER_NOT_EDITABLE');

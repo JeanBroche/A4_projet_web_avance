@@ -74,7 +74,7 @@ export function toOrderSummary(order: OrderWithRelations) {
         }
       : undefined,
     lines: order.lines
-      ? order.lines.map((line) => ({
+      ? order.lines.map((line: CustomerOrderLine) => ({
           id: line.id,
           lineNumber: line.lineNumber,
           productCode: line.productCode,
@@ -141,12 +141,6 @@ export function assertStatusTransition(currentStatus: string, nextStatus: string
   );
 }
 
-export function assertSiteAccess(jwtSiteId: string | null | undefined, resourceSiteCode: string) {
-  if (jwtSiteId && jwtSiteId !== resourceSiteCode) {
-    throw createError("FORBIDDEN", "Order belongs to a different site");
-  }
-}
-
 export function computeDelayRisk(order: OrderWithRelations) {
   const factors: string[] = [];
   let score = 0;
@@ -190,7 +184,7 @@ export function computeDelayRisk(order: OrderWithRelations) {
     factors.push("Order not yet validated");
   }
 
-  const linesWithOf = (order.lines || []).filter((line) => line.ofId);
+  const linesWithOf = (order.lines || []).filter((line: CustomerOrderLine) => line.ofId);
   if (linesWithOf.length > 0) {
     factors.push(
       `${linesWithOf.length} line(s) linked to production OF (M3 enrichment pending)`

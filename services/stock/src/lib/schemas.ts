@@ -20,6 +20,8 @@ export const levelListSchema = accessTokenSchema.extend({
 });
 
 export const levelConsolidateSchema = accessTokenSchema.extend({
+  siteId: siteCodeSchema.optional(),
+  siteCode: siteCodeSchema.optional(),
   code: z.string().min(1).optional()
 });
 
@@ -43,6 +45,7 @@ export const movementCreateSchema = accessTokenSchema.extend({
 });
 
 export const movementListSchema = accessTokenSchema.extend({
+  siteId: siteCodeSchema.optional(),
   siteCode: siteCodeSchema.optional(),
   materialId: materialIdSchema.optional(),
   type: z.enum(["IN", "OUT", "ADJUST"]).optional(),
@@ -51,6 +54,7 @@ export const movementListSchema = accessTokenSchema.extend({
 });
 
 export const alertListSchema = accessTokenSchema.extend({
+  siteId: siteCodeSchema.optional(),
   siteCode: siteCodeSchema.optional(),
   includeResolved: z.boolean().optional()
 });
@@ -61,6 +65,7 @@ export const thresholdUpsertSchema = accessTokenSchema.extend({
 });
 
 export const forecastRuptureSchema = accessTokenSchema.extend({
+  siteId: siteCodeSchema.optional(),
   siteCode: siteCodeSchema.optional(),
   windowDays: z.number().int().positive().max(365).optional()
 });

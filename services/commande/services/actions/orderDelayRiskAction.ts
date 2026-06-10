@@ -3,13 +3,9 @@ import { prisma } from '../../src/db.js';
 
 import { Context } from 'moleculer';
 
-import { parseParams, requireAuth } from '@aeronexis/services-shared';
+import { assertSiteAccess, parseParams, requireAuth } from '@aeronexis/services-shared';
 import { orderDelayRiskSchema } from '../../src/lib/schemas.js';
-import {
-  loadActiveOrder,
-  computeDelayRisk,
-  assertSiteAccess,
-} from '../../src/lib/order-helpers.js';
+import { loadActiveOrder, computeDelayRisk } from '../../src/lib/order-helpers.js';
 
 type OrderDelayRiskParams = z.infer<typeof orderDelayRiskSchema>;
 type AuthContextMeta = {
@@ -22,7 +18,7 @@ export const orderDelayRiskAction = {
     const auth = requireAuth(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
-    assertSiteAccess(auth.siteId, order.siteCode);
+    assertSiteAccess(auth, order.siteCode);
 
     const risk = computeDelayRisk(order);
 
