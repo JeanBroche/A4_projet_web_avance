@@ -136,7 +136,7 @@ export function assertStatusTransition(currentStatus: string, nextStatus: string
   }
 
   throw createError(
-    "INVALID_STATUS_TRANSITION",
+    "ORDER_INVALID_STATUS_TRANSITION",
     `Cannot transition from ${currentStatus} to ${nextStatus}`
   );
 }

@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { ServiceBroker } from "moleculer";
 import jwt, { type SignOptions } from "jsonwebtoken";
+import { getErrorCode } from "@aeronexis/services-shared";
 import moleculerConfig from "../moleculer.config.js";
 import ReportingService from "../services/reporting.service.js";
 
@@ -42,11 +43,6 @@ function signTestToken(
     process.env.JWT_SECRET!,
     { expiresIn: options.expiresIn ?? "5m" } as SignOptions
   );
-}
-
-function getErrorCode(error: unknown) {
-  const err = error as { data?: { error?: { code?: string } }; code?: string };
-  return err?.data?.error?.code || err?.code;
 }
 
 async function callAction<T>(action: string, params?: Record<string, unknown>): Promise<T> {

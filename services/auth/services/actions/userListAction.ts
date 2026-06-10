@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { parseOrThrow, requireAdmin } from "@aeronexis/services-shared";
+import { parseParams, requireAdmin } from "@aeronexis/services-shared";
 import { userListSchema } from '../../src/lib/schemas.js';
 import {
   mapUser,
@@ -17,12 +17,7 @@ type AuthContextMeta = {
 
 export const userListAction = {
   async handler(ctx: Context<UserListParams, AuthContextMeta>) {
-    let params;
-    try {
-      params = userListSchema.parse(ctx.params);
-    } catch (error) {
-      parseOrThrow(error);
-    }
+    const params = parseParams(userListSchema, ctx.params);
 
     requireAdmin(ctx, params.accessToken);
 

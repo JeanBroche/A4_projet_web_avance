@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { ServiceBroker } from "moleculer";
 import jwt, { type SignOptions } from "jsonwebtoken";
+import { getErrorCode } from "@aeronexis/services-shared";
 import moleculerConfig from "../moleculer.config.js";
 import ShipmentService from "../services/shipment.service.js";
 
@@ -29,11 +30,6 @@ let seedPickListId: string | null = null;
 
 async function callAction<T>(action: string, params?: Record<string, unknown>): Promise<T> {
   return broker.call(action, params) as Promise<T>;
-}
-
-function getErrorCode(error: unknown) {
-  const err = error as { data?: { error?: { code?: string } }; code?: string };
-  return err?.data?.error?.code || err?.code;
 }
 
 function skipIfNoDb(t: { skip: (reason: string) => void }) {
@@ -289,7 +285,7 @@ describe("shipment.shipment", () => {
           id: seedShipmentId,
           status: "DELIVERED"
         }),
-      (error: unknown) => getErrorCode(error) === "INVALID_STATUS_TRANSITION"
+      (error: unknown) => getErrorCode(error) === "SHIPMENT_INVALID_STATUS_TRANSITION"
     );
   });
 

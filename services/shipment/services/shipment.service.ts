@@ -1,8 +1,12 @@
 import type { Context, Service, ServiceSchema } from "moleculer";
-import type { ZodType } from "zod";
 import { prisma } from "../src/db.js";
-import { assertSiteAccess, requireAuth, requireLogistique } from "@aeronexis/services-shared";
-import { createError, parseOrThrow } from "../src/lib/errors.js";
+import {
+  assertSiteAccess,
+  createError,
+  parseParams,
+  requireAuth,
+  requireLogistique
+} from "@aeronexis/services-shared";
 import {
   assertShipmentTransition,
   buildHistoryFilter,
@@ -27,14 +31,6 @@ import {
   shipmentPlanSchema,
   shipmentUpdateStatusSchema
 } from "../src/lib/schemas.js";
-
-function parseParams<T>(schema: ZodType<T>, raw: unknown): T {
-  try {
-    return schema.parse(raw);
-  } catch (error) {
-    parseOrThrow(error);
-  }
-}
 
 type OrderFinishedPayload = {
   orderNumber: string;

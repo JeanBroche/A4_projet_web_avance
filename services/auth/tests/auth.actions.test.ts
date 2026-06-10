@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import jwt from "jsonwebtoken";
 import { ServiceBroker } from "moleculer";
+import { getErrorCode } from "@aeronexis/services-shared";
 import moleculerConfig from "../moleculer.config.js";
 import authService from "../services/auth.service.js";
 import { prisma } from "../src/db.js";
@@ -26,11 +27,6 @@ const adminEmail = "admin@aeronexis.local";
 const adminPassword = process.env.SEED_ADMIN_PASSWORD;
 
 let dbAvailable = false;
-
-function getErrorCode(error: unknown) {
-  const err = error as { data?: { error?: { code?: string } }; code?: string };
-  return err?.data?.error?.code || err?.code;
-}
 
 function skipIfNoDb(t: { skip: (reason?: string) => void }) {
   if (!dbAvailable) {

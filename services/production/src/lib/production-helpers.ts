@@ -134,7 +134,7 @@ export function assertStatusTransition(currStatus: string, nextStatus: string) {
 
   if (!allowed[currStatus]?.includes(nextStatus)) {
     throw createError(
-      "INVALID_STATUS_TRANSITION",
+      "PRODUCTION_INVALID_STATUS_TRANSITION",
       `Invalid status transition from ${currStatus} to ${nextStatus}`
     );
   }

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { parseOrThrow } from "@aeronexis/services-shared";
+import { parseParams } from "@aeronexis/services-shared";
 import { logoutSchema } from '../../src/lib/schemas.js';
 import { revokeRefreshToken } from '../../src/lib/tokens.js';
 import { prisma } from '../../src/db.js';
@@ -14,12 +14,7 @@ type AuthContextMeta = {
 
 export const logoutAction = {
   async handler(ctx: Context<LogoutParams, AuthContextMeta>) {
-    let params;
-    try {
-      params = logoutSchema.parse(ctx.params);
-    } catch (error) {
-      parseOrThrow(error);
-    }
+    const params = parseParams(logoutSchema, ctx.params);
 
     await revokeRefreshToken(prisma, params.refreshToken);
 

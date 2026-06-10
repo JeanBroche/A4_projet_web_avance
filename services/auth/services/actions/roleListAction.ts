@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { parseOrThrow, requireAdmin } from "@aeronexis/services-shared";
+import { parseParams, requireAdmin } from "@aeronexis/services-shared";
 import { accessTokenSchema } from '../../src/lib/schemas.js';
 import { prisma } from '../../src/db.js';
 
@@ -13,12 +13,7 @@ type AuthContextMeta = {
 
 export const roleListAction = {
   async handler(ctx: Context<RoleListParams, AuthContextMeta>) {
-    let params;
-    try {
-      params = accessTokenSchema.parse(ctx.params);
-    } catch (error) {
-      parseOrThrow(error);
-    }
+    const params = parseParams(accessTokenSchema, ctx.params);
 
     requireAdmin(ctx, params.accessToken);
 

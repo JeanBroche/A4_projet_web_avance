@@ -1,7 +1,7 @@
 import type { Context } from "moleculer";
 import type { PickList, PickListLine, Shipment, ShipmentTrackingEvent } from "../generated/prisma/client.js";
 import { prisma } from "../db.js";
-import { createError } from "./errors.js";
+import { createError } from "@aeronexis/services-shared";
 import type { ShipmentStatus } from "./schemas.js";
 
 export const PICKLIST_STATUS = {
@@ -44,7 +44,7 @@ export function assertShipmentTransition(current: string, next: ShipmentStatus) 
   const allowed = ALLOWED_SHIPMENT_TRANSITIONS[current as ShipmentStatus] || [];
   if (!allowed.includes(next)) {
     throw createError(
-      "INVALID_STATUS_TRANSITION",
+      "SHIPMENT_INVALID_STATUS_TRANSITION",
       `${current} → ${next} not allowed`
     );
   }

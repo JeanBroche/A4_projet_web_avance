@@ -1,6 +1,6 @@
 import type { Material } from "../generated/prisma/client.js";
 import { prisma } from "../db.js";
-import { createError } from "./errors.js";
+import { createError } from "@aeronexis/services-shared";
 
 export type DbClient =
   | typeof prisma

@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { ServiceBroker } from "moleculer";
 import jwt, { type SignOptions } from "jsonwebtoken";
+import { getErrorCode } from "@aeronexis/services-shared";
 import moleculerConfig from "../moleculer.config.js";
 import stockService from "../services/stock.service.js";
 import { prisma } from "../src/db.js";
@@ -23,11 +24,6 @@ const tokens = { admin: "", logistique: "", commercial: "", direction: "", expir
 let materialAcierId: string | null = null;
 let materialTitaneId: string | null = null;
 let materialParisAcierId: string | null = null;
-function getErrorCode(error: unknown) {
-  const err = error as { data?: { error?: { code?: string } }; code?: string };
-  return err?.data?.error?.code || err?.code;
-}
-
 function skipIfNoDb(t: { skip: (reason?: string) => void }) {
   if (!dbAvailable) {
     t.skip("PostgreSQL unavailable");

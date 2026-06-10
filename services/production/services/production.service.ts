@@ -1,5 +1,4 @@
 import type { ServiceSchema } from "moleculer";
-import type { ZodType } from "zod";
 import { prisma } from "../src/db.js";
 import { publishProductionEvent } from "../src/lib/events.js";
 import {
@@ -20,7 +19,7 @@ import {
 import {
   assertSiteAccess,
   createError,
-  parseOrThrow,
+  parseParams,
   requireProduction,
   requireProductionRead,
   resolveEffectiveSite
@@ -48,14 +47,6 @@ import {
   addBatchAnomalySchema,
   updateBatchAnomalySchema
 } from "../src/lib/schemas.js";
-
-function parseParams<T>(schema: ZodType<T>, raw: unknown): T {
-  try {
-    return schema.parse(raw);
-  } catch (error) {
-    parseOrThrow(error);
-  }
-}
 
 function authEmail(auth: { email?: string; sub?: string }) {
   return auth.email || auth.sub || "unknown";

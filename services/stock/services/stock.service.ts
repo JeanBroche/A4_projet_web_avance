@@ -1,10 +1,10 @@
 import type { Context, Service, ServiceSchema } from "moleculer";
-import type { ZodType } from "zod";
 import { prisma } from "../src/db.js";
-import { createError, parseOrThrow } from "../src/lib/errors.js";
 import { publishStockEvent } from "../src/lib/events.js";
 import {
   assertSiteAccess,
+  createError,
+  parseParams,
   requireAuth,
   requireLogistique,
   requireStockRead,
@@ -32,14 +32,6 @@ import {
   toStockLevel,
   type DbClient
 } from "../src/lib/stock-helpers.js";
-
-function parseParams<T>(schema: ZodType<T>, raw: unknown): T {
-  try {
-    return schema.parse(raw);
-  } catch (error) {
-    parseOrThrow(error);
-  }
-}
 
 async function releaseOrCancel(
   this: Service,
