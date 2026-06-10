@@ -1,5 +1,6 @@
 import type { Context } from "moleculer";
 import type { PickList, PickListLine, Shipment, ShipmentTrackingEvent } from "../generated/prisma/client.js";
+import { withDistributedLock } from "@aeronexis/redis-infra";
 import { prisma } from "../db.js";
 import { createError } from "@aeronexis/services-shared";
 import type { ShipmentStatus } from "./schemas.js";
@@ -51,41 +52,45 @@ export function assertShipmentTransition(current: string, next: ShipmentStatus) 
 }
 
 export async function generatePickListCode(db: DbClient, year = new Date().getFullYear()) {
-  const prefix = `PICK-${year}-`;
-  const latest = await db.pickList.findFirst({
-    where: { code: { startsWith: prefix }, deletedAt: null },
-    orderBy: { code: "desc" },
-    select: { code: true }
-  });
+  return withDistributedLock({ key: `lock:code:pick:${year}` }, async () => {
+    const prefix = `PICK-${year}-`;
+    const latest = await db.pickList.findFirst({
+      where: { code: { startsWith: prefix }, deletedAt: null },
+      orderBy: { code: "desc" },
+      select: { code: true }
+    });
 
-  let sequence = 1;
-  if (latest?.code) {
-    const parsed = Number.parseInt(latest.code.slice(prefix.length), 10);
-    if (!Number.isNaN(parsed)) {
-      sequence = parsed + 1;
+    let sequence = 1;
+    if (latest?.code) {
+      const parsed = Number.parseInt(latest.code.slice(prefix.length), 10);
+      if (!Number.isNaN(parsed)) {
+        sequence = parsed + 1;
+      }
     }
-  }
 
-  return `${prefix}${String(sequence).padStart(5, "0")}`;
+    return `${prefix}${String(sequence).padStart(5, "0")}`;
+  });
 }
 
 export async function generateShipmentCode(db: DbClient, year = new Date().getFullYear()) {
-  const prefix = `SHP-${year}-`;
-  const latest = await db.shipment.findFirst({
-    where: { code: { startsWith: prefix }, deletedAt: null },
-    orderBy: { code: "desc" },
-    select: { code: true }
-  });
+  return withDistributedLock({ key: `lock:code:ship:${year}` }, async () => {
+    const prefix = `SHP-${year}-`;
+    const latest = await db.shipment.findFirst({
+      where: { code: { startsWith: prefix }, deletedAt: null },
+      orderBy: { code: "desc" },
+      select: { code: true }
+    });
 
-  let sequence = 1;
-  if (latest?.code) {
-    const parsed = Number.parseInt(latest.code.slice(prefix.length), 10);
-    if (!Number.isNaN(parsed)) {
-      sequence = parsed + 1;
+    let sequence = 1;
+    if (latest?.code) {
+      const parsed = Number.parseInt(latest.code.slice(prefix.length), 10);
+      if (!Number.isNaN(parsed)) {
+        sequence = parsed + 1;
+      }
     }
-  }
 
-  return `${prefix}${String(sequence).padStart(5, "0")}`;
+    return `${prefix}${String(sequence).padStart(5, "0")}`;
+  });
 }
 
 export async function loadActivePickList(id: string): Promise<PickListWithLines> {

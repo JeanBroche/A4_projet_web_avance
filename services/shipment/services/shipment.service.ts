@@ -22,6 +22,7 @@ import {
   toTrackingTimeline,
   verifyStockReservations
 } from "../src/lib/shipment-helpers.js";
+import { initShipmentAuditWriter, logShipmentAudit } from "../src/lib/audit.js";
 import { publishShipmentEvent } from "../src/lib/events.js";
 import {
   pickListCompleteSchema,
@@ -42,6 +43,10 @@ type OrderFinishedPayload = {
 
 const ShipmentService: ServiceSchema = {
   name: "shipment",
+
+  started(this: Service) {
+    initShipmentAuditWriter(this);
+  },
 
   actions: {
     ping: {
@@ -84,6 +89,22 @@ const ShipmentService: ServiceSchema = {
             include: { lines: { orderBy: { lineNumber: "asc" } } }
           });
           return created;
+        });
+
+        await logShipmentAudit({
+          action: "shipment.picklist.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "PickList",
+          entityId: pickList.id,
+          siteCode: pickList.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            code: pickList.code,
+            orderNumber: pickList.orderNumber,
+            ofId: pickList.ofId
+          }
         });
 
         this.logger.info("Pick list created", {
@@ -141,6 +162,22 @@ const ShipmentService: ServiceSchema = {
             data: { status: PICKLIST_STATUS.COMPLETED },
             include: { lines: { orderBy: { lineNumber: "asc" } } }
           });
+        });
+
+        await logShipmentAudit({
+          action: "shipment.picklist.complete",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "PickList",
+          entityId: completed.id,
+          siteCode: completed.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: { code: completed.code, orderNumber: completed.orderNumber },
+          diff: {
+            before: { status: pickList.status },
+            after: { status: completed.status }
+          }
         });
 
         this.logger.info("Pick list completed", {
@@ -201,6 +238,22 @@ const ShipmentService: ServiceSchema = {
           code: shipment.code,
           orderNumber: shipment.orderNumber,
           siteCode: shipment.siteCode
+        });
+
+        await logShipmentAudit({
+          action: "shipment.shipment.plan",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "Shipment",
+          entityId: shipment.id,
+          siteCode: shipment.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            code: shipment.code,
+            orderNumber: shipment.orderNumber,
+            pickListId: shipment.pickListId
+          }
         });
 
         this.logger.info("Shipment planned", {
@@ -293,6 +346,22 @@ const ShipmentService: ServiceSchema = {
           code: updated.code,
           fromStatus: shipment.status,
           toStatus: params.status
+        });
+
+        await logShipmentAudit({
+          action: "shipment.shipment.updateStatus",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "Shipment",
+          entityId: updated.id,
+          siteCode: updated.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: { code: updated.code, notes: params.notes },
+          diff: {
+            before: { status: shipment.status },
+            after: { status: updated.status }
+          }
         });
 
         this.logger.info("Shipment status updated", {
@@ -391,6 +460,20 @@ const ShipmentService: ServiceSchema = {
           pickListId: pickList.id,
           orderNumber: pickList.orderNumber,
           siteCode: pickList.siteCode
+        });
+
+        await logShipmentAudit({
+          action: "shipment.picklist.auto_created",
+          entity: "PickList",
+          entityId: pickList.id,
+          siteCode: pickList.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            code: pickList.code,
+            orderNumber: pickList.orderNumber,
+            ofId: pickList.ofId,
+            source: "order.order.finished"
+          }
         });
 
         this.logger.info("Auto-created pick list from order.order.finished", {

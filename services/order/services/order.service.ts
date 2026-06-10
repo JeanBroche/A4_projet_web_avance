@@ -1,6 +1,6 @@
-import type { ServiceSchema } from "moleculer";
-
-import { 
+import type { Service, ServiceSchema } from "moleculer";
+import { initOrderAuditWriter } from "../src/lib/audit.js";
+import {
   orderCreateAction,
   orderGetAction,
   orderStatusAction,
@@ -15,6 +15,10 @@ import {
 
 const OrderService: ServiceSchema = {
   name: "order",
+
+  started(this: Service) {
+    initOrderAuditWriter(this);
+  },
 
   actions: {
     ping: {

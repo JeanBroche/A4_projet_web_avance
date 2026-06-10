@@ -8,6 +8,8 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.service.json ./
 COPY packages/moleculer-config packages/moleculer-config
 COPY packages/db packages/db
 COPY packages/services-shared packages/services-shared
+COPY packages/shared packages/shared
+COPY packages/redis-infra packages/redis-infra
 COPY services/production services/production
 
 RUN pnpm install --frozen-lockfile

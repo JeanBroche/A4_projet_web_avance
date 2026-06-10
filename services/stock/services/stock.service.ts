@@ -1,5 +1,6 @@
 import type { Context, Service, ServiceSchema } from "moleculer";
 import { prisma } from "../src/db.js";
+import { initStockAuditWriter, logStockAudit } from "../src/lib/audit.js";
 import { publishStockEvent } from "../src/lib/events.js";
 import {
   assertSiteAccess,
@@ -24,6 +25,7 @@ import {
   thresholdUpsertSchema
 } from "../src/lib/schemas.js";
 import type { StockReservation } from "../src/generated/prisma/client.js";
+import { withMaterialLocks } from "../src/lib/locks.js";
 import {
   computeAvailable,
   consolidateByCode,
@@ -71,6 +73,20 @@ async function releaseOrCancel(
     reservationId: updated.id,
     status: finalStatus
   });
+  await logStockAudit({
+    action: finalStatus === "RELEASED" ? "stock.reservation.release" : "stock.reservation.cancel",
+    actorId: auth.sub,
+    actorEmail: auth.email,
+    roles: auth.roles,
+    entity: "StockReservation",
+    entityId: updated.id,
+    siteCode: reservation.siteCode,
+    correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+    diff: {
+      before: { status: reservation.status },
+      after: { status: finalStatus }
+    }
+  });
   this.logger.info("Reservation transitioned", {
     correlationId: (ctx.meta as { correlationId?: string }).correlationId,
     reservationId: updated.id,
@@ -81,6 +97,11 @@ async function releaseOrCancel(
 
 const StockService: ServiceSchema = {
   name: "stock",
+
+  started(this: Service) {
+    initStockAuditWriter(this);
+  },
+
   actions: {
     ping: {
       handler(ctx) {
@@ -172,6 +193,30 @@ const StockService: ServiceSchema = {
           type: params.type,
           quantity: params.quantity
         });
+        await logStockAudit({
+          action: "stock.movement.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "StockMovement",
+          entityId: result.id,
+          siteCode: material.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            materialId: material.id,
+            materialCode: material.code,
+            type: params.type,
+            quantity: params.quantity,
+            documentRef: params.documentRef
+          },
+          diff: {
+            after: {
+              type: params.type,
+              quantity: params.quantity,
+              currentStock: newCurrent
+            }
+          }
+        });
         this.logger.info("Stock movement recorded", {
           correlationId: (ctx.meta as { correlationId?: string }).correlationId,
           movementId: result.id,
@@ -203,39 +248,59 @@ const StockService: ServiceSchema = {
       async handler(ctx) {
         const params = parseParams(reservationCreateSchema, ctx.params);
         const auth = requireLogistique(ctx, params.accessToken);
-        const reservations = await prisma.$transaction(async (tx: DbClient) => {
-          const created: StockReservation[] = [];
-          for (const line of params.lines) {
-            const material = await loadActiveMaterial(tx, line.materialId);
-            assertSiteAccess(auth, material.siteCode);
-            const available = computeAvailable(material);
-            if (line.qty > available) {
-              throw createError(
-                "INSUFFICIENT_STOCK",
-                `Material ${material.code}: requested ${line.qty}, available ${available}`
-              );
-            }
-            const reservation = await tx.stockReservation.create({
-              data: {
-                ofId: params.ofId,
-                materialId: material.id,
-                siteCode: material.siteCode,
-                quantity: line.qty,
-                status: "ACTIVE"
+        const materialIds = params.lines.map((line) => line.materialId);
+        const reservations = await withMaterialLocks(
+          materialIds,
+          () =>
+            prisma.$transaction(async (tx: DbClient) => {
+              const created: StockReservation[] = [];
+              for (const line of params.lines) {
+                const material = await loadActiveMaterial(tx, line.materialId);
+                assertSiteAccess(auth, material.siteCode);
+                const available = computeAvailable(material);
+                if (line.qty > available) {
+                  throw createError(
+                    "INSUFFICIENT_STOCK",
+                    `Material ${material.code}: requested ${line.qty}, available ${available}`
+                  );
+                }
+                const reservation = await tx.stockReservation.create({
+                  data: {
+                    ofId: params.ofId,
+                    materialId: material.id,
+                    siteCode: material.siteCode,
+                    quantity: line.qty,
+                    status: "ACTIVE"
+                  }
+                });
+                await tx.material.update({
+                  where: { id: material.id },
+                  data: { reservedStock: material.reservedStock + line.qty }
+                });
+                await evaluateThreshold(tx, material.id);
+                created.push(reservation);
               }
-            });
-            await tx.material.update({
-              where: { id: material.id },
-              data: { reservedStock: material.reservedStock + line.qty }
-            });
-            await evaluateThreshold(tx, material.id);
-            created.push(reservation);
-          }
-          return created;
-        });
+              return created;
+            }),
+          this.logger
+        );
         publishStockEvent(this, "stock.reserved", {
           ofId: params.ofId,
           reservationIds: reservations.map((r: StockReservation) => r.id)
+        });
+        await logStockAudit({
+          action: "stock.reservation.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "StockReservation",
+          siteCode: reservations[0]?.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            ofId: params.ofId,
+            reservationIds: reservations.map((r) => r.id),
+            lineCount: reservations.length
+          }
         });
         this.logger.info("Reservations created", {
           correlationId: (ctx.meta as { correlationId?: string }).correlationId,

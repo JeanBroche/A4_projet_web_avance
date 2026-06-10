@@ -14,6 +14,7 @@ import {
 } from '../../src/lib/order-helpers.js';
 
 import { publishOrderEvent } from '../../src/lib/events.js';
+import { logOrderAudit } from '../../src/lib/audit.js';
 
 type OrderValidateParams = z.infer<typeof orderValidateSchema>;
 type AuthContextMeta = {
@@ -71,6 +72,22 @@ export const orderValidateAction = {
       correlationId: ctx.meta.correlationId,
       orderId: updated.id,
       orderNumber: updated.orderNumber,
+    });
+
+    await logOrderAudit({
+      action: 'order.order.validate',
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      roles: auth.roles,
+      entity: 'CustomerOrder',
+      entityId: updated.id,
+      siteCode: updated.siteCode,
+      correlationId: ctx.meta.correlationId,
+      metadata: { orderNumber: updated.orderNumber, notes: params.notes },
+      diff: {
+        before: { status: order.status },
+        after: { status: updated.status }
+      }
     });
 
     return toOrderSummary(updated);

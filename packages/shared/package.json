@@ -3,20 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
+    ".": "./src/index.ts"
   },
   "scripts": {
     "dev": "node -e \"console.log('@aeronexis/shared: dev placeholder')\"",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "node -e \"process.exit(0)\"",
-    "build": "tsc"
+    "build": "tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

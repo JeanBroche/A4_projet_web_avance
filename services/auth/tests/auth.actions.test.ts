@@ -6,6 +6,7 @@ import { after, before, describe, it } from "node:test";
 import jwt from "jsonwebtoken";
 import { ServiceBroker } from "moleculer";
 import { getErrorCode } from "@aeronexis/services-shared";
+import { getRedisClient, resetRedisClient } from "@aeronexis/redis-infra";
 import moleculerConfig from "../moleculer.config.js";
 import authService from "../services/auth.service.js";
 import { prisma } from "../src/db.js";
@@ -27,10 +28,19 @@ const adminEmail = "admin@aeronexis.local";
 const adminPassword = process.env.SEED_ADMIN_PASSWORD;
 
 let dbAvailable = false;
+let redisAvailable = false;
 
 function skipIfNoDb(t: { skip: (reason?: string) => void }) {
   if (!dbAvailable) {
     t.skip("PostgreSQL unavailable");
+    return true;
+  }
+  return false;
+}
+
+function skipIfNoInfra(t: { skip: (reason?: string) => void }) {
+  if (!dbAvailable || !redisAvailable) {
+    t.skip("PostgreSQL or Redis unavailable");
     return true;
   }
   return false;
@@ -53,6 +63,23 @@ before(async () => {
     dbAvailable = false;
     console.warn("Skipping auth integration tests: PostgreSQL unavailable.");
   }
+
+  resetRedisClient();
+  const redis = getRedisClient();
+  if (!redis) {
+    redisAvailable = false;
+    console.warn("Skipping auth session tests: REDIS_URL unavailable.");
+    return;
+  }
+
+  try {
+    await redis.connect();
+    await redis.ping();
+    redisAvailable = true;
+  } catch {
+    redisAvailable = false;
+    console.warn("Skipping auth session tests: Redis unavailable.");
+  }
 });
 
 after(async () => {
@@ -61,7 +88,7 @@ after(async () => {
 
 describe("auth actions", () => {
   it("login succeeds for seeded admin", async (t) => {
-    if (skipIfNoDb(t)) return;
+    if (skipIfNoInfra(t)) return;
     const result = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword
@@ -79,7 +106,7 @@ describe("auth actions", () => {
   });
 
   it("login embeds business site code in access token", async (t) => {
-    if (skipIfNoDb(t)) return;
+    if (skipIfNoInfra(t)) return;
     const result = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword
@@ -113,7 +140,7 @@ describe("auth actions", () => {
   });
 
   it("refresh rotates refresh token", async (t) => {
-    if (skipIfNoDb(t)) return;
+    if (skipIfNoInfra(t)) return;
     const login = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword
@@ -136,7 +163,7 @@ describe("auth actions", () => {
   });
 
   it("logout revokes refresh token", async (t) => {
-    if (skipIfNoDb(t)) return;
+    if (skipIfNoInfra(t)) return;
     const login = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword
@@ -158,7 +185,7 @@ describe("auth actions", () => {
   });
 
   it("me returns current user", async (t) => {
-    if (skipIfNoDb(t)) return;
+    if (skipIfNoInfra(t)) return;
     const login = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword
@@ -191,7 +218,7 @@ describe("auth actions", () => {
   });
 
   it("admin can list roles", async (t) => {
-    if (skipIfNoDb(t)) return;
+    if (skipIfNoInfra(t)) return;
     const login = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword
@@ -206,7 +233,7 @@ describe("auth actions", () => {
   });
 
   it("admin can create and update a user", async (t) => {
-    if (skipIfNoDb(t)) return;
+    if (skipIfNoInfra(t)) return;
     const login = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword

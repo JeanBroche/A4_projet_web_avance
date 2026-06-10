@@ -25,13 +25,16 @@
   "dependencies": {
     "@aeronexis/db": "workspace:*",
     "@aeronexis/moleculer-config": "workspace:*",
+    "@aeronexis/redis-infra": "workspace:*",
     "@aeronexis/services-shared": "workspace:*",
+    "@aeronexis/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.0",
     "jsonwebtoken": "^9.0.3",
+    "kafkajs": "^2.2.4",
     "moleculer": "^0.15.0",
     "pg": "^8.16.0",
     "zod": "^4.4.3"

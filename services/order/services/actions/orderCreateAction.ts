@@ -13,6 +13,7 @@ import {
   ORDER_STATUSES,
 } from '../../src/lib/order-helpers.js';
 import { publishOrderEvent } from '../../src/lib/events.js';
+import { logOrderAudit } from '../../src/lib/audit.js';
 
 type OrderCreateParams = z.infer<typeof orderCreateSchema>;
 type AuthContextMeta = {
@@ -87,6 +88,29 @@ export const orderCreateAction = {
       correlationId: ctx.meta.correlationId,
       orderId: order.id,
       orderNumber: order.orderNumber,
+    });
+
+    await logOrderAudit({
+      action: 'order.order.create',
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      roles: auth.roles,
+      entity: 'CustomerOrder',
+      entityId: order.id,
+      siteCode: order.siteCode,
+      correlationId: ctx.meta.correlationId,
+      metadata: {
+        orderNumber: order.orderNumber,
+        clientId: order.clientId,
+        lineCount: order.lines.length
+      },
+      diff: {
+        after: {
+          status: order.status,
+          totalAmount: order.totalAmount,
+          isUrgent: order.isUrgent
+        }
+      }
     });
 
     return toOrderSummary(order);

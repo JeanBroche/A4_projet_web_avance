@@ -33,6 +33,8 @@ services:
         condition: service_completed_successfully
       postgres-auth:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -50,6 +52,8 @@ services:
       db-migrate:
         condition: service_completed_successfully
       postgres-stock:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -69,6 +73,8 @@ services:
         condition: service_completed_successfully
       postgres-order:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -87,6 +93,8 @@ services:
         condition: service_completed_successfully
       postgres-production:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
@@ -104,6 +112,26 @@ services:
       db-migrate:
         condition: service_completed_successfully
       postgres-shipment:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  audit:
+    build:
+      context: ../..
+      dockerfile: services/audit/Dockerfile
+    container_name: aeronexis-audit
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: audit
+    depends_on:
+      mongo:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       redis:
         condition: service_healthy

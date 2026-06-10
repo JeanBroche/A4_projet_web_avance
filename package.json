@@ -15,7 +15,8 @@
     "dev:production": "pnpm --filter @aeronexis/production dev",
     "dev:shipment": "pnpm --filter @aeronexis/shipment dev",
     "dev:reporting": "pnpm --filter @aeronexis/reporting dev",
-    "dev:backend": "pnpm --parallel --filter @aeronexis/auth --filter @aeronexis/stock --filter @aeronexis/order --filter @aeronexis/production --filter @aeronexis/shipment --filter @aeronexis/reporting dev",
+    "dev:audit": "pnpm --filter @aeronexis/audit dev",
+    "dev:backend": "pnpm --parallel --filter @aeronexis/auth --filter @aeronexis/stock --filter @aeronexis/order --filter @aeronexis/production --filter @aeronexis/shipment --filter @aeronexis/reporting --filter @aeronexis/audit dev",
     "dev:web": "pnpm --filter web dev",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r --if-present run typecheck",
@@ -25,6 +26,7 @@
     "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
     "docker:apps:up": "docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.apps.yml up -d --build",
     "docker:apps:down": "docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.apps.yml down",
+    "smoke:kafka": "node --import tsx scripts/smoke-kafka-bus.ts",
     "mongo:init": "pnpm --filter @aeronexis/mongo-init run init",
     "db:migrate": "pnpm --filter @aeronexis/db run migrate:all",
     "db:migrate:dev": "pnpm --filter @aeronexis/db run migrate:all:dev",
@@ -35,5 +37,11 @@
     "db:studio:production": "pnpm --filter @aeronexis/production run db:studio",
     "db:studio:shipment": "pnpm --filter @aeronexis/shipment run db:studio",
     "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "dotenv": "^17.4.2",
+    "kafkajs": "^2.2.4",
+    "moleculer": "^0.15.0",
+    "tsx": "^4.20.3"
   }
 }

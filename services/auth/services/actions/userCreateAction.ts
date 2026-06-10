@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { Context } from 'moleculer';
 
 import { createError, parseParams, requireAdmin } from "@aeronexis/services-shared";
+import { logAuthAudit } from "../../src/lib/audit.js";
 import { userCreateSchema } from '../../src/lib/schemas.js';
 import { mapUser, mapRoles, userInclude } from '../../src/lib/user-mapper.js';
 import { prisma } from '../../src/db.js';
@@ -16,8 +17,7 @@ type AuthContextMeta = {
 export const userCreateAction = {
   async handler(ctx: Context<UserCreateParams, AuthContextMeta>) {
     const params = parseParams(userCreateSchema, ctx.params);
-
-    requireAdmin(ctx, params.accessToken);
+    const auth = requireAdmin(ctx, params.accessToken);
 
     const email = params.email.toLowerCase();
     const existing = await prisma.user.findFirst({ where: { email } });
@@ -71,6 +71,27 @@ export const userCreateAction = {
       correlationId: ctx.meta.correlationId,
       userId: user.id,
       email: user.email,
+    });
+
+    await logAuthAudit({
+      action: "auth.user.create",
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      roles: auth.roles,
+      entity: "User",
+      entityId: user.id,
+      siteCode: user.siteId ?? undefined,
+      correlationId: ctx.meta.correlationId,
+      metadata: { email: user.email, roleCodes: params.roleCodes },
+      diff: {
+        after: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          siteId: user.siteId,
+          roles: mapRoles(user)
+        }
+      }
     });
 
     return {
