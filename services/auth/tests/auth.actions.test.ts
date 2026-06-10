@@ -3,7 +3,9 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import jwt from "jsonwebtoken";
 import { ServiceBroker } from "moleculer";
+import { getErrorCode } from "@aeronexis/services-shared";
 import moleculerConfig from "../moleculer.config.js";
 import authService from "../services/auth.service.js";
 import { prisma } from "../src/db.js";
@@ -25,11 +27,6 @@ const adminEmail = "admin@aeronexis.local";
 const adminPassword = process.env.SEED_ADMIN_PASSWORD;
 
 let dbAvailable = false;
-
-function getErrorCode(error: unknown) {
-  const err = error as { data?: { error?: { code?: string } }; code?: string };
-  return err?.data?.error?.code || err?.code;
-}
 
 function skipIfNoDb(t: { skip: (reason?: string) => void }) {
   if (!dbAvailable) {
@@ -79,6 +76,17 @@ describe("auth actions", () => {
     assert.ok(result.accessToken);
     assert.ok(result.refreshToken);
     assert.ok(result.roles.some((role) => role.code === "admin"));
+  });
+
+  it("login embeds business site code in access token", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const result = await broker.call("auth.login", {
+      email: adminEmail,
+      password: adminPassword
+    }) as { accessToken: string };
+
+    const payload = jwt.decode(result.accessToken) as { siteId: string | null };
+    assert.equal(payload.siteId, "SITE-LYO");
   });
 
   it("login rejects invalid password", async (t) => {

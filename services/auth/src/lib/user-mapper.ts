@@ -32,7 +32,7 @@ export function buildAccessTokenPayload(user: UserWithRoles) {
   return {
     sub: user.id,
     email: user.email,
-    siteId: user.siteId,
+    siteId: user.site?.code ?? null,
     roles: mapRoles(user).map((role) => role.code)
   };
 }

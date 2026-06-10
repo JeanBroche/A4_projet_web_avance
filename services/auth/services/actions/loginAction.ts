@@ -5,7 +5,7 @@ import { Context } from "moleculer";
 
 
 import { loginSchema } from "../../src/lib/schemas.js";
-import { parseOrThrow, createError, signAccessToken } from "@aeronexis/services-shared";
+import { createError, parseParams, signAccessToken } from "@aeronexis/services-shared";
 import { userInclude, buildAccessTokenPayload } from "../../src/lib/user-mapper.js";
 import { mapUser, mapRoles, type UserWithRoles } from "../../src/lib/user-mapper.js";
 import { createRefreshTokenRecord } from "../../src/lib/tokens.js";
@@ -32,12 +32,7 @@ type AuthContextMeta = {
 
 export const loginAction = {
   async handler(ctx: Context<LoginParams, AuthContextMeta>) {
-    let params;
-    try {
-      params = loginSchema.parse(ctx.params);
-    } catch (error) {
-      parseOrThrow(error);
-    }
+    const params = parseParams(loginSchema, ctx.params);
 
     const user = await prisma.user.findFirst({
       where: { email: params.email.toLowerCase() },

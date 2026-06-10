@@ -31,9 +31,9 @@ jobs:
       POSTGRES_URL: postgresql://ci:ci@localhost:5432/ci
       AUTH_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_auth
       STOCK_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_stock
-      COMMANDE_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_commande
+      ORDER_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_order
       PRODUCTION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_production
-      EXPEDITION_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_expedition
+      SHIPMENT_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci_shipment
       JWT_SECRET: ci-test-jwt-secret
       SEED_ADMIN_PASSWORD: ci-test-password
     steps:

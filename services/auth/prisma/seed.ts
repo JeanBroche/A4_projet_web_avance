@@ -2,8 +2,7 @@ import bcrypt from "bcryptjs";
 import { config } from "dotenv";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { createPrismaClient } from "@aeronexis/db";
-import { PrismaClient } from "../src/generated/prisma/client.js";
+import { prisma } from "../src/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
@@ -17,8 +16,6 @@ function requireSeedPassword(): string {
 }
 
 const password = requireSeedPassword();
-
-const prisma = createPrismaClient(PrismaClient, process.env.AUTH_DATABASE_URL);
 
 const ROLES = [
   { code: "operateur", label: "Operateur production" },
@@ -204,10 +201,100 @@ async function main() {
     }
   });
 
+  const commercialEmail = "commercial@aeronexis.local";
+  const commercialHash = await bcrypt.hash(password, 10);
+  const existingCommercial = await prisma.user.findFirst({
+    where: { email: commercialEmail, deletedAt: null }
+  });
+  const commercial = existingCommercial
+    ? await prisma.user.update({
+        where: { id: existingCommercial.id },
+        data: {
+          passwordHash: commercialHash,
+          firstName: "Commercial",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      })
+    : await prisma.user.create({
+        data: {
+          email: commercialEmail,
+          passwordHash: commercialHash,
+          firstName: "Commercial",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      });
+
+  const commercialRole = await prisma.role.findFirstOrThrow({
+    where: { code: "commercial", deletedAt: null }
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: commercial.id,
+        roleId: commercialRole.id
+      }
+    },
+    update: {},
+    create: {
+      userId: commercial.id,
+      roleId: commercialRole.id
+    }
+  });
+
+  const directionEmail = "direction@aeronexis.local";
+  const directionHash = await bcrypt.hash(password, 10);
+  const existingDirection = await prisma.user.findFirst({
+    where: { email: directionEmail, deletedAt: null }
+  });
+  const direction = existingDirection
+    ? await prisma.user.update({
+        where: { id: existingDirection.id },
+        data: {
+          passwordHash: directionHash,
+          firstName: "Direction",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      })
+    : await prisma.user.create({
+        data: {
+          email: directionEmail,
+          passwordHash: directionHash,
+          firstName: "Direction",
+          lastName: "Aeronexis",
+          siteId: site.id,
+          isActive: true
+        }
+      });
+
+  const directionRole = await prisma.role.findFirstOrThrow({
+    where: { code: "direction", deletedAt: null }
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: direction.id,
+        roleId: directionRole.id
+      }
+    },
+    update: {},
+    create: {
+      userId: direction.id,
+      roleId: directionRole.id
+    }
+  });
+
   console.log("Auth seed completed:", {
     sites: SITES.map((s) => s.code),
     roles: ROLES.length,
-    users: [admin.email, logistic.email, operateur.email]
+    users: [admin.email, logistic.email, operateur.email, commercial.email, direction.email]
   });
 }
 

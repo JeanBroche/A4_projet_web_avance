@@ -7,7 +7,7 @@ Microservice Moleculer notification (alertes, emails, in-app).
 | Milestone | Store | Usage |
 |-----------|-------|-------|
 | M1+ | Redis | Etat des notifications, cache regles |
-| M1+ | Kafka | Consommation `stock.material.low`, `expedition.delivery.alert`, etc. |
+| M1+ | Kafka | Consommation `stock.material.low`, `shipment.delivery.alert`, etc. |
 
 **M1** : pas de Prisma PostgreSQL. Pas inclus dans `pnpm db:migrate`.
 

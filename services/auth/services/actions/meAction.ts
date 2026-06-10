@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { createError, parseOrThrow, requireAuth } from "@aeronexis/services-shared";
+import { createError, parseParams, requireAuth } from "@aeronexis/services-shared";
 import { meSchema } from '../../src/lib/schemas.js';
 import { mapUser, mapRoles, userInclude, type UserWithRoles } from '../../src/lib/user-mapper.js';
 import { prisma } from '../../src/db.js';
@@ -31,12 +31,7 @@ type AuthContextMeta = {
 
 export const meAction = {
   async handler(ctx: Context<MeParams, AuthContextMeta>) {
-    let params;
-    try {
-      params = meSchema.parse(ctx.params);
-    } catch (error) {
-      parseOrThrow(error);
-    }
+    const params = parseParams(meSchema, ctx.params);
 
     const payload = requireAuth(ctx, params.accessToken);
     const user = await findUserById(payload.sub);

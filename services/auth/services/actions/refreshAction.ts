@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { Context } from 'moleculer';
 
-import { parseOrThrow, signAccessToken } from '@aeronexis/services-shared';
+import { parseParams, signAccessToken } from '@aeronexis/services-shared';
 import { refreshSchema } from '../../src/lib/schemas.js';
 import { buildAccessTokenPayload } from '../../src/lib/user-mapper.js';
 import { mapUser, mapRoles } from '../../src/lib/user-mapper.js';
@@ -16,12 +16,7 @@ type AuthContextMeta = {
 
 export const refreshAction = {
   async handler(ctx: Context<RefreshParams, AuthContextMeta>) {
-    let params;
-    try {
-      params = refreshSchema.parse(ctx.params);
-    } catch (error) {
-      parseOrThrow(error);
-    }
+    const params = parseParams(refreshSchema, ctx.params);
 
     const { user, refreshToken } = await rotateRefreshToken(
       prisma,

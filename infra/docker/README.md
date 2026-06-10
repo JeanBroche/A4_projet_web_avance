@@ -32,17 +32,17 @@ Fichiers compose : [`docker-compose.yml`](docker-compose.yml) (infra), [`docker-
 | ------- | ----- | ------------ | ----- |
 | postgres-auth | postgres:16-alpine | 5432 | Base `aeronexis_auth` |
 | postgres-stock | postgres:16-alpine | 5433 | Base `aeronexis_stock` |
-| postgres-commande | postgres:16-alpine | 5434 | Base `aeronexis_commande` |
+| postgres-order | postgres:16-alpine | 5434 | Base `aeronexis_order` |
 | postgres-production | postgres:16-alpine | 5435 | Base `aeronexis_production` |
-| postgres-expedition | postgres:16-alpine | 5436 | Base `aeronexis_expedition` |
+| postgres-shipment | postgres:16-alpine | 5436 | Base `aeronexis_shipment` |
 | mongo | mongo:7 | 27017 | Logs / audit |
 | redis | redis:7-alpine | 6379 | Cache / transporter Moleculer |
 | kafka | apache/kafka:3.8.1 | 9092 | Bus d evenements (KRaft) |
 | minio | minio/minio | 9000, 9001 | Stockage S3 (API + console) |
 
-Avec `docker:apps:up`, conteneurs supplementaires : `db-migrate` (one-shot), `auth`, `stock`, `commande`, `production`, `expedition`.
+Avec `docker:apps:up`, conteneurs supplementaires : `db-migrate` (one-shot), `auth`, `stock`, `order`, `production`, `shipment`.
 
-Volumes nommes : `pg_auth_data`, `pg_stock_data`, `pg_commande_data`, `pg_production_data`, `pg_expedition_data`, `mongo_data`, `mongo_init_modules`, `redis_data`, `kafka_data`, `minio_data`.
+Volumes nommes : `pg_auth_data`, `pg_stock_data`, `pg_order_data`, `pg_production_data`, `pg_shipment_data`, `mongo_data`, `mongo_init_modules`, `redis_data`, `kafka_data`, `minio_data`.
 
 Chaque conteneur PostgreSQL cree sa base via `POSTGRES_DB` au premier demarrage (volume vide).
 
@@ -59,7 +59,7 @@ Conteneurs d initialisation one-shot :
 ```bash
 docker exec -it aeronexis-postgres-auth psql -U aeronexis -d aeronexis_auth -c "SELECT 1;"
 docker exec -it aeronexis-postgres-stock psql -U aeronexis -d aeronexis_stock -c "SELECT 1;"
-# idem : postgres-commande, postgres-production, postgres-expedition
+# idem : postgres-order, postgres-production, postgres-shipment
 ```
 
 ### Microservices (stack apps)

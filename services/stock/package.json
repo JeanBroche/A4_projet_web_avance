@@ -23,6 +23,7 @@
   "dependencies": {
     "@aeronexis/db": "workspace:*",
     "@aeronexis/moleculer-config": "workspace:*",
+    "@aeronexis/services-shared": "workspace:*",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",

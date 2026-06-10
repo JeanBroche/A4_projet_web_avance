@@ -13,6 +13,8 @@ export const listBomSchema = accessTokenSchema.extend({
 export const listBatchSchema = accessTokenSchema.extend({
   status: z.string().min(1).optional(),
   bom_code: z.string().min(1).optional(),
+  siteCode: z.string().min(1).optional(),
+  siteId: z.string().min(1).optional(),
   limit: z.number().int().positive().max(100).optional(),
   offset: z.number().int().min(0).optional()
 });

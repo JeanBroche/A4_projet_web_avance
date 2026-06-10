@@ -49,6 +49,7 @@ model BatchProduct {
   batch_code     String
   bom_id         String
   command_id     String
+  siteCode       String
   status         String    @default("PENDING")
   progress       Int       @default(0)
   plannedStartAt DateTime?
@@ -64,6 +65,7 @@ model BatchProduct {
 
   @@index([batch_code])
   @@index([bom_id])
+  @@index([siteCode])
   @@index([status])
   @@index([deletedAt])
   @@schema("production")

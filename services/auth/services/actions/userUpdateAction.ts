@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 
 import { Context } from 'moleculer';
 
-import { createError, parseOrThrow, requireAdmin } from "@aeronexis/services-shared";
+import { createError, parseParams, requireAdmin } from "@aeronexis/services-shared";
 import { userUpdateSchema } from '../../src/lib/schemas.js';
 import { mapUser, mapRoles, userInclude } from '../../src/lib/user-mapper.js';
 import { prisma } from '../../src/db.js';
@@ -15,12 +15,7 @@ type AuthContextMeta = {
 
 export const userUpdateAction = {
   async handler(ctx: Context<UserUpdateParams, AuthContextMeta>) {
-    let params;
-    try {
-      params = userUpdateSchema.parse(ctx.params);
-    } catch (error) {
-      parseOrThrow(error);
-    }
+    const params = parseParams(userUpdateSchema, ctx.params);
 
     requireAdmin(ctx, params.accessToken);
 

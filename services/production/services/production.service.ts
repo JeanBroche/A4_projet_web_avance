@@ -1,5 +1,4 @@
 import type { ServiceSchema } from "moleculer";
-import type { ZodType } from "zod";
 import { prisma } from "../src/db.js";
 import { publishProductionEvent } from "../src/lib/events.js";
 import {
@@ -16,8 +15,15 @@ import {
   resolveStatusFromProgress,
   recordBatchHistory,
   createDefaultSteps
-} from "../src/lib/prod-helper.js";
-import { requireProduction, createError, parseOrThrow } from "@aeronexis/services-shared";
+} from "../src/lib/production-helpers.js";
+import {
+  assertSiteAccess,
+  createError,
+  parseParams,
+  requireProduction,
+  requireProductionRead,
+  resolveEffectiveSite
+} from "@aeronexis/services-shared";
 import {
   getBatchSchema,
   createBatchSchema,
@@ -42,16 +48,15 @@ import {
   updateBatchAnomalySchema
 } from "../src/lib/schemas.js";
 
-function parseParams<T>(schema: ZodType<T>, raw: unknown): T {
-  try {
-    return schema.parse(raw);
-  } catch (error) {
-    parseOrThrow(error);
-  }
-}
-
 function authEmail(auth: { email?: string; sub?: string }) {
   return auth.email || auth.sub || "unknown";
+}
+
+function requireUserSiteCode(auth: { siteId: string | null; roles: string[] }) {
+  if (!auth.siteId && !auth.roles?.includes("admin")) {
+    throw createError("FORBIDDEN", "User has no site assignment");
+  }
+  return auth.siteId ?? "SITE-LYO";
 }
 
 const ProductionService: ServiceSchema = {
@@ -191,6 +196,8 @@ const ProductionService: ServiceSchema = {
         const params = parseParams(createBatchSchema, ctx.params);
         const auth = requireProduction(ctx, params.accessToken);
 
+        const siteCode = requireUserSiteCode(auth);
+
         const batch = await prisma.$transaction(async (tx) => {
           const existingBom = await loadBomByCode(tx, params.bom_code);
           const batch_code = await generateBatchCode(tx);
@@ -199,6 +206,7 @@ const ProductionService: ServiceSchema = {
               batch_code,
               bom_id: existingBom.id,
               command_id: params.command_id,
+              siteCode,
               status: PROD_STATUSES.PENDING,
               plannedStartAt: params.plannedStartAt,
               plannedEndAt: params.plannedEndAt
@@ -232,7 +240,8 @@ const ProductionService: ServiceSchema = {
     "batch.list": {
       async handler(ctx) {
         const params = parseParams(listBatchSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProductionRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
 
         let bom_id: string | undefined;
         if (params.bom_code) {
@@ -243,7 +252,8 @@ const ProductionService: ServiceSchema = {
         const where = {
           deletedAt: null,
           ...(params.status ? { status: params.status } : {}),
-          ...(bom_id ? { bom_id } : {})
+          ...(bom_id ? { bom_id } : {}),
+          ...(effectiveSite ? { siteCode: effectiveSite } : {})
         };
 
         const [items, total] = await Promise.all([
@@ -263,9 +273,10 @@ const ProductionService: ServiceSchema = {
     "batch.get": {
       async handler(ctx) {
         const params = parseParams(getBatchSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const batch = await loadBatchByCode(prisma, params.batch_code);
+        assertSiteAccess(auth, batch.siteCode);
         this.logger.info("Batch retrieved", {
           correlationId: ctx.meta.correlationId,
           batch_code: params.batch_code
@@ -281,6 +292,7 @@ const ProductionService: ServiceSchema = {
 
         const updatedBatch = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchByCode(tx, params.batch_code);
+          assertSiteAccess(auth, existingBatch.siteCode);
           if (params.status) {
             assertStatusTransition(existingBatch.status, params.status);
           }
@@ -316,10 +328,11 @@ const ProductionService: ServiceSchema = {
     "batch.delete": {
       async handler(ctx) {
         const params = parseParams(deleteBatchSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const deletedBatch = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchByCode(tx, params.batch_code);
+          assertSiteAccess(auth, existingBatch.siteCode);
           return tx.batchProduct.update({
             where: { batch_id: existingBatch.batch_id },
             data: { deletedAt: new Date() }
@@ -341,6 +354,7 @@ const ProductionService: ServiceSchema = {
 
         const updated = await prisma.$transaction(async (tx) => {
           const existing = await loadBatchByCode(tx, params.batch_code);
+          assertSiteAccess(auth, existing.siteCode);
           const nextStatus = resolveStatusFromProgress(params.percent, existing.status);
           if (nextStatus !== existing.status) {
             assertStatusTransition(existing.status, nextStatus);
@@ -383,6 +397,7 @@ const ProductionService: ServiceSchema = {
 
         const updated = await prisma.$transaction(async (tx) => {
           const existing = await loadBatchByCode(tx, params.batch_code);
+          assertSiteAccess(auth, existing.siteCode);
           const batch = await tx.batchProduct.update({
             where: { batch_id: existing.batch_id },
             data: {
@@ -407,9 +422,10 @@ const ProductionService: ServiceSchema = {
     "batch.history": {
       async handler(ctx) {
         const params = parseParams(batchHistorySchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const batch = await loadBatchByCode(prisma, params.batch_code);
+        assertSiteAccess(auth, batch.siteCode);
         const where = { batch_id: batch.batch_id };
 
         const [items, total] = await Promise.all([
@@ -429,9 +445,10 @@ const ProductionService: ServiceSchema = {
     "batch.steps.list": {
       async handler(ctx) {
         const params = parseParams(batchStepsListSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const batch = await loadBatchByCode(prisma, params.batch_code);
+        assertSiteAccess(auth, batch.siteCode);
         const steps = await prisma.productionStep.findMany({
           where: { batch_id: batch.batch_id },
           orderBy: { order_index: "asc" }
@@ -448,6 +465,7 @@ const ProductionService: ServiceSchema = {
 
         const step = await prisma.$transaction(async (tx) => {
           const batch = await loadBatchByCode(tx, params.batch_code);
+          assertSiteAccess(auth, batch.siteCode);
           const existing = await tx.productionStep.findFirst({
             where: { batch_id: batch.batch_id, step_code: params.step_code }
           });
@@ -479,6 +497,7 @@ const ProductionService: ServiceSchema = {
 
         const anomaly = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchById(tx, params.batch_id);
+          assertSiteAccess(auth, existingBatch.siteCode);
           const created = await tx.anomalies.create({
             data: {
               batch_id: existingBatch.batch_id,
@@ -523,6 +542,7 @@ const ProductionService: ServiceSchema = {
 
         const updatedAnomaly = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchById(tx, params.batch_id);
+          assertSiteAccess(auth, existingBatch.siteCode);
           const existingAnomaly = await tx.anomalies.findFirst({
             where: {
               anomaly_code: params.anomaly_code,
@@ -563,7 +583,8 @@ const ProductionService: ServiceSchema = {
     "product.create": {
       async handler(ctx) {
         const params = parseParams(createProductSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
+        assertSiteAccess(auth, params.siteCode);
 
         const product = await prisma.productStock.create({
           data: {
@@ -585,7 +606,7 @@ const ProductionService: ServiceSchema = {
     "product.get": {
       async handler(ctx) {
         const params = parseParams(getProductSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const product = await prisma.productStock.findFirst({
           where: { productCode: params.product_code, deletedAt: null }
@@ -593,6 +614,7 @@ const ProductionService: ServiceSchema = {
         if (!product) {
           throw createError("NOT_FOUND", "Product not found");
         }
+        assertSiteAccess(auth, product.siteCode);
         return product;
       }
     },
@@ -600,10 +622,14 @@ const ProductionService: ServiceSchema = {
     "product.update": {
       async handler(ctx) {
         const params = parseParams(updateProductSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const updatedProduct = await prisma.$transaction(async (tx) => {
           const existingProduct = await loadActiveProduct(tx, params.product_code);
+          assertSiteAccess(auth, existingProduct.siteCode);
+          if (params.siteCode) {
+            assertSiteAccess(auth, params.siteCode);
+          }
           return tx.productStock.update({
             where: { id: existingProduct.id },
             data: {
@@ -625,10 +651,11 @@ const ProductionService: ServiceSchema = {
     "product.delete": {
       async handler(ctx) {
         const params = parseParams(deleteProductSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const deletedProduct = await prisma.$transaction(async (tx) => {
           const existingProduct = await loadActiveProduct(tx, params.product_code);
+          assertSiteAccess(auth, existingProduct.siteCode);
           return tx.productStock.update({
             where: { id: existingProduct.id },
             data: { deletedAt: new Date() }
