@@ -1,8 +1,7 @@
 import type { ActionSchema } from "moleculer";
 import { getDb } from "../../src/db.js";
 import { buildLotTrace } from "../../src/lib/lot-trace-helpers.js";
-import { parseParams } from "../../src/lib/parse-params.js";
-import { requireAdmin } from "../../src/lib/rbac.js";
+import { parseParams, requireAdmin } from "@aeronexis/services-shared";
 import { lotTraceSchema } from "../../src/lib/schemas.js";
 
 export const lotTraceAction: ActionSchema = {

@@ -9,6 +9,7 @@ import { createError, parseParams, signAccessToken } from "@aeronexis/services-s
 import { userInclude, buildAccessTokenPayload } from "../../src/lib/user-mapper.js";
 import { mapUser, mapRoles, type UserWithRoles } from "../../src/lib/user-mapper.js";
 import { createRefreshTokenRecord } from "../../src/lib/tokens.js";
+import { logAuthAudit } from "../../src/lib/audit.js";
 import { prisma } from "../../src/db.js";
 
 
@@ -51,6 +52,17 @@ export const loginAction = {
       correlationId: ctx.meta.correlationId,
       userId: user.id,
       email: user.email,
+    });
+
+    await logAuthAudit({
+      action: "auth.login",
+      actorId: user.id,
+      actorEmail: user.email,
+      roles: mapRoles(user).map((role) => role.code),
+      entity: "User",
+      entityId: user.id,
+      siteCode: user.siteId ?? undefined,
+      correlationId: ctx.meta.correlationId
     });
 
     return issueTokens(user);

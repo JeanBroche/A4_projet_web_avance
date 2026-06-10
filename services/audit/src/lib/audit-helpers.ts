@@ -267,7 +267,7 @@ export async function seedDemoLot(db: Db) {
       timestamp: new Date("2026-01-15T10:00:00.000Z")
     },
     {
-      type: "expedition.shipment.planned",
+      type: "shipment.shipment.planned",
       lotId: DEMO_LOT_ID,
       ofId: "OF-SEED-001",
       siteCode: "SITE-LYO",

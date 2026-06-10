@@ -1,5 +1,5 @@
-import type { ServiceSchema } from 'moleculer';
-
+import type { Service, ServiceSchema } from "moleculer";
+import { initAuthAuditWriter } from "../src/lib/audit.js";
 import {
   loginAction,
   refreshAction,
@@ -12,7 +12,11 @@ import {
 } from './actions/index.js';
 
 const AuthService: ServiceSchema = {
-  name: 'auth',
+  name: "auth",
+
+  started(this: Service) {
+    initAuthAuditWriter(this);
+  },
 
   actions: {
     ping: {

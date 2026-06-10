@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { Context } from 'moleculer';
 
 import { createError, parseParams, requireAdmin } from "@aeronexis/services-shared";
+import { logAuthAudit } from "../../src/lib/audit.js";
 import { userUpdateSchema } from '../../src/lib/schemas.js';
 import { mapUser, mapRoles, userInclude } from '../../src/lib/user-mapper.js';
 import { prisma } from '../../src/db.js';
@@ -16,8 +17,7 @@ type AuthContextMeta = {
 export const userUpdateAction = {
   async handler(ctx: Context<UserUpdateParams, AuthContextMeta>) {
     const params = parseParams(userUpdateSchema, ctx.params);
-
-    requireAdmin(ctx, params.accessToken);
+    const auth = requireAdmin(ctx, params.accessToken);
 
     const existing = await prisma.user.findFirst({
       where: { id: params.id },
@@ -115,6 +115,35 @@ export const userUpdateAction = {
     ctx.service!.logger.info('User updated', {
       correlationId: ctx.meta.correlationId,
       userId: user.id,
+    });
+
+    await logAuthAudit({
+      action: "auth.user.update",
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      roles: auth.roles,
+      entity: "User",
+      entityId: user.id,
+      siteCode: user.siteId ?? undefined,
+      correlationId: ctx.meta.correlationId,
+      diff: {
+        before: {
+          email: existing.email,
+          firstName: existing.firstName,
+          lastName: existing.lastName,
+          siteId: existing.siteId,
+          isActive: existing.isActive,
+          roles: mapRoles(existing)
+        },
+        after: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          siteId: user.siteId,
+          isActive: user.isActive,
+          roles: mapRoles(user)
+        }
+      }
     });
 
     return {

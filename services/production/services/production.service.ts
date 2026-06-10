@@ -1,5 +1,6 @@
-import type { ServiceSchema } from "moleculer";
+import type { Service, ServiceSchema } from "moleculer";
 import { prisma } from "../src/db.js";
+import { initProductionAuditWriter, logProductionMutation } from "../src/lib/audit.js";
 import { publishProductionEvent } from "../src/lib/events.js";
 import {
   PROD_STATUSES,
@@ -62,6 +63,10 @@ function requireUserSiteCode(auth: { siteId: string | null; roles: string[] }) {
 const ProductionService: ServiceSchema = {
   name: "production",
 
+  started(this: Service) {
+    initProductionAuditWriter(this);
+  },
+
   actions: {
     ping: {
       handler(ctx) {
@@ -73,7 +78,7 @@ const ProductionService: ServiceSchema = {
     "bom.create": {
       async handler(ctx) {
         const params = parseParams(createBomSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const bom = await prisma.$transaction(async (tx) => {
           const bom_code = await generateBOMCode(tx);
@@ -97,6 +102,13 @@ const ProductionService: ServiceSchema = {
         this.logger.info("BOM created", {
           correlationId: ctx.meta.correlationId,
           bom_code: bom.bom_code
+        });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.bom.create",
+          entity: "BOMProduct",
+          entityId: bom.id,
+          metadata: { bom_code: bom.bom_code }
         });
 
         return bom;
@@ -144,7 +156,7 @@ const ProductionService: ServiceSchema = {
     "bom.update": {
       async handler(ctx) {
         const params = parseParams(updateBomSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const updatedBom = await prisma.$transaction(async (tx) => {
           const existingBom = await loadBomByCode(tx, params.bom_code);
@@ -166,6 +178,14 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           bom_code: params.bom_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.bom.update",
+          entity: "BOMProduct",
+          entityId: updatedBom.id,
+          metadata: { bom_code: params.bom_code }
+        });
+
         return updatedBom;
       }
     },
@@ -173,7 +193,7 @@ const ProductionService: ServiceSchema = {
     "bom.delete": {
       async handler(ctx) {
         const params = parseParams(deleteBomSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        const auth = requireProduction(ctx, params.accessToken);
 
         const deletedBom = await prisma.$transaction(async (tx) => {
           const existingBom = await loadBomByCode(tx, params.bom_code);
@@ -187,6 +207,14 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           bom_code: params.bom_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.bom.delete",
+          entity: "BOMProduct",
+          entityId: deletedBom.id,
+          metadata: { bom_code: params.bom_code }
+        });
+
         return deletedBom;
       }
     },
@@ -233,6 +261,15 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           batch_code: batch.batch_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.create",
+          entity: "BatchProduct",
+          entityId: batch.batch_id,
+          siteCode: batch.siteCode,
+          metadata: { batch_code: batch.batch_code, command_id: batch.command_id }
+        });
+
         return batch;
       }
     },
@@ -321,6 +358,15 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           batch_code: params.batch_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.update",
+          entity: "BatchProduct",
+          entityId: updatedBatch.batch_id,
+          siteCode: updatedBatch.siteCode,
+          metadata: { batch_code: params.batch_code, status: params.status }
+        });
+
         return updatedBatch;
       }
     },
@@ -343,6 +389,15 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           batch_code: params.batch_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.delete",
+          entity: "BatchProduct",
+          entityId: deletedBatch.batch_id,
+          siteCode: deletedBatch.siteCode,
+          metadata: { batch_code: params.batch_code }
+        });
+
         return deletedBatch;
       }
     },
@@ -382,6 +437,14 @@ const ProductionService: ServiceSchema = {
           status: updated.status
         });
 
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.progress",
+          entity: "BatchProduct",
+          entityId: updated.batch_id,
+          siteCode: updated.siteCode,
+          metadata: { batch_code: params.batch_code, progress: params.percent }
+        });
+
         return updated;
       }
     },
@@ -413,6 +476,14 @@ const ProductionService: ServiceSchema = {
             authEmail(auth)
           );
           return batch;
+        });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.reschedule",
+          entity: "BatchProduct",
+          entityId: updated.batch_id,
+          siteCode: updated.siteCode,
+          metadata: { batch_code: params.batch_code }
         });
 
         return updated;
@@ -486,6 +557,13 @@ const ProductionService: ServiceSchema = {
           return updated;
         });
 
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.steps.update",
+          entity: "ProductionStep",
+          entityId: step.id,
+          metadata: { batch_code: params.batch_code, step_code: params.step_code }
+        });
+
         return step;
       }
     },
@@ -531,6 +609,14 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           batch_id: params.batch_id
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.addAnomalies",
+          entity: "Anomaly",
+          entityId: anomaly.anomaly_id,
+          metadata: { batch_id: params.batch_id, anomaly_code: anomaly.anomaly_code }
+        });
+
         return anomaly;
       }
     },
@@ -576,6 +662,14 @@ const ProductionService: ServiceSchema = {
           batch_id: params.batch_id,
           anomaly_code: params.anomaly_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.batch.updateAnomalies",
+          entity: "Anomaly",
+          entityId: updatedAnomaly.anomaly_id,
+          metadata: { batch_id: params.batch_id, anomaly_code: params.anomaly_code }
+        });
+
         return updatedAnomaly;
       }
     },
@@ -599,6 +693,15 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           product_code: params.product_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.product.create",
+          entity: "ProductStock",
+          entityId: product.id,
+          siteCode: product.siteCode,
+          metadata: { product_code: params.product_code }
+        });
+
         return product;
       }
     },
@@ -644,6 +747,15 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           product_code: params.product_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.product.update",
+          entity: "ProductStock",
+          entityId: updatedProduct.id,
+          siteCode: updatedProduct.siteCode,
+          metadata: { product_code: params.product_code }
+        });
+
         return updatedProduct;
       }
     },
@@ -666,6 +778,15 @@ const ProductionService: ServiceSchema = {
           correlationId: ctx.meta.correlationId,
           product_code: params.product_code
         });
+
+        await logProductionMutation(auth, ctx.meta.correlationId, {
+          action: "production.product.delete",
+          entity: "ProductStock",
+          entityId: deletedProduct.id,
+          siteCode: deletedProduct.siteCode,
+          metadata: { product_code: params.product_code }
+        });
+
         return deletedProduct;
       }
     }

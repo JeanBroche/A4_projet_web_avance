@@ -12,6 +12,7 @@ import {
   VALIDATION_ACTIONS,
   assertStatusTransition,
 } from '../../src/lib/order-helpers.js';
+import { logOrderAudit } from '../../src/lib/audit.js';
 
 type OrderRejectParams = z.infer<typeof orderRejectSchema>;
 type AuthContextMeta = {
@@ -57,6 +58,22 @@ export const orderRejectAction = {
       });
 
       return next;
+    });
+
+    await logOrderAudit({
+      action: 'order.order.reject',
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      roles: auth.roles,
+      entity: 'CustomerOrder',
+      entityId: updated.id,
+      siteCode: updated.siteCode,
+      correlationId: ctx.meta.correlationId,
+      metadata: { orderNumber: updated.orderNumber, reason: params.reason },
+      diff: {
+        before: { status: order.status },
+        after: { status: updated.status }
+      }
     });
 
     return toOrderSummary(updated);

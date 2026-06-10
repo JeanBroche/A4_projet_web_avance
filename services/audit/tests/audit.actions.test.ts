@@ -9,7 +9,7 @@ import moleculerConfig from "../moleculer.config.js";
 import auditService from "../services/audit.service.js";
 import { connectMongo, disconnectMongo, getDb } from "../src/db.js";
 import { COLLECTIONS } from "../src/db.js";
-import { DEMO_LOT_ID } from "../src/lib/audit-helpers.js";
+import { DEMO_LOT_ID, seedDemoLot } from "../src/lib/audit-helpers.js";
 import type { UserActionLoggedPayload } from "@aeronexis/shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -69,6 +69,10 @@ before(async () => {
     return;
   }
 
+  const db = getDb();
+  await seedDemoLot(db);
+  await db.collection(COLLECTIONS.auditLogs).deleteMany({ entity: "AuditTestEntity" });
+
   broker.createService(auditService);
   await broker.start();
 
@@ -77,9 +81,6 @@ before(async () => {
     sub: "commercial-user",
     email: "commercial@aeronexis.test"
   });
-
-  const db = getDb();
-  await db.collection(COLLECTIONS.auditLogs).deleteMany({ entity: "AuditTestEntity" });
 });
 
 after(async () => {

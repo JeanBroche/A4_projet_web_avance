@@ -2,8 +2,7 @@ import type { ActionSchema, Service } from "moleculer";
 import { getDb } from "../../src/db.js";
 import { insertCriticalEvent } from "../../src/lib/audit-helpers.js";
 import { publishAuditEvent } from "../../src/lib/events.js";
-import { parseParams } from "../../src/lib/parse-params.js";
-import { requireAdmin } from "../../src/lib/rbac.js";
+import { parseParams, requireAdmin } from "@aeronexis/services-shared";
 import { eventRecordSchema } from "../../src/lib/schemas.js";
 
 export const eventRecordAction: ActionSchema = {

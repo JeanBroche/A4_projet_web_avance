@@ -108,3 +108,19 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+  audit:
+    build:
+      context: ../..
+      dockerfile: services/audit/Dockerfile
+    container_name: aeronexis-audit
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: audit
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped

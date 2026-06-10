@@ -12,6 +12,7 @@ import {
 } from '../../src/lib/order-helpers.js';
 
 import { publishOrderEvent } from '../../src/lib/events.js';
+import { logOrderAudit } from '../../src/lib/audit.js';
 
 type OrderSetPriorityParams = z.infer<typeof orderSetPrioritySchema>;
 type AuthContextMeta = {
@@ -47,6 +48,22 @@ export const orderSetPriorityAction = {
       orderNumber: updated.orderNumber,
       isUrgent: updated.isUrgent,
       dueDate: updated.dueDate,
+    });
+
+    await logOrderAudit({
+      action: 'order.order.setPriority',
+      actorId: auth.sub,
+      actorEmail: auth.email,
+      roles: auth.roles,
+      entity: 'CustomerOrder',
+      entityId: updated.id,
+      siteCode: updated.siteCode,
+      correlationId: ctx.meta.correlationId,
+      metadata: { orderNumber: updated.orderNumber },
+      diff: {
+        before: { isUrgent: order.isUrgent, dueDate: order.dueDate },
+        after: { isUrgent: updated.isUrgent, dueDate: updated.dueDate }
+      }
     });
 
     return toOrderSummary(updated);

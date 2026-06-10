@@ -1,7 +1,7 @@
 import type { Context } from "moleculer";
 import type { Db } from "mongodb";
+import { createError } from "@aeronexis/services-shared";
 import { COLLECTIONS } from "../db.js";
-import { createError } from "./errors.js";
 import type { EventHistoryDocument, LotProgressDocument } from "./audit-helpers.js";
 
 export interface TimelineEntry {
@@ -30,6 +30,13 @@ type ShipmentHistoryItem = {
   status: string;
   createdAt: string | Date;
   siteCode: string;
+};
+
+type BatchHistoryItem = {
+  id: string;
+  action: string;
+  details?: string | null;
+  createdAt: string | Date;
 };
 
 function toIso(value: string | Date) {
@@ -83,12 +90,12 @@ async function fetchStockMovements(
   }
 }
 
-async function fetchExpeditionHistory(
+async function fetchShipmentHistory(
   ctx: Context,
   params: { siteCode: string; ofId: string; accessToken?: string }
 ): Promise<TimelineEntry[]> {
   try {
-    const result = (await ctx.call("expedition.shipment.history", {
+    const result = (await ctx.call("shipment.shipment.history", {
       siteCode: params.siteCode,
       accessToken: params.accessToken,
       page: 1,
@@ -99,8 +106,8 @@ async function fetchExpeditionHistory(
       .filter((item) => item.siteCode === params.siteCode)
       .map((item) => ({
         timestamp: toIso(item.createdAt),
-        source: "expedition",
-        type: "expedition.shipment",
+        source: "shipment",
+        type: "shipment.shipment",
         label: `Shipment ${item.code} (${item.status})`,
         status: "ok" as const,
         payload: {
@@ -114,13 +121,57 @@ async function fetchExpeditionHistory(
     return [
       {
         timestamp: new Date().toISOString(),
-        source: "expedition",
-        type: "expedition.unavailable",
-        label: "Expedition service unavailable",
+        source: "shipment",
+        type: "shipment.unavailable",
+        label: "Shipment service unavailable",
         status: "unavailable"
       }
     ];
   }
+}
+
+async function fetchProductionHistory(
+  ctx: Context,
+  params: { lotId: string; ofId: string; accessToken?: string }
+): Promise<TimelineEntry[]> {
+  const batchCodes = [params.lotId, params.ofId].filter(Boolean);
+
+  for (const batchCode of batchCodes) {
+    try {
+      const result = (await ctx.call("production.batch.history", {
+        batch_code: batchCode,
+        accessToken: params.accessToken,
+        limit: 100
+      })) as { items: BatchHistoryItem[] };
+
+      if (result.items.length > 0) {
+        return result.items.map((item) => ({
+          timestamp: toIso(item.createdAt),
+          source: "production",
+          type: `production.${item.action}`,
+          label: item.details || item.action,
+          status: "ok" as const,
+          payload: {
+            batchCode,
+            action: item.action,
+            details: item.details
+          }
+        }));
+      }
+    } catch {
+      // try next code
+    }
+  }
+
+  return [
+    {
+      timestamp: new Date().toISOString(),
+      source: "production",
+      type: "production.unavailable",
+      label: "Production service unavailable",
+      status: "unavailable"
+    }
+  ];
 }
 
 function mapEventHistory(events: EventHistoryDocument[]): TimelineEntry[] {
@@ -159,23 +210,31 @@ export async function buildLotTrace(
     .sort({ timestamp: 1 })
     .toArray();
 
-  const [stockEntries, expeditionEntries] = await Promise.all([
+  const [stockEntries, shipmentEntries, productionEntries] = await Promise.all([
     fetchStockMovements(ctx, {
       siteCode: lot.siteCode,
       lotId,
       ofId: lot.ofId,
       accessToken
     }),
-    fetchExpeditionHistory(ctx, {
+    fetchShipmentHistory(ctx, {
       siteCode: lot.siteCode,
+      ofId: lot.ofId,
+      accessToken
+    }),
+    fetchProductionHistory(ctx, {
+      lotId,
       ofId: lot.ofId,
       accessToken
     })
   ]);
 
-  const timeline = [...mapEventHistory(events), ...stockEntries, ...expeditionEntries].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
+  const timeline = [
+    ...mapEventHistory(events),
+    ...stockEntries,
+    ...shipmentEntries,
+    ...productionEntries
+  ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   return {
     lot: {

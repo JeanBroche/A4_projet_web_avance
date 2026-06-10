@@ -1,5 +1,6 @@
 import type { Context, Service, ServiceSchema } from "moleculer";
 import { prisma } from "../src/db.js";
+import { initStockAuditWriter, logStockAudit } from "../src/lib/audit.js";
 import { publishStockEvent } from "../src/lib/events.js";
 import {
   assertSiteAccess,
@@ -71,6 +72,20 @@ async function releaseOrCancel(
     reservationId: updated.id,
     status: finalStatus
   });
+  await logStockAudit({
+    action: finalStatus === "RELEASED" ? "stock.reservation.release" : "stock.reservation.cancel",
+    actorId: auth.sub,
+    actorEmail: auth.email,
+    roles: auth.roles,
+    entity: "StockReservation",
+    entityId: updated.id,
+    siteCode: reservation.siteCode,
+    correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+    diff: {
+      before: { status: reservation.status },
+      after: { status: finalStatus }
+    }
+  });
   this.logger.info("Reservation transitioned", {
     correlationId: (ctx.meta as { correlationId?: string }).correlationId,
     reservationId: updated.id,
@@ -81,6 +96,11 @@ async function releaseOrCancel(
 
 const StockService: ServiceSchema = {
   name: "stock",
+
+  started(this: Service) {
+    initStockAuditWriter(this);
+  },
+
   actions: {
     ping: {
       handler(ctx) {
@@ -172,6 +192,30 @@ const StockService: ServiceSchema = {
           type: params.type,
           quantity: params.quantity
         });
+        await logStockAudit({
+          action: "stock.movement.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "StockMovement",
+          entityId: result.id,
+          siteCode: material.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            materialId: material.id,
+            materialCode: material.code,
+            type: params.type,
+            quantity: params.quantity,
+            documentRef: params.documentRef
+          },
+          diff: {
+            after: {
+              type: params.type,
+              quantity: params.quantity,
+              currentStock: newCurrent
+            }
+          }
+        });
         this.logger.info("Stock movement recorded", {
           correlationId: (ctx.meta as { correlationId?: string }).correlationId,
           movementId: result.id,
@@ -236,6 +280,20 @@ const StockService: ServiceSchema = {
         publishStockEvent(this, "stock.reserved", {
           ofId: params.ofId,
           reservationIds: reservations.map((r: StockReservation) => r.id)
+        });
+        await logStockAudit({
+          action: "stock.reservation.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "StockReservation",
+          siteCode: reservations[0]?.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            ofId: params.ofId,
+            reservationIds: reservations.map((r) => r.id),
+            lineCount: reservations.length
+          }
         });
         this.logger.info("Reservations created", {
           correlationId: (ctx.meta as { correlationId?: string }).correlationId,
