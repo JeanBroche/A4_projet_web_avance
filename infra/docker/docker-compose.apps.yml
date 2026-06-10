@@ -11,11 +11,11 @@ services:
         condition: service_healthy
       postgres-stock:
         condition: service_healthy
-      postgres-commande:
+      postgres-order:
         condition: service_healthy
       postgres-production:
         condition: service_healthy
-      postgres-expedition:
+      postgres-shipment:
         condition: service_healthy
     restart: "no"
 
@@ -55,19 +55,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  commande:
+  order:
     build:
       context: ../..
-      dockerfile: services/commande/Dockerfile
-    container_name: aeronexis-commande
+      dockerfile: services/order/Dockerfile
+    container_name: aeronexis-order
     env_file:
       - ../../.env.docker
     environment:
-      NODE_ID: commande
+      NODE_ID: order
     depends_on:
       db-migrate:
         condition: service_completed_successfully
-      postgres-commande:
+      postgres-order:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -91,19 +91,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  expedition:
+  shipment:
     build:
       context: ../..
-      dockerfile: services/expedition/Dockerfile
-    container_name: aeronexis-expedition
+      dockerfile: services/shipment/Dockerfile
+    container_name: aeronexis-shipment
     env_file:
       - ../../.env.docker
     environment:
-      NODE_ID: expedition
+      NODE_ID: shipment
     depends_on:
       db-migrate:
         condition: service_completed_successfully
-      postgres-expedition:
+      postgres-shipment:
         condition: service_healthy
       redis:
         condition: service_healthy

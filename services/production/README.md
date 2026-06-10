@@ -8,7 +8,7 @@ Microservice Moleculer Production (issue parent [#95](https://github.com/JeanBro
 - Redis (`REDIS_URL` — inclus dans `pnpm docker:up`)
 - Variables : `PRODUCTION_DATABASE_URL`, `JWT_SECRET` (voir [`.env.example`](../../.env.example))
 
-Le service tourne en **TypeScript natif** via `tsx` (pas de compilation `dist` en dev), comme `stock` et `commande`.
+Le service tourne en **TypeScript natif** via `tsx` (pas de compilation `dist` en dev), comme `stock` et `order`.
 
 ## Scripts Prisma (depuis `services/production`)
 

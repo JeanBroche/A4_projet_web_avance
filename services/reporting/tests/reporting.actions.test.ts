@@ -101,7 +101,7 @@ before(async () => {
   });
 
   broker.createService({
-    name: "commande",
+    name: "order",
     actions: {
       "order.listUrgent": {
         handler() {

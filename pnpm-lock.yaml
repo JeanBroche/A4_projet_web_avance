@@ -224,122 +224,6 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
-  services/commande:
-    dependencies:
-      '@aeronexis/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@aeronexis/moleculer-config':
-        specifier: workspace:*
-        version: link:../../packages/moleculer-config
-      '@aeronexis/services-shared':
-        specifier: workspace:*
-        version: link:../../packages/services-shared
-      '@prisma/adapter-pg':
-        specifier: ^7.8.0
-        version: 7.8.0
-      '@prisma/client':
-        specifier: ^7.8.0
-        version: 7.8.0(prisma@7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3))(typescript@5.9.3)
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      ioredis:
-        specifier: ^5.11.0
-        version: 5.11.0
-      jsonwebtoken:
-        specifier: ^9.0.3
-        version: 9.0.3
-      moleculer:
-        specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
-      pg:
-        specifier: ^8.16.0
-        version: 8.21.0
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@types/jsonwebtoken':
-        specifier: ^9.0.10
-        version: 9.0.10
-      '@types/node':
-        specifier: ^22.15.0
-        version: 22.19.19
-      '@types/pg':
-        specifier: ^8.15.2
-        version: 8.20.0
-      moleculer-cli:
-        specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
-      prisma:
-        specifier: ^7.8.0
-        version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
-      tsx:
-        specifier: ^4.20.3
-        version: 4.22.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-
-  services/expedition:
-    dependencies:
-      '@aeronexis/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@aeronexis/moleculer-config':
-        specifier: workspace:*
-        version: link:../../packages/moleculer-config
-      '@aeronexis/services-shared':
-        specifier: workspace:*
-        version: link:../../packages/services-shared
-      '@prisma/adapter-pg':
-        specifier: ^7.8.0
-        version: 7.8.0
-      '@prisma/client':
-        specifier: ^7.8.0
-        version: 7.8.0(prisma@7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3))(typescript@5.9.3)
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      ioredis:
-        specifier: ^5.11.0
-        version: 5.11.0
-      jsonwebtoken:
-        specifier: ^9.0.3
-        version: 9.0.3
-      moleculer:
-        specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
-      pg:
-        specifier: ^8.16.0
-        version: 8.21.0
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@types/jsonwebtoken':
-        specifier: ^9.0.10
-        version: 9.0.10
-      '@types/node':
-        specifier: ^22.15.0
-        version: 22.19.19
-      '@types/pg':
-        specifier: ^8.15.2
-        version: 8.20.0
-      moleculer-cli:
-        specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
-      prisma:
-        specifier: ^7.8.0
-        version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
-      tsx:
-        specifier: ^4.20.3
-        version: 4.22.4
-      typescript:
-        specifier: ^5.8.3
-        version: 5.9.3
-
   services/notification:
     dependencies:
       '@aeronexis/moleculer-config':
@@ -358,6 +242,64 @@ importers:
       moleculer-cli:
         specifier: ^0.8.2
         version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+      tsx:
+        specifier: ^4.20.3
+        version: 4.22.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  services/order:
+    dependencies:
+      '@aeronexis/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@aeronexis/moleculer-config':
+        specifier: workspace:*
+        version: link:../../packages/moleculer-config
+      '@aeronexis/services-shared':
+        specifier: workspace:*
+        version: link:../../packages/services-shared
+      '@prisma/adapter-pg':
+        specifier: ^7.8.0
+        version: 7.8.0
+      '@prisma/client':
+        specifier: ^7.8.0
+        version: 7.8.0(prisma@7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3))(typescript@5.9.3)
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      ioredis:
+        specifier: ^5.11.0
+        version: 5.11.0
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
+      moleculer:
+        specifier: ^0.15.0
+        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+      pg:
+        specifier: ^8.16.0
+        version: 8.21.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.19.19
+      '@types/pg':
+        specifier: ^8.15.2
+        version: 8.20.0
+      moleculer-cli:
+        specifier: ^0.8.2
+        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+      prisma:
+        specifier: ^7.8.0
+        version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
       tsx:
         specifier: ^4.20.3
         version: 4.22.4
@@ -456,6 +398,64 @@ importers:
       moleculer-cli:
         specifier: ^0.8.2
         version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+      tsx:
+        specifier: ^4.20.3
+        version: 4.22.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  services/shipment:
+    dependencies:
+      '@aeronexis/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@aeronexis/moleculer-config':
+        specifier: workspace:*
+        version: link:../../packages/moleculer-config
+      '@aeronexis/services-shared':
+        specifier: workspace:*
+        version: link:../../packages/services-shared
+      '@prisma/adapter-pg':
+        specifier: ^7.8.0
+        version: 7.8.0
+      '@prisma/client':
+        specifier: ^7.8.0
+        version: 7.8.0(prisma@7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3))(typescript@5.9.3)
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      ioredis:
+        specifier: ^5.11.0
+        version: 5.11.0
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
+      moleculer:
+        specifier: ^0.15.0
+        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+      pg:
+        specifier: ^8.16.0
+        version: 8.21.0
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.19.19
+      '@types/pg':
+        specifier: ^8.15.2
+        version: 8.20.0
+      moleculer-cli:
+        specifier: ^0.8.2
+        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+      prisma:
+        specifier: ^7.8.0
+        version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
       tsx:
         specifier: ^4.20.3
         version: 4.22.4

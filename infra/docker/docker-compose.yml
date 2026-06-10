@@ -39,19 +39,19 @@ services:
       retries: 5
       start_period: 10s
 
-  postgres-commande:
+  postgres-order:
     <<: *postgres-service
-    container_name: aeronexis-postgres-commande
+    container_name: aeronexis-postgres-order
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-aeronexis}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aeronexis_dev}
-      POSTGRES_DB: aeronexis_commande
+      POSTGRES_DB: aeronexis_order
     ports:
-      - "${COMMANDE_PG_PORT:-5434}:5432"
+      - "${ORDER_PG_PORT:-5434}:5432"
     volumes:
-      - pg_commande_data:/var/lib/postgresql/data
+      - pg_order_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_commande"]
+      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_order"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -75,19 +75,19 @@ services:
       retries: 5
       start_period: 10s
 
-  postgres-expedition:
+  postgres-shipment:
     <<: *postgres-service
-    container_name: aeronexis-postgres-expedition
+    container_name: aeronexis-postgres-shipment
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-aeronexis}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aeronexis_dev}
-      POSTGRES_DB: aeronexis_expedition
+      POSTGRES_DB: aeronexis_shipment
     ports:
-      - "${EXPEDITION_PG_PORT:-5436}:5432"
+      - "${SHIPMENT_PG_PORT:-5436}:5432"
     volumes:
-      - pg_expedition_data:/var/lib/postgresql/data
+      - pg_shipment_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_expedition"]
+      test: ["CMD-SHELL", "pg_isready -U aeronexis -d aeronexis_shipment"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -217,9 +217,9 @@ services:
 volumes:
   pg_auth_data:
   pg_stock_data:
-  pg_commande_data:
+  pg_order_data:
   pg_production_data:
-  pg_expedition_data:
+  pg_shipment_data:
   mongo_data:
   mongo_init_modules:
   redis_data:

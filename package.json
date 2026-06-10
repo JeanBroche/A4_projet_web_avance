@@ -11,11 +11,11 @@
     "dev:gateway": "pnpm --filter @aeronexis/gateway dev",
     "dev:auth": "pnpm --filter @aeronexis/auth dev",
     "dev:stock": "pnpm --filter @aeronexis/stock dev",
-    "dev:commande": "pnpm --filter @aeronexis/commande dev",
+    "dev:order": "pnpm --filter @aeronexis/order dev",
     "dev:production": "pnpm --filter @aeronexis/production dev",
-    "dev:expedition": "pnpm --filter @aeronexis/expedition dev",
+    "dev:shipment": "pnpm --filter @aeronexis/shipment dev",
     "dev:reporting": "pnpm --filter @aeronexis/reporting dev",
-    "dev:backend": "pnpm --parallel --filter @aeronexis/auth --filter @aeronexis/stock --filter @aeronexis/commande --filter @aeronexis/production --filter @aeronexis/expedition --filter @aeronexis/reporting dev",
+    "dev:backend": "pnpm --parallel --filter @aeronexis/auth --filter @aeronexis/stock --filter @aeronexis/order --filter @aeronexis/production --filter @aeronexis/shipment --filter @aeronexis/reporting dev",
     "dev:web": "pnpm --filter web dev",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r --if-present run typecheck",
@@ -31,9 +31,9 @@
     "db:seed": "pnpm --filter @aeronexis/db run seed:all",
     "db:studio:auth": "pnpm --filter @aeronexis/auth run db:studio",
     "db:studio:stock": "pnpm --filter @aeronexis/stock run db:studio",
-    "db:studio:commande": "pnpm --filter @aeronexis/commande run db:studio",
+    "db:studio:order": "pnpm --filter @aeronexis/order run db:studio",
     "db:studio:production": "pnpm --filter @aeronexis/production run db:studio",
-    "db:studio:expedition": "pnpm --filter @aeronexis/expedition run db:studio",
+    "db:studio:shipment": "pnpm --filter @aeronexis/shipment run db:studio",
     "format": "prettier --write ."
   }
 }

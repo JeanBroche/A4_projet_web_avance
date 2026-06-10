@@ -1,4 +1,4 @@
-export { ruptureStockCalculation, rotationStockCalculation } from "./calculLogistique.js";
-export { urgentOrdersCalculation, delayRiskOrdersCalculation } from "./calculCommerciaux.js";
-export { marginCalculation, totalDelayCalculation } from "./calculFinance.js";
-export { avancementCalculation, retardLotsCalculation } from "./calculProd.js";
+export { ruptureStockCalculation, rotationStockCalculation } from "./logistics-metrics.js";
+export { urgentOrdersCalculation, delayRiskOrdersCalculation } from "./commercial-metrics.js";
+export { marginCalculation, totalDelayCalculation } from "./finance-metrics.js";
+export { avancementCalculation, retardLotsCalculation } from "./production-metrics.js";

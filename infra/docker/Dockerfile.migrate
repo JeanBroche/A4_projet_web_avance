@@ -10,12 +10,12 @@ COPY services/auth/package.json services/auth/prisma.config.ts ./services/auth/
 COPY services/auth/prisma ./services/auth/prisma
 COPY services/stock/package.json services/stock/prisma.config.ts ./services/stock/
 COPY services/stock/prisma ./services/stock/prisma
-COPY services/commande/package.json services/commande/prisma.config.ts ./services/commande/
-COPY services/commande/prisma ./services/commande/prisma
+COPY services/order/package.json services/order/prisma.config.ts ./services/order/
+COPY services/order/prisma ./services/order/prisma
 COPY services/production/package.json services/production/prisma.config.ts ./services/production/
 COPY services/production/prisma ./services/production/prisma
-COPY services/expedition/package.json services/expedition/prisma.config.ts ./services/expedition/
-COPY services/expedition/prisma ./services/expedition/prisma
+COPY services/shipment/package.json services/shipment/prisma.config.ts ./services/shipment/
+COPY services/shipment/prisma ./services/shipment/prisma
 
 RUN pnpm install --frozen-lockfile
 

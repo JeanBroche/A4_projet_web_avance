@@ -96,8 +96,8 @@ export function requireStockRead(
   return requireAnyRole(ctx, accessToken ?? null, ["logistique", "direction"]);
 }
 
-/** Lecture commande : commercial ou direction. */
-export function requireCommandeRead(
+/** Lecture order : commercial ou direction. */
+export function requireOrderRead(
   ctx: Context,
   accessToken?: string | null
 ): AccessTokenPayload {

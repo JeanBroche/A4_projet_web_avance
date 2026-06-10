@@ -16,7 +16,7 @@ import {
   resolveStatusFromProgress,
   recordBatchHistory,
   createDefaultSteps
-} from "../src/lib/prod-helper.js";
+} from "../src/lib/production-helpers.js";
 import {
   assertSiteAccess,
   createError,

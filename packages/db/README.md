@@ -48,15 +48,15 @@ pnpm db:studio    # http://localhost:5555, schema PG `auth`
 |----|-------------|-----------|---------|
 | `services/auth` | 5555 | `auth` | `AUTH_DATABASE_URL` |
 | `services/stock` | 5556 | `stock` | `STOCK_DATABASE_URL` |
-| `services/commande` | 5557 | `commande` | `COMMANDE_DATABASE_URL` |
+| `services/order` | 5557 | `order` | `ORDER_DATABASE_URL` |
 | `services/production` | 5558 | `production` | `PRODUCTION_DATABASE_URL` |
-| `services/expedition` | 5559 | `expedition` | `EXPEDITION_DATABASE_URL` |
+| `services/shipment` | 5559 | `shipment` | `SHIPMENT_DATABASE_URL` |
 
 ## Scripts racine (orchestration optionnelle)
 
 | Commande | Description |
 |----------|-------------|
-| `pnpm db:migrate` | `db:migrate` sur les 5 MS (ordre : auth → stock → commande → production → expedition) |
+| `pnpm db:migrate` | `db:migrate` sur les 5 MS (ordre : auth → stock → order → production → shipment) |
 | `pnpm db:migrate:dev` | `db:migrate:dev` sur les 5 MS |
 | `pnpm db:seed` | `db:seed` sur les 5 MS |
 | `pnpm db:studio:auth` | Raccourci vers `pnpm --filter @aeronexis/auth run db:studio` (idem `:stock`, etc.) |

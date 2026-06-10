@@ -5,7 +5,7 @@ import {
   PROD_STATUSES,
   createDefaultSteps,
   recordBatchHistory
-} from "../src/lib/prod-helper.js";
+} from "../src/lib/production-helpers.js";
 import { prisma } from "../src/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -40,9 +40,9 @@ Ports et commandes de verification : [infra/docker/README.md](infra/docker/READM
 | ------- | ------------------------- |
 | PostgreSQL auth | `localhost:5432` → `aeronexis_auth` |
 | PostgreSQL stock | `localhost:5433` → `aeronexis_stock` |
-| PostgreSQL commande | `localhost:5434` → `aeronexis_commande` |
+| PostgreSQL order | `localhost:5434` → `aeronexis_order` |
 | PostgreSQL production | `localhost:5435` → `aeronexis_production` |
-| PostgreSQL expedition | `localhost:5436` → `aeronexis_expedition` |
+| PostgreSQL shipment | `localhost:5436` → `aeronexis_shipment` |
 | MongoDB | `mongodb://localhost:27017/aeronexis` |
 | Redis | `redis://localhost:6379` |
 | Kafka | `localhost:9092` |
@@ -58,11 +58,11 @@ Chaque microservice Prisma lit son URL via une variable dediee (`AUTH_DATABASE_U
 | `pnpm dev:gateway` | Gateway HTTP (`apps/gateway`, issue [#5](https://github.com/JeanBroche/A4_projet_web_avance/issues/5) — placeholder) |
 | `pnpm dev:auth` | Microservice `auth` |
 | `pnpm dev:stock` | Microservice `stock` |
-| `pnpm dev:commande` | Microservice `commande` |
+| `pnpm dev:order` | Microservice `order` |
 | `pnpm dev:production` | Microservice `production` |
-| `pnpm dev:expedition` | Microservice `expedition` |
+| `pnpm dev:shipment` | Microservice `shipment` |
 | `pnpm dev:reporting` | Microservice `reporting` (KPI direction, milestone M7) |
-| `pnpm dev:backend` | Lance les 6 MS metier (`auth`, `stock`, `commande`, `production`, `expedition`, `reporting`) en parallele |
+| `pnpm dev:backend` | Lance les 6 MS metier (`auth`, `stock`, `order`, `production`, `shipment`, `reporting`) en parallele |
 | `pnpm dev:web` | Lance le frontend Nuxt sur le port 3000 |
 | `pnpm lint` | Lint sur tous les workspaces |
 | `pnpm test` | Tests sur tous les workspaces |
@@ -88,8 +88,8 @@ services/
   auth/             # Microservices Moleculer (issue #5)
   production/
   stock/
-  commande/
-  expedition/
+  order/
+  shipment/
   reporting/
   notification/
   audit/

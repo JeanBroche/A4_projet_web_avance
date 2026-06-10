@@ -2,5 +2,5 @@ export { type ErrorCode, createError, parseOrThrow, validationError, ErrorCodes 
 export { parseParams, resolveSiteCode } from "./paramsUtils.js";
 export { assertSiteAccess, resolveEffectiveSite } from "./siteUtils.js";
 export { signAccessToken, verifyAccessToken, type AccessTokenPayload } from "./jwtUtils.js";
-export { resolveAccessToken, requireAuth, requireAnyRole, requireCommercial, requireRole, requireAdmin, requireProduction, requireDirection, requireLogistique, requireStockRead, requireCommandeRead, requireProductionRead } from "./rbacUtils.js";
+export { resolveAccessToken, requireAuth, requireAnyRole, requireCommercial, requireRole, requireAdmin, requireProduction, requireDirection, requireLogistique, requireStockRead, requireOrderRead, requireProductionRead } from "./rbacUtils.js";
 export { generateCode, generateUniqueCode } from "./codeGenUtils.js";

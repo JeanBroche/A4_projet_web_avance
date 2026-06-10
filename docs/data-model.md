@@ -9,8 +9,8 @@ Cartographie architecture cible → microservices → persistance (M1).
 | Auth | `services/auth` | `aeronexis_auth` | `auth` | Site, User, Role, UserRole, RefreshToken |
 | Production | `services/production` | `aeronexis_production` | `production` | ProductStock (+ Product/BOM/MO en M3) |
 | Stock | `services/stock` | `aeronexis_stock` | `stock` | Material, StockMovement, StockReservation, StockAlert, SupplierDelay |
-| Commande | `services/commande` | `aeronexis_commande` | `commande` | Client (+ Order/OrderLine en M5) |
-| Expedition | `services/expedition` | `aeronexis_expedition` | `expedition` | PickList, Shipment |
+| Order | `services/order` | `aeronexis_order` | `order` | Client (+ Order/OrderLine en M5) |
+| Shipment | `services/shipment` | `aeronexis_shipment` | `shipment` | PickList, Shipment |
 | Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` | KPI_Dashboard (pas de migration M1) |
 | Notification | `services/notification` | Redis + Kafka | -- | Pas de Prisma M1 |
 | Audit | `services/audit` | MongoDB | -- | Collections `audit_logs`, `event_history` provisionnees par [`@aeronexis/mongo-init`](../infra/mongo/init.ts) (issue M0 #9) |
@@ -19,7 +19,7 @@ Cartographie architecture cible → microservices → persistance (M1).
 
 - **5 conteneurs PostgreSQL** Docker (1 par MS Prisma), chacun avec sa base `aeronexis_<service>` via `POSTGRES_DB` au premier `docker:up` ([`infra/docker/docker-compose.yml`](../infra/docker/docker-compose.yml)).
 - Chaque base contient en plus un **schema PG nomme** (`@@schema("...")` Prisma) — tables exposees comme `aeronexis_auth.auth.users`, `aeronexis_stock.stock.materials`, etc.
-- Chaque service lit son URL via une env var dediee : `AUTH_DATABASE_URL`, `STOCK_DATABASE_URL`, `COMMANDE_DATABASE_URL`, `PRODUCTION_DATABASE_URL`, `EXPEDITION_DATABASE_URL`.
+- Chaque service lit son URL via une env var dediee : `AUTH_DATABASE_URL`, `STOCK_DATABASE_URL`, `ORDER_DATABASE_URL`, `PRODUCTION_DATABASE_URL`, `SHIPMENT_DATABASE_URL`.
 - **`packages/db`** : factory client + extension soft-delete ; orchestration optionnelle (`migrate-all`, `seed-all`).
 - **Chaque MS Prisma** : scripts locaux `db:migrate`, `db:seed`, `db:studio` dans `services/<ms>/`.
 - **Pas de FK inter-bases** ni inter-schemas : references metier via codes string (`siteCode`, `orderNumber`, `productCode`).
@@ -49,18 +49,18 @@ Extension `@aeronexis/db` : `createSoftDeleteExtension(Prisma)` — `delete` / `
 | Topic | Producteur | Consommateur |
 |-------|------------|--------------|
 | `stock.material.low` | Stock | Notification |
-| `production.manu_order.finished` | Production | Commande |
-| `commande.order.finished` | Commande | Expedition |
-| `expedition.delivery.alert` | Expedition | Notification |
+| `production.manu_order.finished` | Production | Order |
+| `order.order.finished` | Order | Shipment |
+| `shipment.delivery.alert` | Shipment | Notification |
 | `user.action.logged` | Tous MS | Audit (Mongo) |
 
 ## References cross-MS (M1)
 
 | Champ | MS | Reference future |
 |-------|-----|------------------|
-| `siteCode` | stock, commande, production, expedition | Site seed auth (`SITE-LYO`) |
+| `siteCode` | stock, order, production, shipment | Site seed auth (`SITE-LYO`) |
 | `productCode` | production | Product (M3) |
-| `orderNumber` | expedition | Order (M5) |
+| `orderNumber` | shipment | Order (M5) |
 
 ## MongoDB (audit, M0 #9)
 
