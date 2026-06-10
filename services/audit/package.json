@@ -21,6 +21,7 @@
     "dotenv": "^17.4.2",
     "ioredis": "^5.11.0",
     "jsonwebtoken": "^9.0.3",
+    "kafkajs": "^2.2.4",
     "mongodb": "^6.17.0",
     "moleculer": "^0.15.0",
     "zod": "^4.4.3"

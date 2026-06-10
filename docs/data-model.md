@@ -6,7 +6,7 @@ Cartographie architecture cible → microservices → persistance (M1).
 
 | Service | Dossier | Base PG / store | Schema PG | Modeles |
 |---------|---------|-----------------|-----------|---------|
-| Auth | `services/auth` | `aeronexis_auth` | `auth` | Site, User, Role, UserRole, RefreshToken |
+| Auth | `services/auth` | `aeronexis_auth` + Redis (sessions) | `auth` | Site, User, Role, UserRole |
 | Production | `services/production` | `aeronexis_production` | `production` | ProductStock (+ Product/BOM/MO en M3) |
 | Stock | `services/stock` | `aeronexis_stock` | `stock` | Material, StockMovement, StockReservation, StockAlert, SupplierDelay |
 | Order | `services/order` | `aeronexis_order` | `order` | Client (+ Order/OrderLine en M5) |
@@ -42,9 +42,22 @@ Le modele `Material` joue le role de `StockLevel` consolide : `available = curre
 
 Champs `deletedAt` sur les entites metier (Site, User, Role, Material, Client, ProductStock, Delivery). Index uniques partiels PostgreSQL (`WHERE deletedAt IS NULL`) pour permettre la re-creation d'un code apres suppression logique.
 
-Extension `@aeronexis/db` : `createSoftDeleteExtension(Prisma)` — `delete` / `deleteMany` posent `deletedAt`, les lectures excluent les lignes supprimees. Hors scope : `UserRole`, `RefreshToken` (revocation via `revokedAt`).
+Extension `@aeronexis/db` : `createSoftDeleteExtension(Prisma)` — `delete` / `deleteMany` posent `deletedAt`, les lectures excluent les lignes supprimees. Hors scope : `UserRole`.
 
-## Topics Kafka (cible)
+## Bus Moleculer et Redis applicatif
+
+| Composant | Technologie | Role |
+|-----------|-------------|------|
+| Bus inter-services | **Kafka** (`KAFKA_BROKERS`, transporter Moleculer) | RPC (`broker.call`) et evenements (`broker.emit`) entre microservices |
+| Cache KPI | **Redis** (`@aeronexis/redis-infra`) | TTL reporting (`withCache`) |
+| Sessions auth | **Redis** | Refresh tokens, index sessions, blacklist JWT access |
+| Verrous | **Redis** | Reservations stock, generation codes sequentiels |
+
+Package partage : [`packages/redis-infra`](../packages/redis-infra). Config Moleculer : [`packages/moleculer-config`](../packages/moleculer-config).
+
+Smoke bus Kafka : `pnpm smoke:kafka` (Kafka doit etre demarre via `pnpm docker:up`).
+
+## Topics Kafka (cible metier)
 
 | Topic | Producteur | Consommateur |
 |-------|------------|--------------|
@@ -71,7 +84,7 @@ Collections provisionnees automatiquement au `docker:up` par le conteneur `mongo
 | `audit_logs` | `userId`, `action`, `entity`, `entityId`, `diff`, `ip`, `timestamp` | `{ userId: 1, timestamp: -1 }`, `{ entity: 1, entityId: 1 }` |
 | `event_history` | `type`, `payload`, `correlationId`, `timestamp` | `{ correlationId: 1 }`, `{ timestamp: -1 }` |
 
-Pas de collection `user_sessions` : les sessions utilisateur sont portees par `auth.refresh_tokens` (PostgreSQL).
+Pas de collection `user_sessions` : les refresh tokens auth sont stockes dans **Redis** (`auth:refresh:*`, `auth:user:sessions:*`), pas en PostgreSQL.
 
 ## Commandes
 

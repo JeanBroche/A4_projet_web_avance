@@ -1,3 +1,4 @@
+import { withDistributedLock } from "@aeronexis/redis-infra";
 import { prisma } from "../db.js";
 import { createError, generateCode } from "@aeronexis/services-shared";
 
@@ -49,19 +50,23 @@ async function generateUniqueCodeAsync(
 }
 
 export async function generateBatchCode(db: DbClient) {
-  const suffix = await generateUniqueCodeAsync(db, "BATCH", async (code) => {
-    const row = await db.batchProduct.findFirst({ where: { batch_code: code } });
-    return row !== null;
+  return withDistributedLock({ key: "lock:code:batch" }, async () => {
+    const suffix = await generateUniqueCodeAsync(db, "BATCH", async (code) => {
+      const row = await db.batchProduct.findFirst({ where: { batch_code: code } });
+      return row !== null;
+    });
+    return `BATCH-${suffix}`;
   });
-  return `BATCH-${suffix}`;
 }
 
 export async function generateBOMCode(db: DbClient) {
-  const suffix = await generateUniqueCodeAsync(db, "BOM", async (code) => {
-    const row = await db.bOMProduct.findFirst({ where: { bom_code: code } });
-    return row !== null;
+  return withDistributedLock({ key: "lock:code:bom" }, async () => {
+    const suffix = await generateUniqueCodeAsync(db, "BOM", async (code) => {
+      const row = await db.bOMProduct.findFirst({ where: { bom_code: code } });
+      return row !== null;
+    });
+    return `BOM-${suffix}`;
   });
-  return `BOM-${suffix}`;
 }
 
 export async function generateAnomalyCode(db: DbClient, batch_id: string) {

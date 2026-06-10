@@ -9,6 +9,7 @@ COPY packages/moleculer-config packages/moleculer-config
 COPY packages/db packages/db
 COPY packages/services-shared packages/services-shared
 COPY packages/shared packages/shared
+COPY packages/redis-infra packages/redis-infra
 COPY services/stock services/stock
 
 RUN pnpm install --frozen-lockfile

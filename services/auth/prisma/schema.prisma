@@ -37,9 +37,8 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  site          Site?          @relation(fields: [siteId], references: [id])
-  roles         UserRole[]
-  refreshTokens RefreshToken[]
+  site  Site?      @relation(fields: [siteId], references: [id])
+  roles UserRole[]
 
   @@index([siteId])
   @@index([deletedAt])
@@ -73,19 +72,4 @@ model UserRole {
   @@id([userId, roleId])
   @@schema("auth")
   @@map("user_roles")
-}
-
-model RefreshToken {
-  id        String    @id @default(cuid())
-  tokenHash String    @unique
-  userId    String
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@schema("auth")
-  @@map("refresh_tokens")
 }

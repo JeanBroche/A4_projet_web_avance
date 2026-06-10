@@ -1,4 +1,5 @@
 import type { Client, CustomerOrder, CustomerOrderLine } from "../generated/prisma/client.js";
+import { withDistributedLock } from "@aeronexis/redis-infra";
 import { prisma } from "../db.js";
 import { createError } from "@aeronexis/services-shared";
 
@@ -29,28 +30,30 @@ export type OrderWithRelations = CustomerOrder & {
 };
 
 export async function generateOrderNumber(db: DbClient, year = new Date().getFullYear()) {
-  const prefix = `CMD-${year}-`;
+  return withDistributedLock({ key: `lock:code:order:${year}` }, async () => {
+    const prefix = `CMD-${year}-`;
 
-  const latest = await db.customerOrder.findFirst({
-    where: {
-      orderNumber: { startsWith: prefix },
-      deletedAt: null
-    },
-    orderBy: { orderNumber: "desc" },
-    select: { orderNumber: true }
-  });
+    const latest = await db.customerOrder.findFirst({
+      where: {
+        orderNumber: { startsWith: prefix },
+        deletedAt: null
+      },
+      orderBy: { orderNumber: "desc" },
+      select: { orderNumber: true }
+    });
 
-  let sequence = 1;
+    let sequence = 1;
 
-  if (latest?.orderNumber) {
-    const suffix = latest.orderNumber.slice(prefix.length);
-    const parsed = Number.parseInt(suffix, 10);
-    if (!Number.isNaN(parsed)) {
-      sequence = parsed + 1;
+    if (latest?.orderNumber) {
+      const suffix = latest.orderNumber.slice(prefix.length);
+      const parsed = Number.parseInt(suffix, 10);
+      if (!Number.isNaN(parsed)) {
+        sequence = parsed + 1;
+      }
     }
-  }
 
-  return `${prefix}${String(sequence).padStart(5, "0")}`;
+    return `${prefix}${String(sequence).padStart(5, "0")}`;
+  });
 }
 
 export function toOrderSummary(order: OrderWithRelations) {

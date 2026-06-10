@@ -24,7 +24,7 @@ export function createConfig(overrides: BrokerOptions = {}): BrokerOptions {
         colors: false
       }
     },
-    transporter: (process.env.REDIS_URL || "redis://localhost:6379") as BrokerOptions["transporter"],
+    transporter: `Kafka://${process.env.KAFKA_BROKERS || "localhost:9092"}` as BrokerOptions["transporter"],
     serializer: "JSON",
     middlewares: [correlationIdMiddleware],
     ...overrides

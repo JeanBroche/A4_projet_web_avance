@@ -25,6 +25,7 @@ import {
   thresholdUpsertSchema
 } from "../src/lib/schemas.js";
 import type { StockReservation } from "../src/generated/prisma/client.js";
+import { withMaterialLocks } from "../src/lib/locks.js";
 import {
   computeAvailable,
   consolidateByCode,
@@ -247,36 +248,42 @@ const StockService: ServiceSchema = {
       async handler(ctx) {
         const params = parseParams(reservationCreateSchema, ctx.params);
         const auth = requireLogistique(ctx, params.accessToken);
-        const reservations = await prisma.$transaction(async (tx: DbClient) => {
-          const created: StockReservation[] = [];
-          for (const line of params.lines) {
-            const material = await loadActiveMaterial(tx, line.materialId);
-            assertSiteAccess(auth, material.siteCode);
-            const available = computeAvailable(material);
-            if (line.qty > available) {
-              throw createError(
-                "INSUFFICIENT_STOCK",
-                `Material ${material.code}: requested ${line.qty}, available ${available}`
-              );
-            }
-            const reservation = await tx.stockReservation.create({
-              data: {
-                ofId: params.ofId,
-                materialId: material.id,
-                siteCode: material.siteCode,
-                quantity: line.qty,
-                status: "ACTIVE"
+        const materialIds = params.lines.map((line) => line.materialId);
+        const reservations = await withMaterialLocks(
+          materialIds,
+          () =>
+            prisma.$transaction(async (tx: DbClient) => {
+              const created: StockReservation[] = [];
+              for (const line of params.lines) {
+                const material = await loadActiveMaterial(tx, line.materialId);
+                assertSiteAccess(auth, material.siteCode);
+                const available = computeAvailable(material);
+                if (line.qty > available) {
+                  throw createError(
+                    "INSUFFICIENT_STOCK",
+                    `Material ${material.code}: requested ${line.qty}, available ${available}`
+                  );
+                }
+                const reservation = await tx.stockReservation.create({
+                  data: {
+                    ofId: params.ofId,
+                    materialId: material.id,
+                    siteCode: material.siteCode,
+                    quantity: line.qty,
+                    status: "ACTIVE"
+                  }
+                });
+                await tx.material.update({
+                  where: { id: material.id },
+                  data: { reservedStock: material.reservedStock + line.qty }
+                });
+                await evaluateThreshold(tx, material.id);
+                created.push(reservation);
               }
-            });
-            await tx.material.update({
-              where: { id: material.id },
-              data: { reservedStock: material.reservedStock + line.qty }
-            });
-            await evaluateThreshold(tx, material.id);
-            created.push(reservation);
-          }
-          return created;
-        });
+              return created;
+            }),
+          this.logger
+        );
         publishStockEvent(this, "stock.reserved", {
           ofId: params.ofId,
           reservationIds: reservations.map((r: StockReservation) => r.id)

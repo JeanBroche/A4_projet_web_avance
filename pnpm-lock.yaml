@@ -9,7 +9,20 @@ overrides:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
+      moleculer:
+        specifier: ^0.15.0
+        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+      tsx:
+        specifier: ^4.20.3
+        version: 4.22.4
 
   apps/gateway:
     dependencies:
@@ -100,6 +113,9 @@ importers:
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -107,6 +123,22 @@ importers:
       '@types/node':
         specifier: ^22.15.0
         version: 22.19.19
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
+  packages/redis-infra:
+    dependencies:
+      ioredis:
+        specifier: ^5.11.0
+        version: 5.11.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.0
+        version: 22.19.19
+      tsx:
+        specifier: ^4.20.3
+        version: 4.22.4
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -155,6 +187,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -189,6 +224,9 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+      '@aeronexis/redis-infra':
+        specifier: workspace:*
+        version: link:../../packages/redis-infra
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
@@ -213,6 +251,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -281,6 +322,9 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+      '@aeronexis/redis-infra':
+        specifier: workspace:*
+        version: link:../../packages/redis-infra
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
@@ -302,6 +346,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -342,6 +389,9 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+      '@aeronexis/redis-infra':
+        specifier: workspace:*
+        version: link:../../packages/redis-infra
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
@@ -366,6 +416,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -400,6 +453,9 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+      '@aeronexis/redis-infra':
+        specifier: workspace:*
+        version: link:../../packages/redis-infra
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
@@ -412,6 +468,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -443,6 +502,9 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+      '@aeronexis/redis-infra':
+        specifier: workspace:*
+        version: link:../../packages/redis-infra
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
@@ -464,6 +526,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -504,6 +569,9 @@ importers:
       '@aeronexis/moleculer-config':
         specifier: workspace:*
         version: link:../../packages/moleculer-config
+      '@aeronexis/redis-infra':
+        specifier: workspace:*
+        version: link:../../packages/redis-infra
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
@@ -525,6 +593,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      kafkajs:
+        specifier: ^2.2.4
+        version: 2.2.4
       moleculer:
         specifier: ^0.15.0
         version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
@@ -5097,6 +5168,10 @@ packages:
 
   jws@4.0.1:
     resolution: {integrity: sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==}
+
+  kafkajs@2.2.4:
+    resolution: {integrity: sha512-j/YeapB1vfPT2iOIUn/vxdyKEuhuY2PxMBvf5JWux6iSaukAccrMtXEY/Lb7OvavDhOWME589bpLrEdnVHjfjA==}
+    engines: {node: '>=14.0.0'}
 
   keyv@3.0.0:
     resolution: {integrity: sha512-eguHnq22OE3uVoSYG0LVWNP+4ppamWr9+zWBe1bsNcovIMy6huUJFPgy4mGwCd/rnl3vOLGW1MTlu4c57CT1xA==}
@@ -12018,6 +12093,8 @@ snapshots:
     dependencies:
       jwa: 2.0.1
       safe-buffer: 5.2.1
+
+  kafkajs@2.2.4: {}
 
   keyv@3.0.0:
     dependencies:

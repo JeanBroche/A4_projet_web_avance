@@ -1,19 +1,45 @@
 import { createHash, randomBytes } from "crypto";
-import type { prisma as authPrisma } from "../db.js";
 
 import { createError } from "@aeronexis/services-shared";
+import {
+  getRedisClient,
+  getSessionStore,
+  type SessionStore
+} from "@aeronexis/redis-infra";
+
+import { Errors } from "moleculer";
+
+import { prisma } from "../db.js";
 import { userInclude, type UserWithRoles } from "./user-mapper.js";
 
-type AuthPrisma = typeof authPrisma;
+type AuthPrisma = typeof prisma;
 
-const REFRESH_TTL_DAYS = parseRefreshTtlDays(process.env.JWT_REFRESH_TTL || "7d");
+const REFRESH_TTL_SECONDS = parseRefreshTtlSeconds(process.env.JWT_REFRESH_TTL || "7d");
 
-function parseRefreshTtlDays(value: string) {
+function parseRefreshTtlSeconds(value: string) {
   const match = /^(\d+)d$/i.exec(value.trim());
   if (!match) {
-    return 7;
+    return 7 * 24 * 60 * 60;
   }
-  return Number(match[1]);
+  return Number(match[1]) * 24 * 60 * 60;
+}
+
+let sessionStore: SessionStore | null = null;
+
+function getStore(): SessionStore {
+  if (!sessionStore) {
+    const redis = getRedisClient();
+    const store = getSessionStore(redis, { refreshTtlSeconds: REFRESH_TTL_SECONDS });
+    if (!store) {
+      throw new Errors.MoleculerServerError(
+        "Redis is required for refresh tokens",
+        503,
+        "SERVICE_UNAVAILABLE"
+      );
+    }
+    sessionStore = store;
+  }
+  return sessionStore;
 }
 
 export function generateRefreshToken() {
@@ -24,83 +50,44 @@ export function hashRefreshToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function getRefreshExpiresAt() {
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + REFRESH_TTL_DAYS);
-  return expiresAt;
+export async function createRefreshTokenRecord(_prisma: AuthPrisma, userId: string) {
+  const { token } = await getStore().createRefreshToken(userId);
+  return token;
 }
 
-export async function createRefreshTokenRecord(prisma: AuthPrisma, userId: string) {
-  const refreshToken = generateRefreshToken();
-  const tokenHash = hashRefreshToken(refreshToken);
-
-  await prisma.refreshToken.create({
-    data: {
-      tokenHash,
-      userId,
-      expiresAt: getRefreshExpiresAt()
-    }
-  });
-
-  return refreshToken;
-}
-
-export async function rotateRefreshToken(prisma: AuthPrisma, refreshToken: string) {
-  const tokenHash = hashRefreshToken(refreshToken);
-  const existing = await prisma.refreshToken.findUnique({
-    where: { tokenHash },
-    include: {
-      user: {
-        include: userInclude
-      }
-    }
-  });
-
-  if (!existing || existing.revokedAt || existing.expiresAt <= new Date()) {
+export async function rotateRefreshToken(_prisma: AuthPrisma, refreshToken: string) {
+  const rotated = await getStore().rotateRefreshToken(refreshToken);
+  if (!rotated) {
     throw createError("TOKEN_INVALID");
   }
 
-  if (!existing.user.isActive) {
+  const user = await prisma.user.findFirst({
+    where: { id: rotated.record.userId },
+    include: userInclude
+  });
+
+  if (!user) {
+    throw createError("TOKEN_INVALID");
+  }
+
+  if (!user.isActive) {
     throw createError("USER_INACTIVE");
   }
 
-  const newRefreshToken = generateRefreshToken();
-  const newTokenHash = hashRefreshToken(newRefreshToken);
-
-  await prisma.$transaction([
-    prisma.refreshToken.update({
-      where: { id: existing.id },
-      data: { revokedAt: new Date() }
-    }),
-    prisma.refreshToken.create({
-      data: {
-        tokenHash: newTokenHash,
-        userId: existing.userId,
-        expiresAt: getRefreshExpiresAt()
-      }
-    })
-  ]);
-
   return {
-    user: existing.user as UserWithRoles,
-    refreshToken: newRefreshToken
+    user: user as UserWithRoles,
+    refreshToken: rotated.token
   };
 }
 
-export async function revokeRefreshToken(prisma: AuthPrisma, refreshToken: string) {
-  const tokenHash = hashRefreshToken(refreshToken);
-  const existing = await prisma.refreshToken.findUnique({
-    where: { tokenHash }
-  });
+export async function revokeRefreshToken(_prisma: AuthPrisma, refreshToken: string) {
+  return getStore().revokeRefreshToken(refreshToken);
+}
 
-  if (!existing || existing.revokedAt) {
-    return false;
-  }
+export async function blacklistAccessToken(jti: string, ttlSeconds: number) {
+  await getStore().blacklistJwt(jti, ttlSeconds);
+}
 
-  await prisma.refreshToken.update({
-    where: { id: existing.id },
-    data: { revokedAt: new Date() }
-  });
-
-  return true;
+export async function isAccessTokenBlacklisted(jti: string) {
+  return getStore().isJwtBlacklisted(jti);
 }
