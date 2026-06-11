@@ -12,7 +12,7 @@ export const documentUrlAction: ActionSchema = {
 
     const db = getDb();
     const record = await findDocumentById(db, params.documentId);
-    if (!record) {
+    if (!record || !("lotId" in record) || !record.lotId) {
       throw createError("NOT_FOUND", "Document not found");
     }
 

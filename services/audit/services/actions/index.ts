@@ -2,6 +2,8 @@ import { changeListAction } from "./change-list.js";
 import { documentListAction } from "./document-list.js";
 import { documentUploadAction } from "./document-upload.js";
 import { documentUrlAction } from "./document-url.js";
+import { siteDocumentGetAction } from "./site-document-get.js";
+import { siteDocumentUploadAction } from "./site-document-upload.js";
 import { eventListCriticalAction } from "./event-list-critical.js";
 import { eventRecordAction } from "./event-record.js";
 import { lotExportAction } from "./lot-export.js";
@@ -17,5 +19,7 @@ export const auditActions = {
   "lot.export": lotExportAction,
   "document.upload": documentUploadAction,
   "document.list": documentListAction,
-  "document.url": documentUrlAction
+  "document.url": documentUrlAction,
+  "siteDocument.upload": siteDocumentUploadAction,
+  "siteDocument.get": siteDocumentGetAction
 };

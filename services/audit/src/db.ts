@@ -66,6 +66,7 @@ export async function ensureIndexes(database: Db) {
       .collection(COLLECTIONS.documentAttachments)
       .createIndexes([
         { key: { lotId: 1, uploadedAt: -1 } },
+        { key: { siteCode: 1, category: 1, uploadedAt: -1 } },
         { key: { id: 1 }, unique: true }
       ])
   ]);

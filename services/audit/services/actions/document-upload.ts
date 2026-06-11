@@ -1,5 +1,5 @@
 import type { ActionSchema, Service } from "moleculer";
-import { uploadDocument } from "@aeronexis/storage";
+import { DocumentValidationError, uploadDocument } from "@aeronexis/storage";
 import { createError, parseParams, requireAnyRole } from "@aeronexis/services-shared";
 import { getDb } from "../../src/db.js";
 import { insertDocumentRecord } from "../../src/lib/document-store.js";
@@ -21,22 +21,21 @@ export const documentUploadAction: ActionSchema = {
       throw createError("VALIDATION_ERROR", "contentBase64 is not valid base64");
     }
 
-    if (body.length === 0) {
-      throw createError("VALIDATION_ERROR", "contentBase64 must not decode to empty content");
+    let stored;
+    try {
+      stored = await uploadDocument({
+        lotId: params.lotId,
+        filename: params.filename,
+        contentType: params.contentType,
+        body,
+        uploadedBy: auth.email ?? auth.sub
+      });
+    } catch (error) {
+      if (error instanceof DocumentValidationError) {
+        throw createError("VALIDATION_ERROR", error.message, error.details);
+      }
+      throw error;
     }
-
-    const maxBytes = Number(process.env.DOCUMENT_UPLOAD_MAX_BYTES ?? 10 * 1024 * 1024);
-    if (body.length > maxBytes) {
-      throw createError("VALIDATION_ERROR", `File exceeds maximum size of ${maxBytes} bytes`);
-    }
-
-    const stored = await uploadDocument({
-      lotId: params.lotId,
-      filename: params.filename,
-      contentType: params.contentType,
-      body,
-      uploadedBy: auth.email ?? auth.sub
-    });
 
     const db = getDb();
     await insertDocumentRecord(db, stored);

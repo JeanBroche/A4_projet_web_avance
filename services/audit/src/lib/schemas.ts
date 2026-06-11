@@ -56,3 +56,15 @@ export const documentUrlSchema = accessTokenSchema.extend({
   documentId: z.string().uuid(),
   expiresSec: z.number().int().positive().max(86_400).optional()
 });
+
+export const siteDocumentUploadSchema = accessTokenSchema.extend({
+  siteCode: z.string().trim().min(1),
+  filename: z.string().min(1).max(255),
+  contentType: z.string().min(1).max(128),
+  contentBase64: z.string().min(1),
+  category: z.enum(["certificat", "pj"]).optional()
+});
+
+export const siteDocumentGetSchema = accessTokenSchema.extend({
+  id: z.string().uuid()
+});

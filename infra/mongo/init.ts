@@ -52,6 +52,10 @@ const COLLECTIONS: CollectionSpec[] = [
     name: "document_attachments",
     indexes: [
       { key: { lotId: 1, uploadedAt: -1 }, options: { name: "lotId_1_uploadedAt_-1" } },
+      {
+        key: { siteCode: 1, category: 1, uploadedAt: -1 },
+        options: { name: "siteCode_1_category_1_uploadedAt_-1" }
+      },
       { key: { id: 1 }, options: { name: "id_1", unique: true } }
     ]
   }

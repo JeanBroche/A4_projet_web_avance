@@ -88,22 +88,31 @@ Constantes canoniques : [`packages/shared/src/domain-events.ts`](../packages/sha
 | `shipment.picklist.auto_created` | Shipment | Audit |
 | `user.action.logged` | Tous MS | Audit (Mongo) |
 
-## MinIO (pieces jointes lot)
+## MinIO (stockage documentaire)
 
 | Composant | Technologie | Role |
 |-----------|-------------|------|
-| Stockage objet | **MinIO** (`MINIO_*`, bucket `aeronexis-docs`) | Fichiers binaires (certificats, rapports QC) |
-| Metadonnees | **MongoDB** (`document_attachments`) | Lien lotId ↔ cle objet |
+| Stockage objet | **MinIO** (`MINIO_*`, bucket `aeronexis-docs`) | Fichiers binaires (certificats, PJ, rapports QC) |
+| Metadonnees | **MongoDB** (`document_attachments`) | Lien `lotId` ou `siteCode` ↔ cle objet |
 
-Package client : [`packages/storage`](../packages/storage) (`@aeronexis/storage`).
+Package client : [`packages/storage`](../packages/storage) (`@aeronexis/storage`). Validation MIME (PDF, JPEG, PNG, WebP) et taille max 10 Mo.
 
-Actions audit :
+### Pieces jointes lot
 
 | Action | Role | Description |
 |--------|------|-------------|
-| `audit.document.upload` | production, logistique, admin | Upload base64 → MinIO + enregistrement Mongo |
+| `audit.document.upload` | production, logistique, admin | Upload base64 → MinIO (`lots/{lotId}/...`) + Mongo |
 | `audit.document.list` | production, logistique, admin | Liste des pieces jointes d'un lot |
 | `audit.document.url` | production, logistique, admin | URL pre-signee de telechargement |
+
+### Certificats et PJ site (issue #10)
+
+| Action | Role | Description |
+|--------|------|-------------|
+| `audit.siteDocument.upload` | admin | Upload base64 → MinIO (`{siteCode}/{year}/...`) + Mongo (`category`: `certificat` ou `pj`) |
+| `audit.siteDocument.get` | authentifie + scope site | Retourne metadonnees + contenu base64 |
+
+Collection `document_attachments` : enregistrement lot (`lotId`) **ou** site (`siteCode`, `category` optionnelle). Index `{ siteCode: 1, category: 1, uploadedAt: -1 }`.
 
 ## References cross-MS (M1)
 
