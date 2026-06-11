@@ -5,13 +5,18 @@ Application Nuxt du monorepo AERONEXIS Dynamics.
 ## Démarrage (mode Gateway — défaut)
 
 ```bash
+# Demarrer Docker Desktop, puis infra seule (dev hybride MS sur l'hote) :
+pnpm docker:up
+pnpm db:reset         # migrations + seed démo
+
 # Terminal 1 — backend + gateway
 pnpm dev:backend
-# ou : pnpm docker:apps:up && pnpm db:seed
 
 # Terminal 2 — front (proxy /api → :4000)
 pnpm dev:web
 ```
+
+Scénario seed : [`docs/seed-scenario.md`](../../docs/seed-scenario.md).
 
 Application : [http://localhost:3000](http://localhost:3000)
 

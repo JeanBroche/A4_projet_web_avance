@@ -1,11 +1,11 @@
 import { connectMongo, disconnectMongo, ensureIndexes, getDb } from "../src/db.js";
-import { seedDemoLot } from "../src/lib/audit-helpers.js";
+import { seedDemoScenario } from "../src/lib/audit-helpers.js";
 
 async function main() {
   const db = await connectMongo();
   await ensureIndexes(db);
-  await seedDemoLot(db);
-  console.log("Audit seed completed: BATCH-SEED-001");
+  await seedDemoScenario(db);
+  console.log("Audit seed completed: demo scenario (logs, critical events, trace)");
   await disconnectMongo();
 }
 

@@ -27,6 +27,36 @@ function registerJwtRevocationChecker() {
   });
 }
 
+function parseBrokerList(value: string): string[] {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Moleculer RPC bus via Kafka (@platformatic/kafka).
+ * Use lowercase kafka:// in MOLECULER_TRANSPORTER — Kafka:// is rejected by Moleculer.
+ */
+function resolveTransporter(): BrokerOptions["transporter"] {
+  const explicit = process.env.MOLECULER_TRANSPORTER?.trim();
+  if (explicit && !explicit.toLowerCase().startsWith("kafka://")) {
+    return explicit as BrokerOptions["transporter"];
+  }
+
+  const brokers = explicit
+    ? parseBrokerList(explicit.replace(/^kafka:\/\//i, ""))
+    : parseBrokerList(process.env.KAFKA_BROKERS ?? "localhost:9092");
+
+  return {
+    type: "Kafka",
+    options: {
+      clientId: process.env.KAFKA_CLIENT_ID ?? "moleculer-aeronexis",
+      bootstrapBrokers: brokers
+    }
+  };
+}
+
 export function createConfig(overrides: BrokerOptions = {}): BrokerOptions {
   loadEnv();
   registerJwtRevocationChecker();
@@ -47,7 +77,7 @@ export function createConfig(overrides: BrokerOptions = {}): BrokerOptions {
         colors: false
       }
     },
-    transporter: `Kafka://${process.env.KAFKA_BROKERS || "localhost:9092"}` as BrokerOptions["transporter"],
+    transporter: resolveTransporter(),
     serializer: "JSON",
     middlewares,
     ...overrides

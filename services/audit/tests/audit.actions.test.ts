@@ -124,13 +124,33 @@ describe("audit.change.list", () => {
     assert.equal(result.items[0]?.what.action, "audit.test.update");
   });
 
-  it("rejects non-admin token", async (t) => {
+  it("filters logs by userId for non-admin roles", async (t) => {
     if (skipIfNoMongo(t)) return;
 
-    await assert.rejects(
-      () => callAction("audit.change.list", { accessToken: commercialToken }),
-      (error: unknown) => getErrorCode(error) === "FORBIDDEN"
+    const payload: UserActionLoggedPayload = {
+      action: "audit.test.commercial",
+      actorId: "commercial-user",
+      actorEmail: "commercial@aeronexis.test",
+      entity: "CommercialTestEntity",
+      entityId: "entity-commercial",
+      siteCode: "SITE-LYO",
+      timestamp: new Date().toISOString()
+    };
+
+    await broker.emit("user.action.logged", payload);
+
+    const commercialResult = await callAction<{ items: Array<{ what: { action: string } }> }>(
+      "audit.change.list",
+      { accessToken: commercialToken, entity: "CommercialTestEntity" }
     );
+    assert.ok(commercialResult.items.length >= 1);
+    assert.equal(commercialResult.items[0]?.what.action, "audit.test.commercial");
+
+    const adminResult = await callAction<{ total: number }>("audit.change.list", {
+      accessToken: adminToken,
+      entity: "CommercialTestEntity"
+    });
+    assert.ok(adminResult.total >= 1);
   });
 
   it("rejects missing token", async (t) => {

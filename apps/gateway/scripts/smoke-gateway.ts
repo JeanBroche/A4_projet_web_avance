@@ -112,6 +112,46 @@ async function main() {
     console.log(`✓ ${testCase.method ?? 'GET'} ${testCase.path} (${testCase.name})`)
   }
 
+  const reservations = await request('/api/stock/reservations', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  const reservationItems =
+    (reservations.body as { data?: { items?: unknown[] }; items?: unknown[] })?.data?.items ??
+    (reservations.body as { items?: unknown[] })?.items ??
+    []
+  if (!Array.isArray(reservationItems) || reservationItems.length < 1) {
+    throw new Error(`stock reservations: expected >= 1 item after seed, got ${reservationItems.length}`)
+  }
+  console.log(`✓ seed check: stock reservations (${reservationItems.length})`)
+
+  const unread = await request('/api/notifications/unread-count', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  const unreadCount =
+    (unread.body as { data?: { count?: number }; count?: number })?.data?.count ??
+    (unread.body as { count?: number })?.count ??
+    0
+  if (unreadCount < 1) {
+    throw new Error(`notifications unread-count: expected >= 1 after seed, got ${unreadCount}`)
+  }
+  console.log(`✓ seed check: notifications unread-count (${unreadCount})`)
+
+  const history = await request('/api/commercial/orders/history', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  const orders =
+    (history.body as { data?: { items?: Array<{ status?: string }> }; items?: Array<{ status?: string }> })
+      ?.data?.items ??
+    (history.body as { items?: Array<{ status?: string }> })?.items ??
+    []
+  const statuses = new Set(orders.map((o) => o.status).filter(Boolean))
+  if (statuses.size < 3) {
+    throw new Error(
+      `order history: expected >= 3 distinct statuses after seed, got ${statuses.size} (${[...statuses].join(', ')})`
+    )
+  }
+  console.log(`✓ seed check: order statuses (${statuses.size}: ${[...statuses].join(', ')})`)
+
   console.log('Gateway smoke test passed.')
 }
 

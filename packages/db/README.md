@@ -58,9 +58,13 @@ pnpm db:studio    # http://localhost:5555, schema PG `auth`
 |----------|-------------|
 | `pnpm db:migrate` | `db:migrate` sur les 5 MS (ordre : auth → stock → order → production → shipment) |
 | `pnpm db:migrate:dev` | `db:migrate:dev` sur les 5 MS |
-| `pnpm db:seed` | `db:seed` sur les 5 MS |
+| `pnpm db:seed` | `db:seed` sur auth → stock → order → production → shipment → audit → notification |
+| `pnpm db:reset` | `db:migrate` puis `db:seed` (réinitialisation démo) |
+| `pnpm db:verify-seed` | Assertions post-seed (counts PG, Mongo, Redis) |
 | `pnpm db:studio:auth` | Raccourci vers `pnpm --filter @aeronexis/auth run db:studio` (idem `:stock`, etc.) |
 
-Services **sans Prisma M1** : `reporting` (PG M7), `audit` (MongoDB).
+Services **sans Prisma M1** : `reporting` (PG M7), `audit` (MongoDB), `notification` (Redis).
+
+Scénario démo documenté : [`docs/seed-scenario.md`](../../docs/seed-scenario.md).
 
 Cartographie : [`docs/data-model.md`](../../docs/data-model.md).

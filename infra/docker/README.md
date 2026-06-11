@@ -19,10 +19,15 @@ pnpm db:migrate        # tous les MS (ou cd services/<ms> && pnpm db:migrate)
 
 ```bash
 cp .env.example .env
-cp .env.docker.example .env.docker
+cp .env.docker.example .env.docker   # obligatoire pour docker:apps:up
 pnpm docker:apps:up
+pnpm db:reset          # migrations + seed démo (manuel, non intégré au compose)
+pnpm dev:backend
+pnpm dev:web
 pnpm docker:apps:down
 ```
+
+Le seed n'est **pas** exécuté automatiquement au démarrage Docker (évite d'écraser les données de dev). Utiliser `pnpm db:reset` après `docker:apps:up`.
 
 Fichiers compose : [`docker-compose.yml`](docker-compose.yml) (infra), [`docker-compose.apps.yml`](docker-compose.apps.yml) (MS + migrations).
 

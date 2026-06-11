@@ -19,6 +19,7 @@
     "migrate:all": "node --import tsx scripts/migrate-all.ts deploy",
     "migrate:all:dev": "node --import tsx scripts/migrate-all.ts dev",
     "seed:all": "node --import tsx scripts/seed-all.ts",
+    "verify-seed": "node --import tsx scripts/verify-seed.ts",
     "lint": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit",
     "test": "node -e \"process.exit(0)\"",
@@ -32,6 +33,8 @@
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@types/pg": "^8.15.2",
+    "ioredis": "^5.11.0",
+    "mongodb": "^6.17.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }

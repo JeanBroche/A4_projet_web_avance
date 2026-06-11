@@ -134,7 +134,8 @@ export async function requireTraceRead(
   return requireAnyRole(ctx, accessToken ?? null, [
     "direction",
     "commercial",
-    "logistique"
+    "logistique",
+    "operateur"
   ]);
 }
 

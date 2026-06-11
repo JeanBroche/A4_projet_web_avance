@@ -2,6 +2,12 @@ import bcrypt from "bcryptjs";
 import { config } from "dotenv";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+import {
+  SEED_SITES,
+  SEED_USER_IDS,
+  SEED_USERS,
+  type SeedUserRole
+} from "@aeronexis/shared";
 import { prisma } from "../src/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,8 +32,8 @@ const ROLES = [
 ] as const;
 
 const SITES = [
-  { code: "SITE-LYO", name: "Site Lyon" },
-  { code: "SITE-PAR", name: "Site Paris" }
+  { code: SEED_SITES.LYO, name: "Site Lyon" },
+  { code: SEED_SITES.PAR, name: "Site Paris" }
 ] as const;
 
 async function upsertSite(code: string, name: string) {
@@ -45,13 +51,72 @@ async function upsertSite(code: string, name: string) {
   return prisma.site.create({ data: { code, name, isActive: true } });
 }
 
+async function upsertSeedUser(role: SeedUserRole, siteId: string) {
+  const def = SEED_USERS[role];
+  const userId = SEED_USER_IDS[role];
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const byEmail = await prisma.user.findFirst({
+    where: { email: def.email, deletedAt: null }
+  });
+  if (byEmail && byEmail.id !== userId) {
+    await prisma.userRole.deleteMany({ where: { userId: byEmail.id } });
+    await prisma.user.update({
+      where: { id: byEmail.id },
+      data: { deletedAt: new Date(), isActive: false }
+    });
+  }
+
+  const user = await prisma.user.upsert({
+    where: { id: userId },
+    update: {
+      email: def.email,
+      passwordHash,
+      firstName: def.firstName,
+      lastName: def.lastName,
+      siteId,
+      isActive: true,
+      deletedAt: null
+    },
+    create: {
+      id: userId,
+      email: def.email,
+      passwordHash,
+      firstName: def.firstName,
+      lastName: def.lastName,
+      siteId,
+      isActive: true
+    }
+  });
+
+  const roleRow = await prisma.role.findFirstOrThrow({
+    where: { code: role, deletedAt: null }
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: user.id,
+        roleId: roleRow.id
+      }
+    },
+    update: {},
+    create: {
+      userId: user.id,
+      roleId: roleRow.id
+    }
+  });
+
+  return user;
+}
+
 async function main() {
   const sites = new Map<string, string>();
   for (const entry of SITES) {
     const row = await upsertSite(entry.code, entry.name);
     sites.set(entry.code, row.id);
   }
-  const site = { id: sites.get("SITE-LYO")!, code: "SITE-LYO" };
+  const lyoSiteId = sites.get(SEED_SITES.LYO)!;
 
   for (const role of ROLES) {
     const existingRole = await prisma.role.findFirst({
@@ -67,234 +132,16 @@ async function main() {
     }
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
-  const existingAdmin = await prisma.user.findFirst({
-    where: { email: "admin@aeronexis.local", deletedAt: null }
-  });
-  const admin = existingAdmin
-    ? await prisma.user.update({
-        where: { id: existingAdmin.id },
-        data: {
-          passwordHash,
-          firstName: "Admin",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      })
-    : await prisma.user.create({
-        data: {
-          email: "admin@aeronexis.local",
-          passwordHash,
-          firstName: "Admin",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      });
-
-  const adminRole = await prisma.role.findFirstOrThrow({
-    where: { code: "admin", deletedAt: null }
-  });
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: admin.id,
-        roleId: adminRole.id
-      }
-    },
-    update: {},
-    create: {
-      userId: admin.id,
-      roleId: adminRole.id
-    }
-  });
-
-  const logisticEmail = "logistique@aeronexis.local";
-  const logisticHash = await bcrypt.hash(password, 10);
-  const existingLogistic = await prisma.user.findFirst({
-    where: { email: logisticEmail, deletedAt: null }
-  });
-  const logistic = existingLogistic
-    ? await prisma.user.update({
-        where: { id: existingLogistic.id },
-        data: {
-          passwordHash: logisticHash,
-          firstName: "Logistique",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      })
-    : await prisma.user.create({
-        data: {
-          email: logisticEmail,
-          passwordHash: logisticHash,
-          firstName: "Logistique",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      });
-
-  const logisticRole = await prisma.role.findFirstOrThrow({
-    where: { code: "logistique", deletedAt: null }
-  });
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: logistic.id,
-        roleId: logisticRole.id
-      }
-    },
-    update: {},
-    create: {
-      userId: logistic.id,
-      roleId: logisticRole.id
-    }
-  });
-
-  const operateurEmail = "operateur@aeronexis.local";
-  const operateurHash = await bcrypt.hash(password, 10);
-  const existingOperateur = await prisma.user.findFirst({
-    where: { email: operateurEmail, deletedAt: null }
-  });
-  const operateur = existingOperateur
-    ? await prisma.user.update({
-        where: { id: existingOperateur.id },
-        data: {
-          passwordHash: operateurHash,
-          firstName: "Operateur",
-          lastName: "Production",
-          siteId: site.id,
-          isActive: true
-        }
-      })
-    : await prisma.user.create({
-        data: {
-          email: operateurEmail,
-          passwordHash: operateurHash,
-          firstName: "Operateur",
-          lastName: "Production",
-          siteId: site.id,
-          isActive: true
-        }
-      });
-
-  const operateurRole = await prisma.role.findFirstOrThrow({
-    where: { code: "operateur", deletedAt: null }
-  });
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: operateur.id,
-        roleId: operateurRole.id
-      }
-    },
-    update: {},
-    create: {
-      userId: operateur.id,
-      roleId: operateurRole.id
-    }
-  });
-
-  const commercialEmail = "commercial@aeronexis.local";
-  const commercialHash = await bcrypt.hash(password, 10);
-  const existingCommercial = await prisma.user.findFirst({
-    where: { email: commercialEmail, deletedAt: null }
-  });
-  const commercial = existingCommercial
-    ? await prisma.user.update({
-        where: { id: existingCommercial.id },
-        data: {
-          passwordHash: commercialHash,
-          firstName: "Commercial",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      })
-    : await prisma.user.create({
-        data: {
-          email: commercialEmail,
-          passwordHash: commercialHash,
-          firstName: "Commercial",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      });
-
-  const commercialRole = await prisma.role.findFirstOrThrow({
-    where: { code: "commercial", deletedAt: null }
-  });
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: commercial.id,
-        roleId: commercialRole.id
-      }
-    },
-    update: {},
-    create: {
-      userId: commercial.id,
-      roleId: commercialRole.id
-    }
-  });
-
-  const directionEmail = "direction@aeronexis.local";
-  const directionHash = await bcrypt.hash(password, 10);
-  const existingDirection = await prisma.user.findFirst({
-    where: { email: directionEmail, deletedAt: null }
-  });
-  const direction = existingDirection
-    ? await prisma.user.update({
-        where: { id: existingDirection.id },
-        data: {
-          passwordHash: directionHash,
-          firstName: "Direction",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      })
-    : await prisma.user.create({
-        data: {
-          email: directionEmail,
-          passwordHash: directionHash,
-          firstName: "Direction",
-          lastName: "Aeronexis",
-          siteId: site.id,
-          isActive: true
-        }
-      });
-
-  const directionRole = await prisma.role.findFirstOrThrow({
-    where: { code: "direction", deletedAt: null }
-  });
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: direction.id,
-        roleId: directionRole.id
-      }
-    },
-    update: {},
-    create: {
-      userId: direction.id,
-      roleId: directionRole.id
-    }
-  });
+  const seededUsers: string[] = [];
+  for (const role of Object.keys(SEED_USERS) as SeedUserRole[]) {
+    const user = await upsertSeedUser(role, lyoSiteId);
+    seededUsers.push(user.email);
+  }
 
   console.log("Auth seed completed:", {
     sites: SITES.map((s) => s.code),
     roles: ROLES.length,
-    users: [admin.email, logistic.email, operateur.email, commercial.email, direction.email]
+    users: seededUsers
   });
 }
 

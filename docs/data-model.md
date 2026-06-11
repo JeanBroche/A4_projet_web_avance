@@ -48,7 +48,7 @@ Extension `@aeronexis/db` : `createSoftDeleteExtension(Prisma)` — `delete` / `
 
 | Composant | Technologie | Role |
 |-----------|-------------|------|
-| Bus inter-services | **Kafka** (`KAFKA_BROKERS`, transporter Moleculer) | RPC (`broker.call`) et evenements (`broker.emit`) entre microservices |
+| Bus inter-services | **Kafka** (`KAFKA_BROKERS`, transporter Moleculer + `@platformatic/kafka`) | RPC (`broker.call`) et evenements (`broker.emit`) entre microservices |
 | Cache KPI | **Redis** (`@aeronexis/redis-infra`) | TTL reporting (`withCache`) |
 | Sessions auth | **Redis** | Refresh tokens, index sessions, **blacklist JWT access** (`jti`) |
 | Verrous | **Redis** | Reservations stock, generation codes sequentiels |

@@ -71,12 +71,15 @@ export function createSoftDeleteExtension(Prisma: SoftDeletePrisma) {
             return query(args);
           }
           return query(withActiveOnly(args));
-        }
-      }
-    },
-    model: {
-      $allModels: {
-        async delete(this: unknown, args: { where: Record<string, unknown> }) {
+        },
+        async delete({
+          model,
+          args,
+          query
+        }: QueryExtensionContext<{ where: Record<string, unknown> }>) {
+          if (!isSoftDeleteModel(model)) {
+            return query(args);
+          }
           const context = Prisma.getExtensionContext(this) as {
             update: (input: {
               where: Record<string, unknown>;
@@ -88,7 +91,14 @@ export function createSoftDeleteExtension(Prisma: SoftDeletePrisma) {
             data: { deletedAt: new Date() }
           });
         },
-        async deleteMany(this: unknown, args: { where?: Record<string, unknown> }) {
+        async deleteMany({
+          model,
+          args,
+          query
+        }: QueryExtensionContext<{ where?: Record<string, unknown> }>) {
+          if (!isSoftDeleteModel(model)) {
+            return query(args);
+          }
           const context = Prisma.getExtensionContext(this) as {
             updateMany: (input: {
               where?: Record<string, unknown>;

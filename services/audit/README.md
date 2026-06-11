@@ -15,7 +15,7 @@ Pas de Prisma. Les producteurs emettent `user.action.logged` via le broker Molec
 | Action | Role | Description |
 |--------|------|-------------|
 | `audit.ping` | — | Health check |
-| `audit.change.list` | admin | Historique modifications (qui / quand / quoi) |
+| `audit.change.list` | authentifié | Historique modifications ; admin voit tout, autres rôles filtrés par `userId` |
 | `audit.event.record` | admin | Enregistrement evenement CRITICAL/WARNING |
 | `audit.event.listCritical` | admin | Liste des evenements critiques |
 | `audit.lot.trace` | admin | Timeline lot cross-modules (stock, shipment, production) |
