@@ -1,0 +1,97 @@
+import { config } from 'dotenv'
+import { resolve } from 'node:path'
+
+config({ path: resolve(import.meta.dirname, '../../../.env') })
+
+const baseUrl = process.env.GATEWAY_URL ?? `http://localhost:${process.env.GATEWAY_PORT ?? 4000}`
+
+async function request(path: string, options: RequestInit = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {})
+    },
+    ...options
+  })
+  const body = await response.json().catch(() => null)
+  return { response, body }
+}
+
+type SmokeCase = {
+  name: string
+  path: string
+  method?: string
+  body?: unknown
+  optional?: boolean
+}
+
+const restSmokeCases: SmokeCase[] = [
+  { name: 'stock levels', path: '/api/stock/levels' },
+  { name: 'order history', path: '/api/commercial/orders/history' },
+  { name: 'production BOM', path: '/api/production/bom' },
+  { name: 'production batches', path: '/api/production/batches' },
+  { name: 'shipments history', path: '/api/logistics/shipments' },
+  { name: 'notifications', path: '/api/notifications' },
+  { name: 'reporting rupture (direction)', path: '/api/reporting/kpis/logistique/rupture', optional: true }
+]
+
+async function main() {
+  console.log(`Smoke gateway @ ${baseUrl}`)
+
+  const health = await request('/health')
+  if (!health.response.ok) {
+    throw new Error(`GET /health failed: ${health.response.status}`)
+  }
+  console.log('✓ GET /health')
+
+  const password = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!'
+  const login = await request('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'direction@aeronexis.local',
+      password
+    })
+  })
+
+  if (!login.response.ok) {
+    throw new Error(`POST /api/auth/login failed: ${login.response.status} ${JSON.stringify(login.body)}`)
+  }
+
+  const loginData = login.body as { data?: { accessToken?: string }; accessToken?: string }
+  const token = loginData.data?.accessToken ?? loginData.accessToken
+  if (!token) {
+    throw new Error('Login response missing accessToken')
+  }
+  console.log('✓ POST /api/auth/login')
+
+  const me = await request('/api/auth/me', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!me.response.ok) {
+    throw new Error(`GET /api/auth/me failed: ${me.response.status}`)
+  }
+  console.log('✓ GET /api/auth/me')
+
+  for (const testCase of restSmokeCases) {
+    const result = await request(testCase.path, {
+      method: testCase.method ?? 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+      body: testCase.body ? JSON.stringify(testCase.body) : undefined
+    })
+    if (!result.response.ok) {
+      if (testCase.optional) {
+        console.warn(`⚠ GET ${testCase.path} (${testCase.name}) — ${result.response.status} (optionnel)`)
+        continue
+      }
+      throw new Error(`${testCase.name}: ${testCase.path} -> ${result.response.status} ${JSON.stringify(result.body)}`)
+    }
+    console.log(`✓ ${testCase.method ?? 'GET'} ${testCase.path} (${testCase.name})`)
+  }
+
+  console.log('Gateway smoke test passed.')
+}
+
+main().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})

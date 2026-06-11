@@ -2,13 +2,33 @@
   "name": "@aeronexis/gateway",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "node -e \"console.log('@aeronexis/gateway: dev placeholder')\"",
-    "lint": "node -e \"process.exit(0)\"",
-    "test": "node -e \"process.exit(0)\"",
-    "build": "node -e \"process.exit(0)\""
+    "dev": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.ts --hot services/**/*.service.ts",
+    "start": "node --import tsx ./node_modules/moleculer/bin/moleculer-runner.js --config moleculer.config.ts services/**/*.service.ts",
+    "smoke:health": "node --import tsx scripts/smoke-gateway.ts",
+    "validate:routes": "node --import tsx scripts/validate-routes.ts",
+    "routes:doc": "node --import tsx scripts/validate-routes.ts --write-doc",
+    "build": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
-    "moleculer": "^0.15.0"
+    "@aeronexis/moleculer-config": "workspace:*",
+    "@aeronexis/redis-infra": "workspace:*",
+    "@aeronexis/services-shared": "workspace:*",
+    "dotenv": "^17.4.2",
+    "ioredis": "^5.11.0",
+    "jsonwebtoken": "^9.0.3",
+    "kafkajs": "^2.2.4",
+    "moleculer": "^0.15.0",
+    "moleculer-web": "^0.10.7"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }

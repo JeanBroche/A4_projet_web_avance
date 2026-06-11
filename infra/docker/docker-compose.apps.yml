@@ -170,3 +170,24 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: apps/gateway/Dockerfile
+    container_name: aeronexis-gateway
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: gateway
+      GATEWAY_PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    restart: unless-stopped

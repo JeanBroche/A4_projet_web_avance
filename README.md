@@ -55,7 +55,7 @@ Chaque microservice Prisma lit son URL via une variable dediee (`AUTH_DATABASE_U
 | Commande | Description |
 |----------|-------------|
 | `pnpm dev` | Lance les scripts `dev` de chaque workspace |
-| `pnpm dev:gateway` | Gateway HTTP (`apps/gateway`, issue [#5](https://github.com/JeanBroche/A4_projet_web_avance/issues/5) — placeholder) |
+| `pnpm dev:gateway` | Gateway HTTP (`apps/gateway`, issue [#5](https://github.com/JeanBroche/A4_projet_web_avance/issues/5)) |
 | `pnpm dev:auth` | Microservice `auth` |
 | `pnpm dev:stock` | Microservice `stock` |
 | `pnpm dev:order` | Microservice `order` |
@@ -121,7 +121,7 @@ cd ../production && pnpm run call:ping
 cd ../reporting && pnpm run call:ping
 ```
 
-L'exposition HTTP (`/health`, port 4000) sera disponible quand `apps/gateway` sera implemente (issue #5).
+L'exposition HTTP (`GET /health`, `/api/*` sur le port 4000) est fournie par `apps/gateway` (issue #5).
 
 Details : [`apps/gateway/README.md`](apps/gateway/README.md), [`services/auth/README.md`](services/auth/README.md).
 
