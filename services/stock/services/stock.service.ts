@@ -78,7 +78,11 @@ async function releaseOrCancel(
   });
   publishStockEvent(this, DomainEvents.stock.released, {
     reservationId: updated.id,
-    status: finalStatus
+    ofId: reservation.ofId,
+    siteCode: reservation.siteCode,
+    status: finalStatus,
+    count: 1,
+    reason: finalStatus
   });
   await logStockAudit({
     action: finalStatus === "RELEASED" ? "stock.reservation.release" : "stock.reservation.cancel",

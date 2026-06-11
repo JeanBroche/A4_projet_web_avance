@@ -24,6 +24,8 @@ const tokens = { admin: "", logistique: "", commercial: "", direction: "", expir
 let materialAcierId: string | null = null;
 let materialTitaneId: string | null = null;
 let materialParisAcierId: string | null = null;
+const emittedEvents: Array<{ topic: string; payload: Record<string, unknown> }> = [];
+let originalEmit: ServiceBroker["emit"] | null = null;
 function skipIfNoDb(t: { skip: (reason?: string) => void }) {
   if (!dbAvailable) {
     t.skip("PostgreSQL unavailable");
@@ -49,6 +51,11 @@ function signTestToken(
 }
 before(async () => {
   broker.createService(stockService);
+  originalEmit = broker.emit.bind(broker);
+  broker.emit = ((topic: string, payload: Record<string, unknown>) => {
+    emittedEvents.push({ topic, payload });
+    return originalEmit!(topic, payload);
+  }) as typeof broker.emit;
   await broker.start();
   try {
     const acier = await prisma.material.findFirst({
@@ -192,11 +199,12 @@ describe("stock.reservation", () => {
       siteCode: "SITE-LYO",
       code: "MAT-001"
     })) as Array<{ reserved: number; available: number }>;
+    const ofId = `OF-TEST-${Date.now()}`;
     const created = (await broker.call("stock.reservation.create", {
       accessToken: tokens.logistique,
-      ofId: `OF-TEST-${Date.now()}`,
+      ofId,
       lines: [{ materialId: materialAcierId, qty: 3 }]
-    })) as { reservations: Array<{ id: string; status: string }> };
+    })) as { ofId: string; reservations: Array<{ id: string; status: string }> };
     assert.equal(created.reservations.length, 1);
     assert.equal(created.reservations[0].status, "ACTIVE");
     const after = (await broker.call("stock.level.list", {
@@ -211,6 +219,11 @@ describe("stock.reservation", () => {
       id: created.reservations[0].id
     })) as { status: string };
     assert.equal(released.status, "RELEASED");
+
+    const releasedEvent = emittedEvents.find((event) => event.topic === "stock.released");
+    assert.ok(releasedEvent);
+    assert.equal(releasedEvent.payload.ofId, ofId);
+    assert.equal(releasedEvent.payload.siteCode, "SITE-LYO");
   });
   it("reservation.create fails when qty exceeds available", async (t) => {
     if (skipIfNoDb(t)) return;

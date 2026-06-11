@@ -58,6 +58,10 @@ Catalogue complet : [`ROUTES.md`](./ROUTES.md).
 
 RBAC appliqué dans chaque microservice ; la gateway vérifie le JWT sur toutes les routes protégées (cookie `aeronexis_access_token` ou header `Authorization: Bearer`).
 
+## Healthcheck
+
+`GET /health` retourne l'état de la gateway et ping les 8 microservices critiques (`auth`, `stock`, `order`, `production`, `shipment`, `audit`, `notification`, `reporting`). Réponse `ok` ou `degraded` avec latence par service. Voir [`docs/supervision.md`](../../docs/supervision.md).
+
 ## Auth cookies
 
 - `POST /api/auth/login` pose `aeronexis_access_token` et `aeronexis_refresh_token` (HttpOnly, SameSite=Lax).

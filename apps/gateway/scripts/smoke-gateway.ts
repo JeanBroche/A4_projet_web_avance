@@ -77,7 +77,8 @@ async function main() {
   if (!health.response.ok) {
     throw new Error(`GET /health failed: ${health.response.status}`)
   }
-  console.log('✓ GET /health')
+  const healthBody = health.body as { status?: string; services?: unknown[] }
+  console.log(`✓ GET /health (${healthBody.status ?? 'unknown'}, ${healthBody.services?.length ?? 0} services)`)
 
   const password = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!'
   const login = await request('/api/auth/login', {

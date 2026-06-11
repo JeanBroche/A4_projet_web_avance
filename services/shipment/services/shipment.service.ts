@@ -23,6 +23,7 @@ import {
   verifyStockReservations
 } from "../src/lib/shipment-helpers.js";
 import { initShipmentAuditWriter, logShipmentAudit } from "../src/lib/audit.js";
+import { DomainEvents } from "@aeronexis/shared";
 import { publishShipmentEvent } from "../src/lib/events.js";
 import {
   pickListCompleteSchema,
@@ -162,6 +163,15 @@ const ShipmentService: ServiceSchema = {
             data: { status: PICKLIST_STATUS.COMPLETED },
             include: { lines: { orderBy: { lineNumber: "asc" } } }
           });
+        });
+
+        publishShipmentEvent(this, DomainEvents.shipment.picklistCompleted, {
+          id: completed.id,
+          pickListId: completed.id,
+          code: completed.code,
+          orderNumber: completed.orderNumber,
+          ofId: completed.ofId,
+          siteCode: completed.siteCode
         });
 
         await logShipmentAudit({

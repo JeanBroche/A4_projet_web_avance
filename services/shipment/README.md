@@ -8,7 +8,7 @@ Microservice Moleculer shipment (M6). Gere le picking, la planification, le suiv
 |--------|------|-------------|
 | `shipment.ping` | — | Health check |
 | `shipment.picklist.create` | logistique | Cree une liste de picking pour une commande |
-| `shipment.picklist.complete` | logistique | Finalise le picking |
+| `shipment.picklist.complete` | logistique | Finalise le picking ; emet `shipment.picklist.completed` pour la traçabilite audit |
 | `shipment.shipment.plan` | logistique | Planifie une expedition depuis un pick list complete |
 | `shipment.shipment.get` | auth | Detail d'une expedition |
 | `shipment.shipment.track` | auth | Timeline de tracking |

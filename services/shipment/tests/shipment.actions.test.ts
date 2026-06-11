@@ -160,6 +160,37 @@ describe("shipment.picklist.complete", () => {
 
     assert.equal(completed.pickList.status, "COMPLETED");
   });
+
+  it("emits shipment.picklist.completed for lot trace", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const events: Array<{ topic: string; payload: Record<string, unknown> }> = [];
+    const originalEmit = broker.emit.bind(broker);
+    broker.emit = ((topic: string, payload: Record<string, unknown>) => {
+      events.push({ topic, payload });
+      return originalEmit(topic, payload);
+    }) as typeof broker.emit;
+
+    const orderNumber = `CMD-EVENT-${Date.now()}`;
+    const created = await callAction<{ pickList: { id: string } }>("shipment.picklist.create", {
+      accessToken: tokens.logistique,
+      orderNumber,
+      siteCode: "SITE-LYO",
+      ofId: "BATCH-SEED-001",
+      lines: [{ productCode: "PROD-002", quantity: 1 }]
+    });
+
+    await callAction("shipment.picklist.complete", {
+      accessToken: tokens.logistique,
+      id: created.pickList.id
+    });
+
+    const completedEvent = events.find((event) => event.topic === "shipment.picklist.completed");
+    assert.ok(completedEvent);
+    assert.equal(completedEvent.payload.siteCode, "SITE-LYO");
+    assert.equal(completedEvent.payload.orderNumber, orderNumber);
+    assert.equal(completedEvent.payload.ofId, "BATCH-SEED-001");
+  });
 });
 
 describe("shipment.shipment", () => {

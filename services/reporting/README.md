@@ -41,9 +41,20 @@ Les noms d actions et de fichiers existants sont conserves. Le mapping vers les 
 - `siteCode` (optionnel) : filtre par site.
 - `windowDays` (optionnel, defaut 30) : fenetre d agregation pour `rotation`, `delayRiskOrders`, `margin`, `totalDelay`.
 
-### Coefficients metier
+### KPI finance (V1 — estimations)
 
-`calcul.finance.margin` applique un ratio cout/CA de 65 % (faute de module finance dedie) et `calcul.finance.totalDelay` une penalite forfaitaire de 5 000 centimes par commande en retard active. Ces coefficients sont definis dans [`services/actions/finance-metrics.ts`](services/actions/finance-metrics.ts) et seront recalibres lors de l implementation reelle de l issue #57.
+Les actions `calcul.finance.margin` et `calcul.finance.totalDelay` couvrent la famille #57 finance en **attendant un module finance dedie** ([issue #57](https://github.com/JeanBroche/A4_projet_web_avance/issues/57)). Elles ne lisent pas de comptabilite reelle : les chiffres sont **des approximations documentees**, utiles pour le tableau de bord direction mais non auditables financierement.
+
+| Action | Donnees source | Hypotheses V1 | Limites connues |
+|--------|----------------|---------------|-----------------|
+| `calcul.finance.margin` | `order.order.history` (CA estime par commande) | Ratio cout/CA fixe a **65 %** (`KPI_COST_RATIO`, voir [`src/lib/kpi-config.ts`](src/lib/kpi-config.ts)) | Pas de couts reels BOM, pas de charges fixes, pas de marge par produit |
+| `calcul.finance.totalDelay` | commandes actives en retard dans la fenetre | Penalite forfaitaire **5 000 centimes** par commande en retard (`KPI_DELAY_PENALTY_CENTS`) | Pas de penalites contractuelles client, pas de SLA par client |
+
+**Reponse attendue en soutenance :** la direction dispose deja d'indicateurs finance **indicatifs** ; la V2 remplacera les coefficients par un microservice finance ou des exports comptables. Les KPI logistique, commercial et production, eux, s'appuient sur des donnees operationnelles reelles.
+
+### Coefficients metier (implementation)
+
+Les coefficients sont centralises dans [`src/lib/kpi-config.ts`](src/lib/kpi-config.ts) et utilises par [`services/actions/finance-metrics.ts`](services/actions/finance-metrics.ts). Ils seront recalibres lors de l'implementation reelle de l'issue #57.
 
 ## Cache
 
@@ -63,7 +74,7 @@ pnpm db:migrate && pnpm db:seed
 pnpm dev:backend
 ```
 
-Le service ecoute via le transporter Redis configure dans `@aeronexis/moleculer-config`.
+Le service ecoute via le transporter **Kafka** configure dans `@aeronexis/moleculer-config` (Redis sert uniquement au cache KPI).
 
 ## Verification CLI
 

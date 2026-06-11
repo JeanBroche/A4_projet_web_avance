@@ -5,6 +5,7 @@ import { applyHttpMeta } from "../src/http.js";
 import { formatHttpError } from "../src/errors.js";
 import { publicApiAliases, protectedApiAliases } from "../src/routes.js";
 import { authFacadeActions } from "../src/facades/auth.facade.js";
+import { checkGatewayHealth } from "../src/health.js";
 
 const port = Number(process.env.GATEWAY_PORT || 4000);
 
@@ -87,12 +88,8 @@ const ApiService: ServiceSchema = {
 
   actions: {
     health: {
-      handler() {
-        return {
-          status: "ok",
-          nodeID: this.broker.nodeID,
-          ts: new Date().toISOString()
-        };
+      async handler() {
+        return checkGatewayHealth(this.broker);
       }
     },
     ...authFacadeActions
