@@ -3,6 +3,7 @@ import { connectMongo, disconnectMongo, ensureIndexes } from "../src/db.js";
 import { auditActions } from "./actions/index.js";
 import { lotTraceEvents } from "./events/lot-trace-events.js";
 import { userActionLoggedEvent } from "./events/user-action-logged.js";
+import { incidentReportedEvent } from "./events/incident-reported.js";
 
 const AuditService: ServiceSchema = {
   name: "audit",
@@ -19,7 +20,8 @@ const AuditService: ServiceSchema = {
 
   events: {
     "user.action.logged": userActionLoggedEvent,
-    ...lotTraceEvents
+    ...lotTraceEvents,
+    ...incidentReportedEvent
   },
 
   actions: auditActions

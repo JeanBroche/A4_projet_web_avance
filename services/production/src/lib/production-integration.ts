@@ -1,7 +1,6 @@
 import type { Context } from "moleculer";
 import { resolveOfId } from "@aeronexis/shared";
-
-type BomLike = { material_id: string; quantity: number };
+import type { BomLineInput } from "./production-helpers.js";
 
 type StockLevel = { materialId: string; code: string };
 
@@ -11,31 +10,51 @@ export async function reserveMaterialsForBatch(
     batchCode: string;
     orderNumber: string;
     siteCode: string;
-    bom: BomLike;
+    lines: BomLineInput[];
     accessToken?: string;
   }
 ) {
   const ofId = resolveOfId(params.batchCode, params.orderNumber);
 
-  const levels = await ctx.call<StockLevel[], Record<string, unknown>>("stock.level.list", {
-    siteCode: params.siteCode,
-    code: params.bom.material_id,
-    accessToken: params.accessToken
-  });
-
-  const material = levels[0];
-  if (!material) {
-    ctx.service?.logger.warn("BOM material not found in stock for reservation", {
-      materialCode: params.bom.material_id,
+  if (params.lines.length === 0) {
+    ctx.service?.logger.warn("No BOM lines to reserve for batch", {
+      batchCode: params.batchCode,
       siteCode: params.siteCode,
       ofId
     });
     return null;
   }
 
+  const reservationLines: Array<{ materialId: string; qty: number }> = [];
+
+  for (const line of params.lines) {
+    const levels = await ctx.call<StockLevel[], Record<string, unknown>>("stock.level.list", {
+      siteCode: params.siteCode,
+      code: line.material_id,
+      accessToken: params.accessToken
+    });
+
+    const material = levels[0];
+    if (!material) {
+      ctx.service?.logger.warn("BOM material not found in stock for reservation", {
+        materialCode: line.material_id,
+        siteCode: params.siteCode,
+        ofId
+      });
+      continue;
+    }
+
+    reservationLines.push({ materialId: material.materialId, qty: line.quantity });
+  }
+
+  if (reservationLines.length === 0) {
+    return null;
+  }
+
   return ctx.call("stock.reservation.create", {
     ofId,
-    lines: [{ materialId: material.materialId, qty: params.bom.quantity }],
+    siteCode: params.siteCode,
+    lines: reservationLines,
     accessToken: params.accessToken
   });
 }

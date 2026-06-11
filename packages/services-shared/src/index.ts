@@ -10,7 +10,11 @@ export {
 } from "./errorUtils.js";
 export {
   type ApiSuccessPayload,
+  type ApiFailurePayload,
+  isApiEnvelopeEnabled,
+  isFailureEnvelope,
   isSuccessEnvelope,
+  failureResponse,
   successResponse,
   unwrapResponse
 } from "./responseUtils.js";
@@ -26,5 +30,5 @@ export {
   type AccessTokenPayload,
   type JwtBlacklistChecker
 } from "./jwtUtils.js";
-export { resolveAccessToken, requireAuth, requireAnyRole, requireCommercial, requireRole, requireAdmin, requireProduction, requireDirection, requireLogistique, requireStockRead, requireOrderRead, requireProductionRead, requireCommercialStats } from "./rbacUtils.js";
+export { resolveAccessToken, requireAuth, requireAnyRole, requireCommercial, requireRole, requireAdmin, requireProduction, requireDirection, requireLogistique, requireStockRead, requireOrderRead, requireProductionRead, requireCommercialStats, requireTraceRead } from "./rbacUtils.js";
 export { generateCode, generateUniqueCode } from "./codeGenUtils.js";

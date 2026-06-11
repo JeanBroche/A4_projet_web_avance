@@ -127,6 +127,17 @@ export async function requireCommercialStats(
   return requireAnyRole(ctx, accessToken ?? null, ["commercial", "direction"]);
 }
 
+export async function requireTraceRead(
+  ctx: Context,
+  accessToken?: string | null
+): Promise<AccessTokenPayload> {
+  return requireAnyRole(ctx, accessToken ?? null, [
+    "direction",
+    "commercial",
+    "logistique"
+  ]);
+}
+
 export async function requireProductionRead(
   ctx: Context,
   accessToken?: string | null

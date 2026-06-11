@@ -1,9 +1,5 @@
 import type { Middleware } from "moleculer";
-import { isSuccessEnvelope, successResponse } from "@aeronexis/services-shared";
-
-function isEnvelopeEnabled() {
-  return process.env.API_SUCCESS_ENVELOPE === "true";
-}
+import { isApiEnvelopeEnabled, isSuccessEnvelope, successResponse } from "@aeronexis/services-shared";
 
 function shouldSkipEnvelope(actionName: string, result: unknown) {
   if (actionName.endsWith(".ping")) {
@@ -30,7 +26,7 @@ const successEnvelopeMiddleware: Middleware = {
   localAction(handler, action) {
     return async function successEnvelopeHandler(ctx) {
       const result = await handler.call(this, ctx);
-      if (!isEnvelopeEnabled() || shouldSkipEnvelope(action.name ?? "", result)) {
+      if (!isApiEnvelopeEnabled() || shouldSkipEnvelope(action.name ?? "", result)) {
         return result;
       }
       return successResponse(result, {

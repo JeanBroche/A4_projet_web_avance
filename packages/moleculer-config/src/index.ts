@@ -6,6 +6,8 @@ import { registerJwtBlacklistChecker } from "@aeronexis/services-shared";
 import { getRedisClient } from "@aeronexis/redis-infra";
 import correlationIdMiddleware from "./middlewares/correlation-id.js";
 import successEnvelopeMiddleware from "./middlewares/success-envelope.js";
+import errorEnvelopeMiddleware from "./middlewares/error-envelope.js";
+import { isApiEnvelopeEnabled } from "@aeronexis/services-shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -30,8 +32,8 @@ export function createConfig(overrides: BrokerOptions = {}): BrokerOptions {
   registerJwtRevocationChecker();
 
   const middlewares = [correlationIdMiddleware];
-  if (process.env.API_SUCCESS_ENVELOPE === "true") {
-    middlewares.push(successEnvelopeMiddleware);
+  if (isApiEnvelopeEnabled()) {
+    middlewares.push(errorEnvelopeMiddleware, successEnvelopeMiddleware);
   }
 
   return {

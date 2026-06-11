@@ -91,3 +91,38 @@ export const supplierDelayNotifySchema = accessTokenSchema.extend({
   actualDate: z.coerce.date().optional(),
   notes: z.string().min(1).optional()
 });
+
+export const materialListSchema = accessTokenSchema.extend({
+  siteId: siteCodeSchema.optional(),
+  siteCode: siteCodeSchema.optional(),
+  code: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
+export const materialGetSchema = accessTokenSchema
+  .extend({
+    materialId: materialIdSchema.optional(),
+    code: z.string().min(1).optional(),
+    siteCode: siteCodeSchema.optional(),
+    siteId: siteCodeSchema.optional()
+  })
+  .superRefine((value, ctx) => {
+    if (!value.materialId && (!value.code || !value.siteCode)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "materialId or code+siteCode is required",
+        path: ["materialId"]
+      });
+    }
+  });
+
+export const materialUpsertSchema = accessTokenSchema.extend({
+  code: z.string().min(1),
+  siteCode: siteCodeSchema,
+  description: z.string().min(1).optional(),
+  unit: z.string().min(1).default("pcs"),
+  currentStock: z.number().int().nonnegative().optional(),
+  minimumStock: z.number().int().nonnegative().optional(),
+  supplier: z.string().min(1).optional()
+});

@@ -3,13 +3,18 @@ import { DomainEvents } from "@aeronexis/shared";
 import { prisma } from "../src/db.js";
 import { initProductionAuditWriter, logProductionMutation } from "../src/lib/audit.js";
 import { publishProductionEvent } from "../src/lib/events.js";
-import { buildManuOrderFinishedPayload } from "../src/lib/production-integration.js";
+import {
+  buildManuOrderFinishedPayload,
+  reserveMaterialsForBatch
+} from "../src/lib/production-integration.js";
 import {
   PROD_STATUSES,
   VALIDATION_ANOMALIES,
   generateBatchCode,
   generateBOMCode,
   loadBomByCode,
+  loadBomLines,
+  replaceBomLines,
   loadBatchByCode,
   loadBatchById,
   loadActiveProduct,
@@ -17,7 +22,8 @@ import {
   assertStatusTransition,
   resolveStatusFromProgress,
   recordBatchHistory,
-  createDefaultSteps
+  createDefaultSteps,
+  type BomLineInput
 } from "../src/lib/production-helpers.js";
 import {
   assertSiteAccess,
@@ -62,6 +68,20 @@ function requireUserSiteCode(auth: { siteId: string | null; roles: string[] }) {
   return auth.siteId ?? "SITE-LYO";
 }
 
+function resolveBomLinesInput(params: {
+  material_id?: string;
+  quantity?: number;
+  lines?: BomLineInput[];
+}): BomLineInput[] {
+  if (params.lines?.length) {
+    return params.lines;
+  }
+  if (params.material_id) {
+    return [{ material_id: params.material_id, quantity: params.quantity ?? 1 }];
+  }
+  return [];
+}
+
 const ProductionService: ServiceSchema = {
   name: "production",
 
@@ -83,18 +103,23 @@ const ProductionService: ServiceSchema = {
         const auth = await requireProduction(ctx, params.accessToken);
         const siteCode = requireUserSiteCode(auth);
 
+        const lines = resolveBomLinesInput(params);
+        const primaryLine = lines[0];
+
         const bom = await prisma.$transaction(async (tx) => {
           const bom_code = await generateBOMCode(tx);
-          return tx.bOMProduct.create({
+          const created = await tx.bOMProduct.create({
             data: {
               bom_code,
-              material_id: params.material_id,
+              material_id: primaryLine.material_id,
               description: params.description,
-              quantity: params.quantity,
+              quantity: primaryLine.quantity,
               status: PROD_STATUSES.PENDING,
               siteCode
             }
           });
+          await replaceBomLines(tx, created.id, lines);
+          return created;
         });
 
         publishProductionEvent(this, DomainEvents.production.bomCreated, {
@@ -149,11 +174,12 @@ const ProductionService: ServiceSchema = {
         await requireProduction(ctx, params.accessToken);
 
         const bom = await loadBomByCode(prisma, params.bom_code);
+        const lines = await loadBomLines(prisma, bom.id);
         this.logger.info("BOM retrieved", {
           correlationId: ctx.meta.correlationId,
           bom_code: params.bom_code
         });
-        return bom;
+        return { ...bom, lines };
       }
     },
 
@@ -167,15 +193,23 @@ const ProductionService: ServiceSchema = {
           if (params.status) {
             assertStatusTransition(existingBom.status, params.status);
           }
-          return tx.bOMProduct.update({
+          const nextLines = params.lines ?? (params.material_id
+            ? [{ material_id: params.material_id, quantity: params.quantity ?? existingBom.quantity }]
+            : null);
+          const primaryLine = nextLines?.[0];
+          const updated = await tx.bOMProduct.update({
             where: { id: existingBom.id },
             data: {
-              material_id: params.material_id,
+              material_id: primaryLine?.material_id ?? params.material_id,
               description: params.description,
-              quantity: params.quantity,
+              quantity: primaryLine?.quantity ?? params.quantity,
               status: params.status
             }
           });
+          if (nextLines) {
+            await replaceBomLines(tx, existingBom.id, nextLines);
+          }
+          return updated;
         });
 
         this.logger.info("BOM updated", {
@@ -229,14 +263,24 @@ const ProductionService: ServiceSchema = {
         const auth = await requireProduction(ctx, params.accessToken);
 
         const siteCode = requireUserSiteCode(auth);
+        const existingBom = await loadBomByCode(prisma, params.bom_code);
+        const bomLines = await loadBomLines(prisma, existingBom.id);
+        const batch_code = await generateBatchCode(prisma);
+
+        await reserveMaterialsForBatch(ctx, {
+          batchCode: batch_code,
+          orderNumber: params.command_id,
+          siteCode,
+          lines: bomLines,
+          accessToken: params.accessToken
+        });
 
         const batch = await prisma.$transaction(async (tx) => {
-          const existingBom = await loadBomByCode(tx, params.bom_code);
-          const batch_code = await generateBatchCode(tx);
+          const bom = await loadBomByCode(tx, params.bom_code);
           const created = await tx.batchProduct.create({
             data: {
               batch_code,
-              bom_id: existingBom.id,
+              bom_id: bom.id,
               command_id: params.command_id,
               siteCode,
               status: PROD_STATUSES.PENDING,
@@ -625,8 +669,27 @@ const ProductionService: ServiceSchema = {
           batch_code: anomaly.batch.batch_code,
           command_id: anomaly.batch.command_id,
           siteCode: anomaly.batch.siteCode,
-          description: params.description
+          description: params.description,
+          severity: params.severity
         });
+
+        if (params.severity === "HIGH" || params.severity === "CRITICAL") {
+          this.broker.emit(DomainEvents.audit.incidentReported, {
+            severity: params.severity === "CRITICAL" ? "CRITICAL" : "WARNING",
+            type: "production.anomaly",
+            message: `Anomalie ${anomaly.anomaly.anomaly_code} sur lot ${anomaly.batch.batch_code}: ${params.description}`,
+            siteCode: anomaly.batch.siteCode,
+            actorId: auth.sub,
+            metadata: {
+              anomaly_id: anomaly.anomaly.anomaly_id,
+              anomaly_code: anomaly.anomaly.anomaly_code,
+              batch_id: anomaly.batch.batch_id,
+              batch_code: anomaly.batch.batch_code,
+              command_id: anomaly.batch.command_id
+            },
+            correlationId: ctx.meta.correlationId
+          });
+        }
 
         this.logger.info("Batch anomaly added", {
           correlationId: ctx.meta.correlationId,

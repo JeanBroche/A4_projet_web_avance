@@ -49,6 +49,42 @@ export const clientStatsSchema = accessTokenSchema.extend({
   clientId: cuidLikeSchema
 });
 
+export const clientListSchema = accessTokenSchema.extend({
+  siteCode: siteCodeSchema.optional(),
+  siteId: siteCodeSchema.optional(),
+  code: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
+export const clientGetSchema = accessTokenSchema
+  .extend({
+    clientId: cuidLikeSchema.optional(),
+    code: z.string().min(1).optional(),
+    siteCode: siteCodeSchema.optional(),
+    siteId: siteCodeSchema.optional()
+  })
+  .superRefine((value, ctx) => {
+    if (!value.clientId && (!value.code || !value.siteCode)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "clientId or code+siteCode is required",
+        path: ["clientId"]
+      });
+    }
+  });
+
+export const clientUpsertSchema = accessTokenSchema.extend({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  siteCode: siteCodeSchema,
+  country: z.string().min(1).optional(),
+  type: z.string().min(1).optional(),
+  annualRevenue: z.number().int().nonnegative().optional(),
+  firstContractDate: z.coerce.date().optional(),
+  status: z.enum(["active", "inactive"]).optional()
+});
+
 export const orderHistorySchema = accessTokenSchema.extend({
   clientId: cuidLikeSchema.optional(),
   siteCode: siteCodeSchema.optional(),

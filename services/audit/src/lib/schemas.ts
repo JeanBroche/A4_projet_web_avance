@@ -30,6 +30,7 @@ export const eventRecordSchema = accessTokenSchema.extend({
 export const eventListCriticalSchema = accessTokenSchema.extend({
   severity: z.enum(["CRITICAL", "WARNING"]).optional(),
   siteCode: z.string().min(1).optional(),
+  siteId: z.string().min(1).optional(),
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   ...paginationSchema

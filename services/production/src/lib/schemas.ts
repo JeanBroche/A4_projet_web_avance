@@ -71,9 +71,15 @@ export const batchStepUpdateSchema = accessTokenSchema.extend({
   status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED"])
 });
 
+const bomLineSchema = z.object({
+  material_id: z.string().min(1),
+  quantity: z.number().int().positive()
+});
+
 export const addBatchAnomalySchema = accessTokenSchema.extend({
   batch_id: z.string().min(1),
-  description: z.string().min(1)
+  description: z.string().min(1),
+  severity: z.enum(["NORMAL", "HIGH", "CRITICAL"]).optional().default("NORMAL")
 });
 
 export const updateBatchAnomalySchema = accessTokenSchema.extend({
@@ -87,19 +93,31 @@ export const getBomSchema = accessTokenSchema.extend({
   bom_code: z.string().min(1)
 });
 
-export const createBomSchema = accessTokenSchema.extend({
-  material_id: z.string().min(1),
-  description: z.string().min(1).optional(),
-  quantity: z.number().int().positive().default(1),
-  siteCode: z.string().min(1).optional(),
-  siteId: z.string().min(1).optional()
-});
+export const createBomSchema = accessTokenSchema
+  .extend({
+    material_id: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    quantity: z.number().int().positive().default(1),
+    lines: z.array(bomLineSchema).min(1).optional(),
+    siteCode: z.string().min(1).optional(),
+    siteId: z.string().min(1).optional()
+  })
+  .superRefine((value, ctx) => {
+    if (!value.lines?.length && !value.material_id) {
+      ctx.addIssue({
+        code: "custom",
+        message: "material_id or lines is required",
+        path: ["material_id"]
+      });
+    }
+  });
 
 export const updateBomSchema = accessTokenSchema.extend({
   bom_code: z.string().min(1),
   material_id: z.string().min(1).optional(),
   description: z.string().optional(),
   quantity: z.number().int().positive().default(1).optional(),
+  lines: z.array(bomLineSchema).min(1).optional(),
   status: z.string().min(1).optional()
 });
 

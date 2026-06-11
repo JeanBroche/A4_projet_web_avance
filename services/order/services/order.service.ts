@@ -14,6 +14,9 @@ import {
   orderListUrgentAction,
   orderDelayRiskAction,
   clientStatsAction,
+  clientListAction,
+  clientGetAction,
+  clientUpsertAction,
   orderHistoryAction,
   orderValidateAction,
   orderRejectAction,
@@ -51,6 +54,12 @@ const OrderService: ServiceSchema = {
     "order.delayRisk": orderDelayRiskAction,
 
     "client.stats": clientStatsAction,
+
+    "client.list": clientListAction,
+
+    "client.get": clientGetAction,
+
+    "client.upsert": clientUpsertAction,
 
     "order.history": orderHistoryAction,
 

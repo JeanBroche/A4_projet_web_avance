@@ -6,7 +6,13 @@ import {
   signAccessToken,
   verifyAccessTokenWithBlacklist
 } from "../src/jwtUtils.js";
-import { isSuccessEnvelope, successResponse, unwrapResponse } from "../src/responseUtils.js";
+import {
+  failureResponse,
+  isFailureEnvelope,
+  isSuccessEnvelope,
+  successResponse,
+  unwrapResponse
+} from "../src/responseUtils.js";
 
 describe("responseUtils", () => {
   it("wraps and unwraps success payloads", () => {
@@ -14,6 +20,15 @@ describe("responseUtils", () => {
     assert.equal(wrapped.status, "success");
     assert.deepEqual(unwrapResponse(wrapped), { ok: true });
     assert.ok(isSuccessEnvelope(wrapped));
+  });
+
+  it("wraps failure payloads", () => {
+    const wrapped = failureResponse(
+      { code: "NOT_FOUND", message: "Missing" },
+      { correlationId: "abc" }
+    );
+    assert.equal(wrapped.status, "failure");
+    assert.ok(isFailureEnvelope(wrapped));
   });
 });
 

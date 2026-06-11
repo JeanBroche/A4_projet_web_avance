@@ -7,6 +7,7 @@ import {
 import { handleStockMaterialLow } from "./events/stock-material-low.js";
 import { handleSupplierDelay } from "./events/stock-supplier-delay.js";
 import { handleShipmentDeliveryAlert } from "./events/shipment-delivery-alert.js";
+import { handleAuditIncidentReported } from "./events/audit-incident-reported.js";
 
 const NotificationService: ServiceSchema = {
   name: "notification",
@@ -37,6 +38,11 @@ const NotificationService: ServiceSchema = {
     "shipment.delivery.alert": {
       async handler(ctx) {
         await handleShipmentDeliveryAlert(ctx);
+      }
+    },
+    "audit.incident.reported": {
+      async handler(ctx) {
+        await handleAuditIncidentReported(ctx);
       }
     }
   }

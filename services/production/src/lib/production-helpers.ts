@@ -30,12 +30,15 @@ type DbClient = Pick<
   typeof prisma,
   | "productStock"
   | "bOMProduct"
+  | "bOMLine"
   | "batchProduct"
   | "anomalies_Batch"
   | "anomalies"
   | "productionStep"
   | "batchActionHistory"
 >;
+
+export type BomLineInput = { material_id: string; quantity: number };
 
 async function generateUniqueCodeAsync(
   db: DbClient,
@@ -111,6 +114,40 @@ export async function loadBomByCode(db: DbClient, bom_code: string) {
   }
 
   return bom;
+}
+
+export async function loadBomLines(db: DbClient, bom_id: string): Promise<BomLineInput[]> {
+  const lines = await db.bOMLine.findMany({
+    where: { bom_id },
+    orderBy: { createdAt: "asc" }
+  });
+
+  if (lines.length > 0) {
+    return lines.map((line) => ({
+      material_id: line.material_id,
+      quantity: line.quantity
+    }));
+  }
+
+  const bom = await db.bOMProduct.findFirst({ where: { id: bom_id, deletedAt: null } });
+  if (!bom) {
+    return [];
+  }
+
+  return [{ material_id: bom.material_id, quantity: bom.quantity }];
+}
+
+export async function replaceBomLines(db: DbClient, bom_id: string, lines: BomLineInput[]) {
+  await db.bOMLine.deleteMany({ where: { bom_id } });
+  for (const line of lines) {
+    await db.bOMLine.create({
+      data: {
+        bom_id,
+        material_id: line.material_id,
+        quantity: line.quantity
+      }
+    });
+  }
 }
 
 export async function loadActiveProduct(db: DbClient, product_code: string) {

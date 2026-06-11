@@ -9,6 +9,7 @@ import {
   createError,
   parseParams,
   requireAuth,
+  requireAnyRole,
   requireLogistique,
   requireStockRead,
   resolveEffectiveSite
@@ -24,7 +25,10 @@ import {
   reservationCreateSchema,
   supplierDelayListSchema,
   supplierDelayNotifySchema,
-  thresholdUpsertSchema
+  thresholdUpsertSchema,
+  materialListSchema,
+  materialGetSchema,
+  materialUpsertSchema
 } from "../src/lib/schemas.js";
 import type { StockReservation } from "../src/generated/prisma/client.js";
 import { withMaterialLocks } from "../src/lib/locks.js";
@@ -253,7 +257,11 @@ const StockService: ServiceSchema = {
     "reservation.create": {
       async handler(ctx) {
         const params = parseParams(reservationCreateSchema, ctx.params);
-        const auth = await requireLogistique(ctx, params.accessToken);
+        const auth = await requireAnyRole(ctx, params.accessToken, [
+          "logistique",
+          "operateur",
+          "commercial"
+        ]);
         const materialIds = params.lines.map((line) => line.materialId);
         const reservations = await withMaterialLocks(
           materialIds,
@@ -437,6 +445,85 @@ const StockService: ServiceSchema = {
             material: { select: { code: true, description: true, siteCode: true } }
           }
         });
+      }
+    },
+    "material.list": {
+      async handler(ctx) {
+        const params = parseParams(materialListSchema, ctx.params);
+        const auth = await requireStockRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
+        const materials = await prisma.material.findMany({
+          where: {
+            deletedAt: null,
+            ...(effectiveSite ? { siteCode: effectiveSite } : {}),
+            ...(params.code ? { code: params.code } : {})
+          },
+          orderBy: [{ siteCode: "asc" }, { code: "asc" }],
+          take: params.limit ?? 100,
+          skip: params.offset ?? 0
+        });
+        return materials.map(toStockLevel);
+      }
+    },
+    "material.get": {
+      async handler(ctx) {
+        const params = parseParams(materialGetSchema, ctx.params);
+        const auth = await requireStockRead(ctx, params.accessToken);
+        const material = params.materialId
+          ? await loadActiveMaterial(prisma, params.materialId)
+          : await prisma.material.findFirst({
+              where: {
+                code: params.code!,
+                siteCode: params.siteCode!,
+                deletedAt: null
+              }
+            });
+        if (!material) {
+          throw createError("NOT_FOUND", "Material not found");
+        }
+        assertSiteAccess(auth, material.siteCode);
+        return toStockLevel(material);
+      }
+    },
+    "material.upsert": {
+      async handler(ctx) {
+        const params = parseParams(materialUpsertSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+        assertSiteAccess(auth, params.siteCode);
+
+        const existing = await prisma.material.findFirst({
+          where: {
+            code: params.code,
+            siteCode: params.siteCode,
+            deletedAt: null
+          }
+        });
+
+        const material = existing
+          ? await prisma.material.update({
+              where: { id: existing.id },
+              data: {
+                description: params.description,
+                unit: params.unit,
+                currentStock: params.currentStock ?? existing.currentStock,
+                minimumStock: params.minimumStock ?? existing.minimumStock,
+                supplier: params.supplier ?? existing.supplier
+              }
+            })
+          : await prisma.material.create({
+              data: {
+                code: params.code,
+                siteCode: params.siteCode,
+                description: params.description,
+                unit: params.unit,
+                currentStock: params.currentStock ?? 0,
+                minimumStock: params.minimumStock ?? 0,
+                supplier: params.supplier
+              }
+            });
+
+        await evaluateThreshold(prisma, material.id);
+        return toStockLevel(material);
       }
     },
     "supplier.delay.notify": {

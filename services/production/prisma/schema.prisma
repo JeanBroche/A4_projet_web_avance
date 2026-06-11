@@ -39,11 +39,25 @@ model BOMProduct {
   updatedAt   DateTime  @updatedAt
 
   batches BatchProduct[]
+  lines   BOMLine[]
 
   @@index([bom_code])
   @@index([siteCode])
   @@index([deletedAt])
   @@index([siteCode, bom_code])
+  @@schema("production")
+}
+
+model BOMLine {
+  id          String     @id @default(cuid())
+  bom_id      String
+  material_id String
+  quantity    Int        @default(1)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  bom         BOMProduct @relation(fields: [bom_id], references: [id])
+
+  @@index([bom_id])
   @@schema("production")
 }
 

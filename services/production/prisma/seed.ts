@@ -4,7 +4,8 @@ import { fileURLToPath } from "url";
 import {
   PROD_STATUSES,
   createDefaultSteps,
-  recordBatchHistory
+  recordBatchHistory,
+  replaceBomLines
 } from "../src/lib/production-helpers.js";
 import { prisma } from "../src/db.js";
 
@@ -58,6 +59,10 @@ async function upsertDemoBomAndBatch() {
         siteCode: "SITE-LYO"
       }
     });
+    await replaceBomLines(prisma, bom.id, [
+      { material_id: "MAT-001", quantity: 1 },
+      { material_id: "MAT-002", quantity: 2 }
+    ]);
   }
 
   let batch = await prisma.batchProduct.findFirst({
