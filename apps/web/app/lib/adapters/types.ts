@@ -39,9 +39,9 @@ import type {
 
 export interface AuthAdapter {
   login(credentials: LoginCredentials): Promise<LoginResult>
-  refresh(refreshToken: string): Promise<LoginResult>
-  logout(refreshToken: string, accessToken?: string | null): Promise<void>
-  me(accessToken: string): Promise<User>
+  refresh(refreshToken?: string): Promise<LoginResult>
+  logout(refreshToken?: string, accessToken?: string | null): Promise<void>
+  me(accessToken?: string): Promise<User>
   switchRole?(userId: string, role: UserRole): Promise<User>
 }
 

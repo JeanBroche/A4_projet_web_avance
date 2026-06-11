@@ -10,7 +10,7 @@ export function useAdapters(): Adapters {
 
   if (config.public.apiAdapter === 'moleculer') {
     const siteCode = () => session.value.user?.siteCode ?? 'SITE-LYO'
-    return createMoleculerAdapters(() => session.value.accessToken, siteCode)
+    return createMoleculerAdapters(siteCode)
   }
 
   if (!mockAdapters) {

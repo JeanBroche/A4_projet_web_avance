@@ -26,16 +26,13 @@ function trackReservationCuids(reservations: StockReservation[], raw: Array<{ id
 }
 
 export function createMoleculerStockAdapter(
-  getToken: () => string | null,
   getSiteCode: () => string
 ): StockAdapter {
   const { request } = useApiClient()
-  const token = () => getToken()
   const siteCode = () => getSiteCode()
 
   async function listRawLevels(): Promise<LevelRow[]> {
     return request<LevelRow[]>('/stock/levels', {
-      accessToken: token(),
       params: { siteCode: siteCode() }
     })
   }
@@ -55,7 +52,6 @@ export function createMoleculerStockAdapter(
 
     async listConsolidatedLevels() {
       const levels = await request<LevelRow[]>('/stock/levels/consolidated', {
-        accessToken: token(),
         params: { siteCode: siteCode() }
       })
       return (levels ?? []).map(l => mapMaterialToStockLevel(l as Parameters<typeof mapMaterialToStockLevel>[0]))
@@ -68,7 +64,6 @@ export function createMoleculerStockAdapter(
         message?: string
         material?: { code?: string, description?: string | null }
       }>>('/stock/alerts', {
-        accessToken: token(),
         params: { siteCode: siteCode() }
       })
       return (alerts ?? []).map((a): StockAlert => ({
@@ -90,8 +85,7 @@ export function createMoleculerStockAdapter(
           unit: input.unit,
           currentStock: input.qty,
           minimumStock: input.minQty
-        },
-        accessToken: token()
+        }
       })
       return mapMaterialToStockLevel(result)
     },
@@ -116,12 +110,11 @@ export function createMoleculerStockAdapter(
           type: delta > 0 ? 'IN' : 'OUT',
           quantity: Math.abs(delta),
           reason: 'Ajustement stock'
-        },
-        accessToken: token()
+        }
       })
       const updated = await request<Parameters<typeof mapMaterialToStockLevel>[0]>(
         `/stock/materials/${encodeURIComponent(materialId)}`,
-        { accessToken: token() }
+        {}
       )
       return mapMaterialToStockLevel(updated)
     },
@@ -144,8 +137,7 @@ export function createMoleculerStockAdapter(
             type: 'OUT',
             quantity: qty,
             reason: 'Suppression niveau stock'
-          },
-          accessToken: token()
+          }
         })
       }
     },
@@ -154,7 +146,6 @@ export function createMoleculerStockAdapter(
       const result = await request<{ reservations: Array<Parameters<typeof mapReservationToUi>[0]> }>(
         '/stock/reservations',
         {
-          accessToken: token(),
           params: {
             ...(ofId ? { ofId } : {}),
             siteCode: siteCode(),
@@ -181,8 +172,7 @@ export function createMoleculerStockAdapter(
         '/stock/reservations',
         {
           method: 'POST',
-          body: { ofId: input.ofId, siteCode: siteCode(), lines },
-          accessToken: token()
+          body: { ofId: input.ofId, siteCode: siteCode(), lines }
         }
       )
       const raw = result.reservations ?? []
@@ -195,7 +185,7 @@ export function createMoleculerStockAdapter(
       const cuid = reservationCuidByNumeric.get(Number(id)) ?? String(id)
       const result = await request<{ reservation?: Parameters<typeof mapReservationToUi>[0] }>(
         `/stock/reservations/${encodeURIComponent(cuid)}/release`,
-        { method: 'POST', accessToken: token() }
+        { method: 'POST' }
       )
       const raw = result.reservation ?? (result as unknown as Parameters<typeof mapReservationToUi>[0])
       return mapReservationToUi(raw)
@@ -205,7 +195,7 @@ export function createMoleculerStockAdapter(
       const cuid = reservationCuidByNumeric.get(Number(id)) ?? String(id)
       const result = await request<{ reservation?: Parameters<typeof mapReservationToUi>[0] }>(
         `/stock/reservations/${encodeURIComponent(cuid)}/cancel`,
-        { method: 'POST', accessToken: token() }
+        { method: 'POST' }
       )
       const raw = result.reservation ?? (result as unknown as Parameters<typeof mapReservationToUi>[0])
       return mapReservationToUi(raw)
@@ -214,7 +204,7 @@ export function createMoleculerStockAdapter(
     async getRuptureForecast() {
       const result = await request<{ items?: Array<Parameters<typeof mapForecastToUi>[0]> } | Array<Parameters<typeof mapForecastToUi>[0]>>(
         '/stock/forecast/rupture',
-        { accessToken: token(), params: { siteCode: siteCode() } }
+        { params: { siteCode: siteCode() } }
       )
       const items = Array.isArray(result) ? result : (result.items ?? [])
       return items.map(mapForecastToUi)
@@ -234,8 +224,7 @@ export function createMoleculerStockAdapter(
           expectedDate,
           actualDate,
           notes: input.comment
-        },
-        accessToken: token()
+        }
       })
       return mapSupplierDelayToUi(delay)
     },
@@ -243,7 +232,7 @@ export function createMoleculerStockAdapter(
     async listSupplierDelays() {
       const items = await request<Array<Parameters<typeof mapSupplierDelayToUi>[0]>>(
         '/stock/supplier-delays',
-        { accessToken: token(), params: { siteCode: siteCode() } }
+        { params: { siteCode: siteCode() } }
       )
       return (items ?? []).map(mapSupplierDelayToUi)
     },
@@ -259,8 +248,7 @@ export function createMoleculerStockAdapter(
           type: 'IN',
           quantity,
           reason: reason ?? 'Retour article'
-        },
-        accessToken: token()
+        }
       })
     }
   }

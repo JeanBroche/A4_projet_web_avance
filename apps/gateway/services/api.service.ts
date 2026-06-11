@@ -4,6 +4,7 @@ import { authorizeRequest } from "../src/authorize.js";
 import { applyHttpMeta } from "../src/http.js";
 import { formatHttpError } from "../src/errors.js";
 import { publicApiAliases, protectedApiAliases } from "../src/routes.js";
+import { authFacadeActions } from "../src/facades/auth.facade.js";
 
 const port = Number(process.env.GATEWAY_PORT || 4000);
 
@@ -22,6 +23,8 @@ function createRouteHooks(requireAuth: boolean) {
       req: { headers?: Record<string, string | string[] | undefined> },
       _res: unknown
     ) {
+      const meta = ctx.meta as Record<string, unknown>;
+      meta.$req = req;
       applyHttpMeta(ctx, req);
     },
     async onAuthorize(
@@ -91,7 +94,8 @@ const ApiService: ServiceSchema = {
           ts: new Date().toISOString()
         };
       }
-    }
+    },
+    ...authFacadeActions
   }
 };
 

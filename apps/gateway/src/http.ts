@@ -1,4 +1,5 @@
 import type { Context } from "moleculer";
+import { getAccessTokenFromRequest } from "./cookies.js";
 
 type IncomingRequest = {
   headers?: Record<string, string | string[] | undefined>;
@@ -36,6 +37,12 @@ export function applyHttpMeta(ctx: Context, req: IncomingRequest) {
     }
   }
 
+  const cookieAccessToken = getAccessTokenFromRequest(req);
+  if (cookieAccessToken && !meta.accessToken) {
+    meta.accessToken = cookieAccessToken;
+    meta.authorization = `Bearer ${cookieAccessToken}`;
+  }
+
   const correlationId =
     headerValue(req.headers, "x-correlation-id") ??
     headerValue(req.headers, "x-request-id");
@@ -44,6 +51,10 @@ export function applyHttpMeta(ctx: Context, req: IncomingRequest) {
   }
 
   if (ctx.params && typeof ctx.params === "object") {
-    ctx.params = normalizeMsParams(ctx.params as Record<string, unknown>);
+    const params = normalizeMsParams(ctx.params as Record<string, unknown>);
+    if (meta.accessToken && !params.accessToken) {
+      params.accessToken = meta.accessToken;
+    }
+    ctx.params = params;
   }
 }

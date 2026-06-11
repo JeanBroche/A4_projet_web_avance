@@ -1,7 +1,7 @@
 import { useApiClient } from '~/lib/api/client'
 import type { AuthAdapter } from '~/lib/adapters/types'
 import { mapAuthUser, mapLoginResult } from '~/lib/mappers/auth'
-import type { LoginCredentials, User } from '~/types'
+import type { LoginCredentials } from '~/types'
 
 export function createMoleculerAuthAdapter(): AuthAdapter {
   const { request } = useApiClient()
@@ -15,22 +15,18 @@ export function createMoleculerAuthAdapter(): AuthAdapter {
       return mapLoginResult(data)
     },
 
-    async refresh(refreshToken: string) {
+    async refresh() {
       const data = await request<Parameters<typeof mapLoginResult>[0]>('/auth/refresh', {
-        method: 'POST',
-        body: { refreshToken }
+        method: 'POST'
       })
       return mapLoginResult(data)
     },
 
-    async logout(refreshToken: string, accessToken?: string | null) {
-      await request('/auth/logout', {
-        method: 'POST',
-        body: { refreshToken, ...(accessToken ? { accessToken } : {}) }
-      })
+    async logout() {
+      await request('/auth/logout', { method: 'POST' })
     },
 
-    async me(accessToken: string) {
+    async me() {
       const data = await request<{
         user: {
           id: string
@@ -41,7 +37,7 @@ export function createMoleculerAuthAdapter(): AuthAdapter {
           roles?: Array<{ code: string, label?: string }>
         }
         roles?: Array<{ code: string, label?: string }>
-      }>('/auth/me', { accessToken })
+      }>('/auth/me')
       return mapAuthUser(data.user, data.roles)
     }
   }

@@ -7,6 +7,7 @@ export function useAuth() {
   const { session, persist, clear } = useSessionState()
   const { isAuthenticated } = useSession()
   const config = useRuntimeConfig()
+  const isMock = computed(() => config.public.apiAdapter === 'mock')
 
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -16,11 +17,15 @@ export function useAuth() {
     error.value = null
     try {
       const result = await adapters.auth.login(credentials)
-      persist({
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        user: result.user
-      })
+      if (isMock.value) {
+        persist({
+          user: result.user,
+          accessToken: result.accessToken ?? null,
+          refreshToken: result.refreshToken ?? null
+        })
+      } else {
+        persist({ user: result.user })
+      }
       return result
     } catch (e) {
       const failure = toFailureResult(e)
@@ -32,18 +37,29 @@ export function useAuth() {
   }
 
   async function refreshSession() {
-    const refreshToken = session.value.refreshToken
-    if (!refreshToken) {
-      clear()
-      return false
+    if (isMock.value) {
+      const refreshToken = session.value.refreshToken
+      if (!refreshToken) {
+        clear()
+        return false
+      }
+      try {
+        const result = await adapters.auth.refresh(refreshToken)
+        persist({
+          user: result.user,
+          accessToken: result.accessToken ?? null,
+          refreshToken: result.refreshToken ?? null
+        })
+        return true
+      } catch {
+        clear()
+        return false
+      }
     }
+
     try {
-      const result = await adapters.auth.refresh(refreshToken)
-      persist({
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        user: result.user
-      })
+      const result = await adapters.auth.refresh()
+      persist({ user: result.user })
       return true
     } catch {
       clear()
@@ -52,36 +68,55 @@ export function useAuth() {
   }
 
   async function restoreSession() {
-    if (!session.value.accessToken && !session.value.refreshToken) return
+    if (isMock.value) {
+      if (!session.value.accessToken && !session.value.refreshToken) return
 
-    if (session.value.accessToken) {
-      try {
-        const user = await adapters.auth.me(session.value.accessToken)
-        persist({ ...session.value, user })
-        return
-      } catch {
-        // token expired — try refresh
+      if (session.value.accessToken) {
+        try {
+          const user = await adapters.auth.me(session.value.accessToken)
+          persist({
+            ...session.value,
+            user
+          })
+          return
+        } catch {
+          // token expired — try refresh
+        }
       }
+
+      await refreshSession()
+      return
     }
 
-    await refreshSession()
+    if (session.value.user) return
+
+    try {
+      const user = await adapters.auth.me()
+      persist({ user })
+    } catch {
+      await refreshSession()
+    }
   }
 
   async function logout() {
-    const refreshToken = session.value.refreshToken
-    if (refreshToken) {
-      try {
-        await adapters.auth.logout(refreshToken, session.value.accessToken)
-      } catch {
-        // ignore logout errors
+    try {
+      if (isMock.value) {
+        await adapters.auth.logout(
+          session.value.refreshToken ?? undefined,
+          session.value.accessToken
+        )
+      } else {
+        await adapters.auth.logout()
       }
+    } catch {
+      // ignore logout errors
     }
     clear()
     await navigateTo('/')
   }
 
   async function switchRole(role: UserRole) {
-    if (config.public.apiAdapter !== 'mock' || !adapters.auth.switchRole) return
+    if (!isMock.value || !adapters.auth.switchRole) return
     const userId = session.value.user?.id
     if (!userId) return
     const user = await adapters.auth.switchRole(userId, role)

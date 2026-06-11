@@ -10,18 +10,16 @@ import { isCuidLike, resolveStringIdByNumeric } from '~/lib/mappers/resolve-id'
 import { toNumericId } from '~/lib/mappers/id'
 
 export function createMoleculerOrderAdapter(
-  getToken: () => string | null,
   getSiteCode: () => string
 ): OrderAdapter {
   const { request } = useApiClient()
-  const token = () => getToken()
   const siteCode = () => getSiteCode()
 
   async function resolveOrderId(numericOrCuid: number | string): Promise<string | null> {
     if (isCuidLike(String(numericOrCuid))) return String(numericOrCuid)
     const history = await request<{ items?: Array<Record<string, unknown>> }>(
       '/commercial/orders/history',
-      { accessToken: token(), params: { limit: 200, siteCode: siteCode() } }
+      { params: { limit: 200, siteCode: siteCode() } }
     )
     return resolveStringIdByNumeric(history.items ?? [], numericOrCuid)
   }
@@ -42,13 +40,13 @@ export function createMoleculerOrderAdapter(
     async list() {
       const history = await request<{ items?: Array<Parameters<typeof mapOrderToUi>[0]> }>(
         '/commercial/orders/history',
-        { accessToken: token(), params: { limit: 100, siteCode: siteCode() } }
+        { params: { limit: 100, siteCode: siteCode() } }
       )
       const orders = history.items ?? []
       if (orders.length === 0) {
         const urgent = await request<Array<Parameters<typeof mapOrderToUi>[0]>>(
           '/commercial/orders/urgent',
-          { accessToken: token(), params: { siteCode: siteCode() } }
+          { params: { siteCode: siteCode() } }
         )
         return (urgent ?? []).map(mapOrderToUi)
       }
@@ -57,7 +55,6 @@ export function createMoleculerOrderAdapter(
 
     async create(input) {
       const clients = await request<Array<Record<string, unknown>>>('/commercial/clients', {
-        accessToken: token(),
         params: { siteCode: siteCode() }
       })
       let client = clients.find(c => c.name === input.client || c.code === input.client)
@@ -68,8 +65,7 @@ export function createMoleculerOrderAdapter(
             code: input.client.toUpperCase().replace(/\s+/g, '-').slice(0, 20),
             name: input.client,
             siteCode: siteCode()
-          },
-          accessToken: token()
+          }
         })
       }
       const productCode = input.productCode ?? await resolveProductCode()
@@ -85,8 +81,7 @@ export function createMoleculerOrderAdapter(
             quantity: input.itemsCount,
             unitPrice: 10000
           }]
-        },
-        accessToken: token()
+        }
       })
       return mapOrderToUi(order)
     },
@@ -97,18 +92,16 @@ export function createMoleculerOrderAdapter(
       const backendStatus = mapUiStatusToBackend(status)
       if (backendStatus === 'SHIPPED') {
         await request(`/commercial/orders/${encodeURIComponent(orderId)}/mark-shipped`, {
-          method: 'POST',
-          accessToken: token()
+          method: 'POST'
         })
       } else if (backendStatus === 'DELIVERED') {
         await request(`/commercial/orders/${encodeURIComponent(orderId)}/mark-delivered`, {
-          method: 'POST',
-          accessToken: token()
+          method: 'POST'
         })
       }
       const order = await request<Parameters<typeof mapOrderToUi>[0]>(
         `/commercial/orders/${encodeURIComponent(orderId)}`,
-        { accessToken: token() }
+        {}
       )
       return mapOrderToUi(order)
     },
@@ -118,7 +111,7 @@ export function createMoleculerOrderAdapter(
       if (!orderId) throw new Error('NOT_FOUND')
       const order = await request<Parameters<typeof mapOrderToUi>[0]>(
         `/commercial/orders/${encodeURIComponent(orderId)}/validate`,
-        { method: 'POST', accessToken: token() }
+        { method: 'POST' }
       )
       return mapOrderToUi(order)
     },
@@ -130,8 +123,7 @@ export function createMoleculerOrderAdapter(
         `/commercial/orders/${encodeURIComponent(orderId)}/reject`,
         {
           method: 'POST',
-          body: { reason: 'Rejected via UI' },
-          accessToken: token()
+          body: { reason: 'Rejected via UI' }
         }
       )
       return mapOrderToUi(order)
@@ -144,8 +136,7 @@ export function createMoleculerOrderAdapter(
         `/commercial/orders/${encodeURIComponent(orderId)}/priority`,
         {
           method: 'PATCH',
-          body: { isUrgent: priority === 'urgent' },
-          accessToken: token()
+          body: { isUrgent: priority === 'urgent' }
         }
       )
       return mapOrderToUi(order)
@@ -153,14 +144,13 @@ export function createMoleculerOrderAdapter(
 
     async getClientStats(client) {
       const clients = await request<Array<Record<string, unknown>>>('/commercial/clients', {
-        accessToken: token(),
         params: { siteCode: siteCode() }
       })
       const match = clients.find(c => c.name === client || c.code === client)
       if (!match?.id) throw new Error('NOT_FOUND')
       const stats = await request<Parameters<typeof mapClientStatsToUi>[0]>(
         `/commercial/clients/${encodeURIComponent(String(match.id))}/stats`,
-        { accessToken: token() }
+        {}
       )
       return mapClientStatsToUi(stats)
     },
@@ -173,7 +163,7 @@ export function createMoleculerOrderAdapter(
         | { items?: Array<Parameters<typeof mapOrderHistoryToUi>[0][number]> }
       >(
         `/commercial/orders/${encodeURIComponent(id)}/status`,
-        { accessToken: token() }
+        {}
       )
       const entries = Array.isArray(history) ? history : (history.items ?? [])
       return mapOrderHistoryToUi(entries)
@@ -190,7 +180,7 @@ export function createMoleculerOrderAdapter(
           score?: number
         }>(
           `/commercial/orders/${encodeURIComponent(id)}/delay-risk`,
-          { accessToken: token() }
+          {}
         )
         const level = (risk.riskLevel ?? risk.level ?? 'low').toLowerCase()
         const riskLevel = level === 'high' || level === 'critical'

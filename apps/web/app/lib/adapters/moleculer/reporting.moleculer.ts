@@ -3,9 +3,8 @@ import type { ReportingAdapter } from '~/lib/adapters/types'
 import { mapCalculResponsesToDashboard } from '~/lib/mappers/reporting'
 import type { ReportingDashboardOptions } from '~/types'
 
-export function createMoleculerReportingAdapter(getToken: () => string | null): ReportingAdapter {
+export function createMoleculerReportingAdapter(): ReportingAdapter {
   const { request } = useApiClient()
-  const token = () => getToken()
 
   function kpiParams(options?: ReportingDashboardOptions) {
     if (options?.consolidated) return {}
@@ -16,7 +15,7 @@ export function createMoleculerReportingAdapter(getToken: () => string | null): 
   return {
     async getDashboard(options) {
       const params = kpiParams(options)
-      const auth = { accessToken: token(), params }
+      const auth = { params }
       const [
         rupture,
         rotation,

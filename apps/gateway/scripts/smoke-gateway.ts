@@ -5,16 +5,50 @@ config({ path: resolve(import.meta.dirname, '../../../.env') })
 
 const baseUrl = process.env.GATEWAY_URL ?? `http://localhost:${process.env.GATEWAY_PORT ?? 4000}`
 
-async function request(path: string, options: RequestInit = {}) {
+type RequestResult = {
+  response: Response
+  body: unknown
+  cookies: Map<string, string>
+}
+
+function collectSetCookies(response: Response): Map<string, string> {
+  const cookies = new Map<string, string>()
+  const headers = typeof response.headers.getSetCookie === 'function'
+    ? response.headers.getSetCookie()
+    : []
+  for (const header of headers) {
+    const [pair] = header.split(';')
+    const eq = pair.indexOf('=')
+    if (eq === -1) continue
+    cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1))
+  }
+  return cookies
+}
+
+function cookieHeader(cookies: Map<string, string>): string | undefined {
+  if (cookies.size === 0) return undefined
+  return [...cookies.entries()].map(([name, value]) => `${name}=${value}`).join('; ')
+}
+
+async function request(
+  path: string,
+  options: RequestInit & { cookies?: Map<string, string> } = {}
+): Promise<RequestResult> {
+  const cookieValue = options.cookies ? cookieHeader(options.cookies) : undefined
   const response = await fetch(`${baseUrl}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(cookieValue ? { Cookie: cookieValue } : {}),
       ...(options.headers ?? {})
     },
     ...options
   })
   const body = await response.json().catch(() => null)
-  return { response, body }
+  const cookies = collectSetCookies(response)
+  for (const [name, value] of options.cookies ?? []) {
+    if (!cookies.has(name)) cookies.set(name, value)
+  }
+  return { response, body, cookies }
 }
 
 type SmokeCase = {
@@ -58,37 +92,39 @@ async function main() {
     throw new Error(`POST /api/auth/login failed: ${login.response.status} ${JSON.stringify(login.body)}`)
   }
 
-  const loginPayload = login.body as {
-    data?: { accessToken?: string, refreshToken?: string }
-    accessToken?: string
-    refreshToken?: string
+  const accessFromCookie = login.cookies.get('aeronexis_access_token')
+  if (!accessFromCookie) {
+    throw new Error('Login response missing aeronexis_access_token cookie')
   }
-  const token = loginPayload.data?.accessToken ?? loginPayload.accessToken
-  const refreshToken = loginPayload.data?.refreshToken ?? loginPayload.refreshToken
-  if (!token) {
-    throw new Error('Login response missing accessToken')
-  }
-  console.log('✓ POST /api/auth/login')
+  console.log('✓ POST /api/auth/login (HttpOnly cookies)')
 
-  const me = await request('/api/auth/me', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  if (!me.response.ok) {
-    throw new Error(`GET /api/auth/me failed: ${me.response.status}`)
+  const meWithCookie = await request('/api/auth/me', { cookies: login.cookies })
+  if (!meWithCookie.response.ok) {
+    throw new Error(`GET /api/auth/me with cookie failed: ${meWithCookie.response.status}`)
   }
-  console.log('✓ GET /api/auth/me')
+  console.log('✓ GET /api/auth/me (cookie)')
+
+  const meWithBearer = await request('/api/auth/me', {
+    headers: { Authorization: `Bearer ${accessFromCookie}` }
+  })
+  if (!meWithBearer.response.ok) {
+    throw new Error(`GET /api/auth/me with Bearer failed: ${meWithBearer.response.status}`)
+  }
+  console.log('✓ GET /api/auth/me (Bearer fallback)')
 
   const refresh = await request('/api/auth/refresh', {
     method: 'POST',
-    body: JSON.stringify({ refreshToken })
+    cookies: login.cookies
   })
   if (!refresh.response.ok) {
     throw new Error(`POST /api/auth/refresh failed: ${refresh.response.status}`)
   }
-  console.log('✓ POST /api/auth/refresh (public)')
+  console.log('✓ POST /api/auth/refresh (cookie)')
+
+  const sessionCookies = refresh.cookies.size > 0 ? refresh.cookies : login.cookies
 
   const kpiSite = await request('/api/reporting/kpis/logistique/rupture?siteCode=SITE-LYO', {
-    headers: { Authorization: `Bearer ${token}` }
+    cookies: sessionCookies
   })
   if (!kpiSite.response.ok) {
     console.warn(`⚠ KPI rupture with siteCode — ${kpiSite.response.status} (optionnel)`)
@@ -99,7 +135,7 @@ async function main() {
   for (const testCase of restSmokeCases) {
     const result = await request(testCase.path, {
       method: testCase.method ?? 'GET',
-      headers: { Authorization: `Bearer ${token}` },
+      cookies: sessionCookies,
       body: testCase.body ? JSON.stringify(testCase.body) : undefined
     })
     if (!result.response.ok) {
@@ -112,9 +148,7 @@ async function main() {
     console.log(`✓ ${testCase.method ?? 'GET'} ${testCase.path} (${testCase.name})`)
   }
 
-  const reservations = await request('/api/stock/reservations', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
+  const reservations = await request('/api/stock/reservations', { cookies: sessionCookies })
   const reservationItems =
     (reservations.body as { data?: { items?: unknown[] }; items?: unknown[] })?.data?.items ??
     (reservations.body as { items?: unknown[] })?.items ??
@@ -124,9 +158,7 @@ async function main() {
   }
   console.log(`✓ seed check: stock reservations (${reservationItems.length})`)
 
-  const unread = await request('/api/notifications/unread-count', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
+  const unread = await request('/api/notifications/unread-count', { cookies: sessionCookies })
   const unreadCount =
     (unread.body as { data?: { count?: number }; count?: number })?.data?.count ??
     (unread.body as { count?: number })?.count ??
@@ -136,9 +168,7 @@ async function main() {
   }
   console.log(`✓ seed check: notifications unread-count (${unreadCount})`)
 
-  const history = await request('/api/commercial/orders/history', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
+  const history = await request('/api/commercial/orders/history', { cookies: sessionCookies })
   const orders =
     (history.body as { data?: { items?: Array<{ status?: string }> }; items?: Array<{ status?: string }> })
       ?.data?.items ??

@@ -30,17 +30,15 @@ function saveProductCode(code: string) {
 }
 
 export function createMoleculerProductionAdapter(
-  getToken: () => string | null,
   getSiteCode: () => string
 ): ProductionAdapter {
   const { request } = useApiClient()
-  const token = () => getToken()
   const siteCode = () => getSiteCode()
 
   async function listRawBatches() {
     const result = await request<{ items: Array<Record<string, unknown>> }>(
       '/production/batches',
-      { accessToken: token(), params: { siteCode: siteCode() } }
+      { params: { siteCode: siteCode() } }
     )
     return result.items ?? []
   }
@@ -48,7 +46,7 @@ export function createMoleculerProductionAdapter(
   async function resolveBomCode(id: number | string): Promise<string | null> {
     const listed = await request<{ items: Array<Record<string, unknown>> }>(
       '/production/bom',
-      { accessToken: token(), params: { siteCode: siteCode() } }
+      { params: { siteCode: siteCode() } }
     )
     const items = listed.items ?? []
     if (isCuidLike(String(id))) {
@@ -78,7 +76,7 @@ export function createMoleculerProductionAdapter(
   async function batchHasOpenAnomaly(batchCode: string): Promise<boolean> {
     const history = await request<{ items?: Array<{ action?: string, details?: string }> }>(
       `/production/batches/${encodeURIComponent(batchCode)}/history`,
-      { accessToken: token(), params: { limit: 50 } }
+      { params: { limit: 50 } }
     )
     const reported = (history.items ?? []).filter(h => h.action === 'batch.anomaly_reported')
     const closed = new Set(
@@ -93,7 +91,7 @@ export function createMoleculerProductionAdapter(
     async listBomOrders() {
       const result = await request<{ items: Array<Parameters<typeof mapBomToUi>[0]> }>(
         '/production/bom',
-        { accessToken: token(), params: { siteCode: siteCode() } }
+        { params: { siteCode: siteCode() } }
       )
       return (result.items ?? []).map(mapBomToUi)
     },
@@ -109,8 +107,7 @@ export function createMoleculerProductionAdapter(
             material_id: line.reference,
             quantity: line.qtyNeeded
           }))
-        },
-        accessToken: token()
+        }
       })
       return mapBomToUi(bom)
     },
@@ -127,8 +124,7 @@ export function createMoleculerProductionAdapter(
               material_id: line.reference,
               quantity: line.qtyNeeded
             }))
-          },
-          accessToken: token()
+          }
         }
       )
       return mapBomToUi(bom)
@@ -141,8 +137,7 @@ export function createMoleculerProductionAdapter(
         `/production/bom/${encodeURIComponent(bomCode)}`,
         {
           method: 'PATCH',
-          body: { status: mapUiBomStatus(status) },
-          accessToken: token()
+          body: { status: mapUiBomStatus(status) }
         }
       )
       return mapBomToUi(bom)
@@ -163,7 +158,7 @@ export function createMoleculerProductionAdapter(
     async createBatch(input) {
       const boms = await request<{ items: Array<Record<string, unknown>> }>(
         '/production/bom',
-        { accessToken: token(), params: { siteCode: siteCode() } }
+        { params: { siteCode: siteCode() } }
       )
       const bomMatch = boms.items?.find(b => String(b.description ?? '').includes(input.ofNumber))
         ?? boms.items?.[0]
@@ -175,8 +170,7 @@ export function createMoleculerProductionAdapter(
           bom_code: bomCode,
           command_id: input.ofNumber,
           siteCode: siteCode()
-        },
-        accessToken: token()
+        }
       })
       return mapBatchToUi(batch)
     },
@@ -188,11 +182,11 @@ export function createMoleculerProductionAdapter(
       const updated = mapped === 'COMPLETED'
         ? await request<Parameters<typeof mapBatchToUi>[0]>(
             `/production/batches/${encodeURIComponent(batchCode)}/progress`,
-            { method: 'PATCH', body: { percent: 100 }, accessToken: token() }
+            { method: 'PATCH', body: { percent: 100 } }
           )
         : await request<Parameters<typeof mapBatchToUi>[0]>(
             `/production/batches/${encodeURIComponent(batchCode)}`,
-            { method: 'PATCH', body: { status: mapped }, accessToken: token() }
+            { method: 'PATCH', body: { status: mapped } }
           )
       return mapBatchToUi(updated)
     },
@@ -202,14 +196,13 @@ export function createMoleculerProductionAdapter(
       if (!batchId) throw new Error('NOT_FOUND')
       await request(`/production/batches/${encodeURIComponent(batchId)}/anomalies`, {
         method: 'POST',
-        body: { description: input.description },
-        accessToken: token()
+        body: { description: input.description }
       })
       const batchCode = await resolveBatchCode(input.batchId)
       if (!batchCode) throw new Error('NOT_FOUND')
       const batch = await request<Parameters<typeof mapBatchToUi>[0]>(
         `/production/batches/${encodeURIComponent(batchCode)}`,
-        { accessToken: token() }
+        {}
       )
       return mapBatchToUi({ ...batch, hasAnomaly: true })
     },
@@ -220,7 +213,7 @@ export function createMoleculerProductionAdapter(
       if (!batchIdCuid || !batchCode) throw new Error('NOT_FOUND')
       const history = await request<{ items?: Array<{ action?: string, details?: string }> }>(
         `/production/batches/${encodeURIComponent(batchCode)}/history`,
-        { accessToken: token(), params: { limit: 50 } }
+        { params: { limit: 50 } }
       )
       const anomalyCode = (history.items ?? []).find(h => h.action === 'batch.anomaly_reported')?.details
       if (anomalyCode) {
@@ -228,14 +221,13 @@ export function createMoleculerProductionAdapter(
           `/production/batches/${encodeURIComponent(batchIdCuid)}/anomalies/${encodeURIComponent(anomalyCode)}`,
           {
             method: 'PATCH',
-            body: { status: 'CLOSED' },
-            accessToken: token()
+            body: { status: 'CLOSED' }
           }
         )
       }
       const batch = await request<Parameters<typeof mapBatchToUi>[0]>(
         `/production/batches/${encodeURIComponent(batchCode)}`,
-        { accessToken: token() }
+        {}
       )
       return mapBatchToUi({ ...batch, hasAnomaly: false })
     },
@@ -247,7 +239,7 @@ export function createMoleculerProductionAdapter(
           try {
             return await request<Parameters<typeof mapProductToUi>[0]>(
               `/production/products/${encodeURIComponent(code)}`,
-              { accessToken: token() }
+              {}
             )
           } catch {
             return null
@@ -260,7 +252,7 @@ export function createMoleculerProductionAdapter(
     async getProduct(productCode) {
       const product = await request<Parameters<typeof mapProductToUi>[0]>(
         `/production/products/${encodeURIComponent(productCode)}`,
-        { accessToken: token() }
+        {}
       )
       saveProductCode(productCode)
       return mapProductToUi(product)
@@ -269,8 +261,7 @@ export function createMoleculerProductionAdapter(
     async createProduct(input) {
       const product = await request<Parameters<typeof mapProductToUi>[0]>('/production/products', {
         method: 'POST',
-        body: { ...input, siteCode: input.siteCode ?? siteCode() },
-        accessToken: token()
+        body: { ...input, siteCode: input.siteCode ?? siteCode() }
       })
       saveProductCode(input.productCode)
       return mapProductToUi(product)
@@ -281,8 +272,7 @@ export function createMoleculerProductionAdapter(
         `/production/products/${encodeURIComponent(input.productCode)}`,
         {
           method: 'PATCH',
-          body: input,
-          accessToken: token()
+          body: input
         }
       )
       saveProductCode(input.productCode)
@@ -291,8 +281,7 @@ export function createMoleculerProductionAdapter(
 
     async deleteProduct(productCode) {
       await request(`/production/products/${encodeURIComponent(productCode)}`, {
-        method: 'DELETE',
-        accessToken: token()
+        method: 'DELETE'
       })
       if (import.meta.client) {
         const codes = loadProductCodes()

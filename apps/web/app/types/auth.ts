@@ -15,13 +15,15 @@ export interface LoginCredentials {
 }
 
 export interface LoginResult {
-  accessToken: string
-  refreshToken: string
   user: User
+  /** Présents uniquement en mode mock */
+  accessToken?: string
+  refreshToken?: string
 }
 
 export interface SessionState {
-  accessToken: string | null
-  refreshToken: string | null
   user: User | null
+  /** Présents uniquement en mode mock */
+  accessToken?: string | null
+  refreshToken?: string | null
 }

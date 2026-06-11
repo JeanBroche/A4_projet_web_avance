@@ -8,7 +8,7 @@ export function useSession() {
   const isAuthenticated = computed(() => session.value.user !== null)
   const role = computed(() => session.value.user?.role ?? null)
   const roleLabel = computed(() => (role.value ? getRoleLabel(role.value) : null))
-  const accessToken = computed(() => session.value.accessToken)
+  const accessToken = computed(() => session.value.accessToken ?? null)
 
   function hasRole(...roles: UserRole[]): boolean {
     if (!role.value) return false

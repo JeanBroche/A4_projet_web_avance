@@ -2,7 +2,7 @@
 
 API Gateway HTTP (Moleculer `moleculer-web`, issue [#5](https://github.com/JeanBroche/A4_projet_web_avance/issues/5)).
 
-Expose les microservices Moleculer en **REST 1:1** sur le port **4000** (`/api/*`), avec validation JWT. Pas de BFF : le front Nuxt appelle ces routes et mappe les DTOs MS localement (`apps/web/app/lib/mappers/`).
+Expose les microservices Moleculer en **REST** sur le port **4000** (`/api/*`), avec validation JWT. Auth login/refresh/logout passent par une facade gateway qui pose des cookies HttpOnly ; le reste est un proxy 1:1 vers les MS (le front mappe les DTOs dans `apps/web/app/lib/mappers/`).
 
 ## Prérequis
 
@@ -38,7 +38,7 @@ Le proxy Nitro redirige `/api/*` vers `http://localhost:4000`.
 
 | Couche | Rôle |
 |--------|------|
-| **Gateway** | Proxy HTTP → action Moleculer (DTO brut MS) |
+| **Gateway** | Proxy HTTP → action Moleculer ; facade auth (cookies HttpOnly) |
 | **Front Nuxt** | Adapters `moleculer/*` + mappers + orchestration UI |
 
 Catalogue complet : [`ROUTES.md`](./ROUTES.md).
@@ -56,4 +56,10 @@ Catalogue complet : [`ROUTES.md`](./ROUTES.md).
 | `/api/audit/*` | audit |
 | `/api/notifications` | notification |
 
-RBAC appliqué dans chaque microservice ; la gateway vérifie le JWT sur toutes les routes protégées.
+RBAC appliqué dans chaque microservice ; la gateway vérifie le JWT sur toutes les routes protégées (cookie `aeronexis_access_token` ou header `Authorization: Bearer`).
+
+## Auth cookies
+
+- `POST /api/auth/login` pose `aeronexis_access_token` et `aeronexis_refresh_token` (HttpOnly, SameSite=Lax).
+- Le front Nuxt envoie les cookies via `credentials: include` (proxy `/api` same-origin).
+- En dev HTTP : `COOKIE_SECURE=false` (voir `.env.example`). En production HTTPS : `COOKIE_SECURE=true`.

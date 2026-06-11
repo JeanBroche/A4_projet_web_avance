@@ -33,14 +33,14 @@ export function mapAuthUser(user: BackendUser, roles?: BackendRole[]): User {
 }
 
 export function mapLoginResult(data: {
-  accessToken: string
-  refreshToken: string
+  accessToken?: string
+  refreshToken?: string
   user: BackendUser
   roles?: BackendRole[]
 }): LoginResult {
   return {
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-    user: mapAuthUser(data.user, data.roles ?? data.user.roles)
+    user: mapAuthUser(data.user, data.roles ?? data.user.roles),
+    ...(data.accessToken ? { accessToken: data.accessToken } : {}),
+    ...(data.refreshToken ? { refreshToken: data.refreshToken } : {})
   }
 }

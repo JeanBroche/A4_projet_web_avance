@@ -4,18 +4,16 @@ import { mapShipmentToUi, mapUiShipmentStatus } from '~/lib/mappers/shipment'
 import { isCuidLike, resolveStringIdByNumeric } from '~/lib/mappers/resolve-id'
 
 export function createMoleculerShipmentAdapter(
-  getToken: () => string | null,
   getSiteCode: () => string
 ): ShipmentAdapter {
   const { request } = useApiClient()
-  const token = () => getToken()
   const siteCode = () => getSiteCode()
 
   async function resolveShipmentId(id: number | string): Promise<string | null> {
     if (isCuidLike(String(id))) return String(id)
     const history = await request<{ items: Array<Record<string, unknown>> }>(
       '/logistics/shipments',
-      { accessToken: token() }
+      {}
     )
     return resolveStringIdByNumeric(history.items ?? [], id)
   }
@@ -24,7 +22,7 @@ export function createMoleculerShipmentAdapter(
     async list() {
       const result = await request<{ items: Array<Parameters<typeof mapShipmentToUi>[0]> }>(
         '/logistics/shipments',
-        { accessToken: token() }
+        {}
       )
       return (result.items ?? []).map(mapShipmentToUi)
     },
@@ -38,19 +36,16 @@ export function createMoleculerShipmentAdapter(
           clientCode: input.client,
           siteCode: siteCode(),
           lines: [{ productCode: input.productCode ?? 'PROD-GENERIC', quantity: 1 }]
-        },
-        accessToken: token()
+        }
       })
       await request(`/logistics/picklists/${encodeURIComponent(picklist.pickList.id)}/complete`, {
-        method: 'POST',
-        accessToken: token()
+        method: 'POST'
       })
       const planned = await request<{ shipment: Parameters<typeof mapShipmentToUi>[0] }>(
         '/logistics/shipments/plan',
         {
           method: 'POST',
-          body: { pickListId: picklist.pickList.id, carrier: input.carrier },
-          accessToken: token()
+          body: { pickListId: picklist.pickList.id, carrier: input.carrier }
         }
       )
       return mapShipmentToUi(planned.shipment)
@@ -63,8 +58,7 @@ export function createMoleculerShipmentAdapter(
         `/logistics/shipments/${encodeURIComponent(shipmentId)}/status`,
         {
           method: 'PATCH',
-          body: { status: mapUiShipmentStatus(status) },
-          accessToken: token()
+          body: { status: mapUiShipmentStatus(status) }
         }
       )
       return mapShipmentToUi(updated.shipment)

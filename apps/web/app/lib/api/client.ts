@@ -25,7 +25,8 @@ export function useApiClient() {
         method: options.method ?? 'GET',
         headers,
         body: options.body as Record<string, unknown> | undefined,
-        params: options.params
+        params: options.params,
+        credentials: 'include'
       })
       return unwrapEnvelope<T>(response)
     } catch (error: unknown) {

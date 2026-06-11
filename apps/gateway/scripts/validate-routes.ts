@@ -3,6 +3,8 @@ import { join, resolve } from 'node:path'
 import { allRouteDefinitions } from '../src/routes/index.js'
 
 const servicesRoot = resolve(import.meta.dirname, '../../../services')
+const gatewayServicePath = resolve(import.meta.dirname, '../services/api.service.ts')
+const gatewayFacadesRoot = resolve(import.meta.dirname, '../src/facades')
 const routesDocPath = resolve(import.meta.dirname, '../ROUTES.md')
 const writeDoc = process.argv.includes('--write-doc')
 
@@ -42,11 +44,28 @@ function actionExists(serviceName: string, actionPath: string): boolean {
   })
 }
 
+function gatewayActionExists(action: string): boolean {
+  if (!action.startsWith('api.')) return false
+  const actionPath = action.slice(4)
+  const patterns = [`"${actionPath}"`, `'${actionPath}'`]
+  if (!actionPath.includes('.')) {
+    patterns.push(`${actionPath}:`)
+  }
+  const gatewayFiles = [
+    gatewayServicePath,
+    ...collectServiceFiles(gatewayFacadesRoot)
+  ]
+  return gatewayFiles.some((file) => {
+    const content = readFileSync(file, 'utf8')
+    return patterns.some((pattern) => content.includes(pattern))
+  })
+}
+
 function generateRoutesDoc(): string {
   const lines = [
     '# Gateway — catalogue REST',
     '',
-    'Proxy HTTP 1:1 vers les actions Moleculer. Pas de BFF : le front Nuxt mappe les DTOs MS.',
+    'Proxy HTTP vers les actions Moleculer. Auth login/refresh/logout passent par la facade gateway (cookies HttpOnly).',
     '',
     '| HTTP | Chemin | Action MS |',
     '|------|--------|-----------|'
@@ -58,7 +77,7 @@ function generateRoutesDoc(): string {
     '',
     '## RBAC',
     '',
-    '- Chaque microservice applique ses propres règles (`accessToken` via JWT).',
+    '- Auth : JWT dans cookies HttpOnly (`aeronexis_access_token`, `aeronexis_refresh_token`) ou header Bearer.',
     '- `audit.change.list` : rôle `admin` uniquement.',
     '- Actions `reporting.calcul.*` : rôle `direction` (ou `admin`).',
     ''
@@ -70,6 +89,7 @@ const missing: string[] = []
 for (const route of allRouteDefinitions) {
   const [service, ...rest] = route.action.split('.')
   const actionPath = rest.join('.')
+  if (gatewayActionExists(route.action)) continue
   if (!actionExists(service, actionPath)) {
     missing.push(`${route.method} /api/${route.path} -> ${route.action}`)
   }

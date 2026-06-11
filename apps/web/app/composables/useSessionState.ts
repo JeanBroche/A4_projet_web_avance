@@ -3,7 +3,7 @@ import type { SessionState } from '~/types'
 const SESSION_COOKIE = 'aeronexis-session'
 
 function emptySession(): SessionState {
-  return { accessToken: null, refreshToken: null, user: null }
+  return { user: null }
 }
 
 export function useSessionState() {
@@ -15,7 +15,8 @@ export function useSessionState() {
   const session = useState<SessionState>('session', () => {
     if (cookie.value) {
       try {
-        return JSON.parse(cookie.value) as SessionState
+        const parsed = JSON.parse(cookie.value) as SessionState
+        return { user: parsed.user ?? null }
       } catch {
         return emptySession()
       }
@@ -25,7 +26,7 @@ export function useSessionState() {
 
   function persist(next: SessionState) {
     session.value = next
-    cookie.value = JSON.stringify(next)
+    cookie.value = JSON.stringify({ user: next.user })
   }
 
   function clear() {

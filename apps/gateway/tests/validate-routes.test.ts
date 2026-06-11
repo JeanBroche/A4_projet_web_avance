@@ -1,10 +1,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { allRouteDefinitions } from '../src/routes/index.js'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { allRouteDefinitions } from '../src/routes/index.js'
 
 const servicesRoot = resolve(import.meta.dirname, '../../../services')
+const gatewayServicePath = resolve(import.meta.dirname, '../services/api.service.ts')
+const gatewayFacadesRoot = resolve(import.meta.dirname, '../src/facades')
 
 function collectServiceFiles(dir: string): string[] {
   const files: string[] = []
@@ -32,10 +34,28 @@ function actionExists(serviceName: string, actionPath: string): boolean {
   })
 }
 
+function gatewayActionExists(action: string): boolean {
+  if (!action.startsWith('api.')) return false
+  const actionPath = action.slice(4)
+  const patterns = [`"${actionPath}"`, `'${actionPath}'`]
+  if (!actionPath.includes('.')) {
+    patterns.push(`${actionPath}:`)
+  }
+  const gatewayFiles = [
+    gatewayServicePath,
+    ...collectServiceFiles(gatewayFacadesRoot)
+  ]
+  return gatewayFiles.some((file) => {
+    const content = readFileSync(file, 'utf8')
+    return patterns.some((pattern) => content.includes(pattern))
+  })
+}
+
 describe('validate-routes', () => {
-  it('every REST alias points to an existing MS action', () => {
+  it('every REST alias points to an existing MS or gateway action', () => {
     const missing: string[] = []
     for (const route of allRouteDefinitions) {
+      if (gatewayActionExists(route.action)) continue
       const [service, ...rest] = route.action.split('.')
       const actionPath = rest.join('.')
       if (!actionExists(service, actionPath)) {
