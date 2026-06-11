@@ -5,7 +5,7 @@ async function main() {
   const db = await connectMongo();
   await ensureIndexes(db);
   await seedDemoLot(db);
-  console.log("Audit seed completed: LOT-2026-00001");
+  console.log("Audit seed completed: BATCH-SEED-001");
   await disconnectMongo();
 }
 

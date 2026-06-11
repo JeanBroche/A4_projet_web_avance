@@ -216,6 +216,28 @@ describe("audit.lot.trace", () => {
   });
 });
 
+describe("audit lot trace events", () => {
+  it("records production.batch.created in event_history", async (t) => {
+    if (skipIfNoMongo(t)) return;
+
+    await broker.emit("production.batch.created", {
+      batch_code: "BATCH-EVENT-TEST",
+      command_id: "CMD-EVENT-001",
+      siteCode: "SITE-LYO",
+      status: "PENDING"
+    });
+
+    const db = getDb();
+    const match = await db.collection(COLLECTIONS.eventHistory).findOne({
+      type: "production.batch.created",
+      orderNumber: "CMD-EVENT-001"
+    });
+
+    assert.ok(match);
+    assert.equal(match.siteCode, "SITE-LYO");
+  });
+});
+
 describe("audit.lot.export", () => {
   it("exports CSV for demo lot", async (t) => {
     if (skipIfNoMongo(t)) return;
@@ -229,7 +251,7 @@ describe("audit.lot.export", () => {
     );
 
     assert.equal(result.format, "csv");
-    assert.match(result.filename, /^LOT-2026-00001-trace\.csv$/);
+    assert.match(result.filename, /^BATCH-SEED-001-trace\.csv$/);
     assert.match(result.content, /^timestamp,source,type,label,status,payload/);
   });
 });

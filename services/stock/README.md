@@ -79,4 +79,4 @@ Les tests sautent automatiquement si PostgreSQL n est pas disponible. Ils utilis
 
 ## Kafka
 
-La publication d evenements (`stock.reserved`, `stock.movement.recorded`, `supplier.delay.reported`...) est branchee via [`src/lib/events.ts`](src/lib/events.ts).
+La publication d evenements (`stock.reserved`, `stock.movement.recorded`, `stock.supplier.delay.reported`...) est branchee via [`src/lib/events.ts`](src/lib/events.ts).

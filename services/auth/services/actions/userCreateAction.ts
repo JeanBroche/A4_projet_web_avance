@@ -17,7 +17,7 @@ type AuthContextMeta = {
 export const userCreateAction = {
   async handler(ctx: Context<UserCreateParams, AuthContextMeta>) {
     const params = parseParams(userCreateSchema, ctx.params);
-    const auth = requireAdmin(ctx, params.accessToken);
+    const auth = await requireAdmin(ctx, params.accessToken);
 
     const email = params.email.toLowerCase();
     const existing = await prisma.user.findFirst({ where: { email } });

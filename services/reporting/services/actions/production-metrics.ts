@@ -24,12 +24,16 @@ const TERMINAL_STATUSES = ["COMPLETED", "CANCELLED"];
 
 async function loadActiveBatches(
   ctx: Context,
+  siteCode: string | undefined,
   accessToken: string | undefined
 ): Promise<BatchRow[]> {
   const page = await callDownstream<BatchListPage>(
     ctx,
     "production.batch.list",
-    { limit: 100 },
+    {
+      ...(siteCode ? { siteCode } : {}),
+      limit: 500
+    },
     accessToken
   );
   return page.items.filter((b) => !TERMINAL_STATUSES.includes(b.status));
@@ -38,14 +42,18 @@ async function loadActiveBatches(
 export const avancementCalculation = {
   async handler(ctx: Context) {
     const params = parseParams(baseKpiSchema, ctx.params);
-    requireDirection(ctx, params.accessToken);
+    await requireDirection(ctx, params.accessToken);
 
     return withCache(
       ctx.service!,
       "calcul.production.avancement",
       { siteCode: params.siteCode ?? null },
       async () => {
-        const batches = await loadActiveBatches(ctx, params.accessToken);
+        const batches = await loadActiveBatches(
+          ctx,
+          params.siteCode,
+          params.accessToken
+        );
 
         const totalActive = batches.length;
         const totalProgress = batches.reduce(
@@ -68,14 +76,18 @@ export const avancementCalculation = {
 export const retardLotsCalculation = {
   async handler(ctx: Context) {
     const params = parseParams(baseKpiSchema, ctx.params);
-    requireDirection(ctx, params.accessToken);
+    await requireDirection(ctx, params.accessToken);
 
     return withCache(
       ctx.service!,
       "calcul.production.retardLots",
       { siteCode: params.siteCode ?? null },
       async () => {
-        const batches = await loadActiveBatches(ctx, params.accessToken);
+        const batches = await loadActiveBatches(
+          ctx,
+          params.siteCode,
+          params.accessToken
+        );
         const now = new Date();
 
         const lateBatches = batches.filter((b) => {

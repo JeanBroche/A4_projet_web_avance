@@ -12,6 +12,7 @@ import {
 } from '../../src/lib/order-helpers.js';
 
 import { publishOrderEvent } from '../../src/lib/events.js';
+import { DomainEvents } from '@aeronexis/shared';
 import { logOrderAudit } from '../../src/lib/audit.js';
 
 type OrderSetPriorityParams = z.infer<typeof orderSetPrioritySchema>;
@@ -22,7 +23,7 @@ type AuthContextMeta = {
 export const orderSetPriorityAction = {
   async handler(ctx: Context<OrderSetPriorityParams, AuthContextMeta>) {
     const params = parseParams(orderSetPrioritySchema, ctx.params);
-    const auth = requireCommercial(ctx, params.accessToken);
+    const auth = await requireCommercial(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);
@@ -43,7 +44,7 @@ export const orderSetPriorityAction = {
       },
     });
 
-    publishOrderEvent(ctx.service!, 'order.priority.changed', {
+    publishOrderEvent(ctx.service!, DomainEvents.order.priorityChanged, {
       orderId: updated.id,
       orderNumber: updated.orderNumber,
       isUrgent: updated.isUrgent,

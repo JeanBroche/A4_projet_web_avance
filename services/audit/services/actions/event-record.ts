@@ -8,7 +8,7 @@ import { eventRecordSchema } from "../../src/lib/schemas.js";
 export const eventRecordAction: ActionSchema = {
   async handler(this: Service, ctx) {
     const params = parseParams(eventRecordSchema, ctx.params);
-    const auth = requireAdmin(ctx, params.accessToken);
+    const auth = await requireAdmin(ctx, params.accessToken);
     const correlationId = (ctx.meta as { correlationId?: string }).correlationId;
 
     const db = getDb();

@@ -1,6 +1,7 @@
 import type { Client, CustomerOrder, CustomerOrderLine } from "../generated/prisma/client.js";
 import { withDistributedLock } from "@aeronexis/redis-infra";
 import { prisma } from "../db.js";
+import { resolveOfId, computeDelayRisk } from "@aeronexis/shared";
 import { createError } from "@aeronexis/services-shared";
 
 export const ORDER_STATUSES = {
@@ -128,14 +129,17 @@ export async function loadActiveClient(db: DbClient, clientId: string) {
   return client;
 }
 
+const ALLOWED_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
+  [ORDER_STATUSES.DRAFT]: [ORDER_STATUSES.VALIDATED, ORDER_STATUSES.REJECTED],
+  [ORDER_STATUSES.VALIDATED]: [ORDER_STATUSES.IN_PRODUCTION],
+  [ORDER_STATUSES.IN_PRODUCTION]: [ORDER_STATUSES.SHIPPED],
+  [ORDER_STATUSES.SHIPPED]: [ORDER_STATUSES.DELIVERED]
+};
+
 export function assertStatusTransition(currentStatus: string, nextStatus: string) {
-  if (currentStatus === ORDER_STATUSES.DRAFT) {
-    if (
-      nextStatus === ORDER_STATUSES.VALIDATED ||
-      nextStatus === ORDER_STATUSES.REJECTED
-    ) {
-      return;
-    }
+  const allowed = ALLOWED_STATUS_TRANSITIONS[currentStatus];
+  if (allowed?.includes(nextStatus)) {
+    return;
   }
 
   throw createError(
@@ -144,64 +148,68 @@ export function assertStatusTransition(currentStatus: string, nextStatus: string
   );
 }
 
-export function computeDelayRisk(order: OrderWithRelations) {
-  const factors: string[] = [];
-  let score = 0;
-  const now = new Date();
+export type OrderFinishedPayload = {
+  orderNumber: string;
+  siteCode: string;
+  clientCode?: string;
+  ofId?: string;
+  lines: Array<{ lineNumber: number; productCode: string; quantity: number }>;
+};
 
-  if (TERMINAL_STATUSES.has(order.status)) {
-    return { score: 0, factors: ["Order is in a terminal status"] };
-  }
-
-  if (order.isUrgent) {
-    score += 25;
-    factors.push("Order marked as urgent");
-  }
-
-  const referenceDate = order.dueDate || order.promisedDeliveryDate;
-
-  if (referenceDate) {
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const daysRemaining = Math.ceil((referenceDate.getTime() - now.getTime()) / msPerDay);
-
-    if (daysRemaining < 0) {
-      score += 60;
-      factors.push(`Delivery date exceeded by ${Math.abs(daysRemaining)} day(s)`);
-    } else if (daysRemaining <= 3) {
-      score += 45;
-      factors.push(`Only ${daysRemaining} day(s) until promised delivery`);
-    } else if (daysRemaining <= 7) {
-      score += 25;
-      factors.push(`${daysRemaining} day(s) until promised delivery`);
-    } else {
-      score += 5;
-      factors.push(`${daysRemaining} day(s) until promised delivery`);
-    }
-  } else {
-    score += 10;
-    factors.push("No promised delivery date set");
-  }
-
-  if (order.status === ORDER_STATUSES.DRAFT) {
-    score += 15;
-    factors.push("Order not yet validated");
-  }
-
-  const linesWithOf = (order.lines || []).filter((line: CustomerOrderLine) => line.ofId);
-  if (linesWithOf.length > 0) {
-    factors.push(
-      `${linesWithOf.length} line(s) linked to production OF (M3 enrichment pending)`
-    );
-  }
+export function buildOrderFinishedPayload(order: OrderWithRelations): OrderFinishedPayload {
+  const lines = order.lines ?? [];
+  const batchOfId = lines.find((line) => line.ofId && line.ofId.startsWith("BATCH-"))?.ofId;
+  const ofId = resolveOfId(batchOfId, order.orderNumber);
 
   return {
-    score: Math.min(100, score),
-    factors,
-    daysRemaining: referenceDate
-      ? Math.ceil((referenceDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      : null
+    orderNumber: order.orderNumber,
+    siteCode: order.siteCode,
+    clientCode: order.client?.code,
+    ofId,
+    lines: lines.map((line) => ({
+      lineNumber: line.lineNumber,
+      productCode: line.productCode,
+      quantity: line.quantity
+    }))
   };
 }
+
+type OrderTxClient = typeof prisma;
+
+export async function applyOrderStatusTransition(
+  db: OrderTxClient,
+  order: OrderWithRelations,
+  nextStatus: string,
+  changedBy: string,
+  notes?: string
+) {
+  assertStatusTransition(order.status, nextStatus);
+
+  return db.$transaction(async (tx) => {
+    const updated = await tx.customerOrder.update({
+      where: { id: order.id },
+      data: { status: nextStatus },
+      include: {
+        client: true,
+        lines: { where: { deletedAt: null }, orderBy: { lineNumber: "asc" } }
+      }
+    });
+
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId: order.id,
+        fromStatus: order.status,
+        toStatus: nextStatus,
+        changedBy,
+        notes
+      }
+    });
+
+    return updated;
+  });
+}
+
+export { computeDelayRisk } from "@aeronexis/shared";
 
 export function computeClientStats(orders: CustomerOrder[]) {
   const deliveredOrders = orders.filter((o) => o.status === ORDER_STATUSES.DELIVERED);

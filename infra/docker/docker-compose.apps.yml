@@ -135,4 +135,38 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  notification:
+    build:
+      context: ../..
+      dockerfile: services/notification/Dockerfile
+    container_name: aeronexis-notification
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: notification
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  reporting:
+    build:
+      context: ../..
+      dockerfile: services/reporting/Dockerfile
+    container_name: aeronexis-reporting
+    env_file:
+      - ../../.env.docker
+    environment:
+      NODE_ID: reporting
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped

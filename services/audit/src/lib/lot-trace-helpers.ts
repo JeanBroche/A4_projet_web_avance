@@ -1,8 +1,10 @@
 import type { Context } from "moleculer";
 import type { Db } from "mongodb";
+import { matchesStockDocumentRef, orderNumberFromOfId, parseLotTraceKey } from "@aeronexis/shared";
 import { createError } from "@aeronexis/services-shared";
 import { COLLECTIONS } from "../db.js";
 import type { EventHistoryDocument, LotProgressDocument } from "./audit-helpers.js";
+import { findLotProgress } from "./lot-trace-writer.js";
 
 export interface TimelineEntry {
   timestamp: string;
@@ -43,16 +45,15 @@ function toIso(value: string | Date) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-function matchesRef(documentRef: string | null | undefined, lotId: string, ofId: string) {
-  if (!documentRef) {
-    return false;
-  }
-  return documentRef.includes(lotId) || documentRef.includes(ofId);
-}
-
 async function fetchStockMovements(
   ctx: Context,
-  params: { siteCode: string; lotId: string; ofId: string; accessToken?: string }
+  params: {
+    siteCode: string;
+    lotId: string;
+    ofId: string;
+    orderNumber?: string;
+    accessToken?: string;
+  }
 ): Promise<TimelineEntry[]> {
   try {
     const movements = (await ctx.call("stock.movement.list", {
@@ -61,8 +62,12 @@ async function fetchStockMovements(
       limit: 500
     })) as StockMovement[];
 
+    const extraRefs = [params.orderNumber].filter(Boolean) as string[];
+
     return movements
-      .filter((movement) => matchesRef(movement.documentRef, params.lotId, params.ofId))
+      .filter((movement) =>
+        matchesStockDocumentRef(movement.documentRef, params.lotId, params.ofId, extraRefs)
+      )
       .map((movement) => ({
         timestamp: toIso(movement.createdAt),
         source: "stock",
@@ -92,31 +97,36 @@ async function fetchStockMovements(
 
 async function fetchShipmentHistory(
   ctx: Context,
-  params: { siteCode: string; ofId: string; accessToken?: string }
+  params: {
+    siteCode: string;
+    ofId: string;
+    orderNumber?: string;
+    accessToken?: string;
+  }
 ): Promise<TimelineEntry[]> {
   try {
     const result = (await ctx.call("shipment.shipment.history", {
       siteCode: params.siteCode,
+      orderNumber: params.orderNumber,
+      ofId: params.ofId,
       accessToken: params.accessToken,
       page: 1,
       pageSize: 100
     })) as { items: ShipmentHistoryItem[] };
 
-    return result.items
-      .filter((item) => item.siteCode === params.siteCode)
-      .map((item) => ({
-        timestamp: toIso(item.createdAt),
-        source: "shipment",
-        type: "shipment.shipment",
-        label: `Shipment ${item.code} (${item.status})`,
-        status: "ok" as const,
-        payload: {
-          shipmentId: item.id,
-          code: item.code,
-          orderNumber: item.orderNumber,
-          status: item.status
-        }
-      }));
+    return result.items.map((item) => ({
+      timestamp: toIso(item.createdAt),
+      source: "shipment",
+      type: "shipment.shipment",
+      label: `Shipment ${item.code} (${item.status})`,
+      status: "ok" as const,
+      payload: {
+        shipmentId: item.id,
+        code: item.code,
+        orderNumber: item.orderNumber,
+        status: item.status
+      }
+    }));
   } catch {
     return [
       {
@@ -134,9 +144,12 @@ async function fetchProductionHistory(
   ctx: Context,
   params: { lotId: string; ofId: string; accessToken?: string }
 ): Promise<TimelineEntry[]> {
-  const batchCodes = [params.lotId, params.ofId].filter(Boolean);
+  const batchCodes = [...new Set([params.lotId, params.ofId].filter(Boolean))];
 
   for (const batchCode of batchCodes) {
+    if (!batchCode.startsWith("BATCH-")) {
+      continue;
+    }
     try {
       const result = (await ctx.call("production.batch.history", {
         batch_code: batchCode,
@@ -190,40 +203,51 @@ function mapEventHistory(events: EventHistoryDocument[]): TimelineEntry[] {
   }));
 }
 
+async function resolveLotRecord(db: Db, key: string): Promise<LotProgressDocument> {
+  const existing = await findLotProgress(db, key);
+  if (existing) {
+    return existing;
+  }
+
+  const identity = parseLotTraceKey(key);
+  throw createError("NOT_FOUND", `Lot trace not found: ${identity.lotId}`);
+}
+
 export async function buildLotTrace(
   db: Db,
   ctx: Context,
   lotId: string,
   accessToken?: string
 ) {
-  const lot = await db
-    .collection<LotProgressDocument>(COLLECTIONS.lotProgressAudit)
-    .findOne({ lotId });
-
-  if (!lot) {
-    throw createError("NOT_FOUND", `Lot trace not found: ${lotId}`);
-  }
+  const lot = await resolveLotRecord(db, lotId);
 
   const events = await db
     .collection<EventHistoryDocument>(COLLECTIONS.eventHistory)
-    .find({ $or: [{ lotId }, { ofId: lot.ofId }] })
+    .find({ $or: [{ lotId: lot.lotId }, { ofId: lot.ofId }] })
     .sort({ timestamp: 1 })
     .toArray();
+
+  const orderNumber =
+    orderNumberFromOfId(lot.ofId) ??
+    (events.find((e) => typeof e.payload?.orderNumber === "string")?.payload
+      ?.orderNumber as string | undefined);
 
   const [stockEntries, shipmentEntries, productionEntries] = await Promise.all([
     fetchStockMovements(ctx, {
       siteCode: lot.siteCode,
-      lotId,
+      lotId: lot.lotId,
       ofId: lot.ofId,
+      orderNumber: orderNumber,
       accessToken
     }),
     fetchShipmentHistory(ctx, {
       siteCode: lot.siteCode,
       ofId: lot.ofId,
+      orderNumber: orderNumber,
       accessToken
     }),
     fetchProductionHistory(ctx, {
-      lotId,
+      lotId: lot.lotId,
       ofId: lot.ofId,
       accessToken
     })

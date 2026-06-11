@@ -10,7 +10,8 @@ export const COLLECTIONS = {
   auditLogs: "audit_logs",
   eventHistory: "event_history",
   criticalEvents: "critical_events",
-  lotProgressAudit: "lot_progress_audit"
+  lotProgressAudit: "lot_progress_audit",
+  documentAttachments: "document_attachments"
 } as const;
 
 let client: MongoClient | null = null;
@@ -57,7 +58,16 @@ export async function ensureIndexes(database: Db) {
       ]),
     database
       .collection(COLLECTIONS.lotProgressAudit)
-      .createIndexes([{ key: { lotId: 1 }, unique: true }])
+      .createIndexes([
+        { key: { lotId: 1 }, unique: true },
+        { key: { ofId: 1 } }
+      ]),
+    database
+      .collection(COLLECTIONS.documentAttachments)
+      .createIndexes([
+        { key: { lotId: 1, uploadedAt: -1 } },
+        { key: { id: 1 }, unique: true }
+      ])
   ]);
 }
 

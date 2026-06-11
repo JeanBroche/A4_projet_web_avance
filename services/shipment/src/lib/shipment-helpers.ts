@@ -1,5 +1,5 @@
 import type { Context } from "moleculer";
-import type { PickList, PickListLine, Shipment, ShipmentTrackingEvent } from "../generated/prisma/client.js";
+import type { PickList, Shipment, ShipmentTrackingEvent } from "../generated/prisma/client.js";
 import { withDistributedLock } from "@aeronexis/redis-infra";
 import { prisma } from "../db.js";
 import { createError } from "@aeronexis/services-shared";
@@ -31,7 +31,15 @@ type DbClient = Pick<
   "pickList" | "shipment" | "shipmentTrackingEvent"
 >;
 
-export type PickListWithLines = PickList & { lines: PickListLine[] };
+export type PickListLineRecord = {
+  id: string;
+  lineNumber: number;
+  productCode: string;
+  quantity: number;
+  pickedQty: number;
+};
+
+export type PickListWithLines = PickList & { lines: PickListLineRecord[] };
 export type ShipmentWithRelations = Shipment & {
   trackingEvents?: ShipmentTrackingEvent[];
   pickList?: PickListWithLines | null;
@@ -133,7 +141,7 @@ export function toPickListSummary(pickList: PickListWithLines) {
     status: pickList.status,
     createdAt: pickList.createdAt,
     updatedAt: pickList.updatedAt,
-    lines: pickList.lines.map((line) => ({
+    lines: pickList.lines.map((line: PickListLineRecord) => ({
       id: line.id,
       lineNumber: line.lineNumber,
       productCode: line.productCode,
@@ -174,6 +182,8 @@ export function toTrackingTimeline(events: ShipmentTrackingEvent[]) {
 export function buildHistoryFilter(params: {
   siteCode?: string;
   clientCode?: string;
+  orderNumber?: string;
+  ofId?: string;
   status?: string;
   dateFrom?: Date;
   dateTo?: Date;
@@ -185,6 +195,12 @@ export function buildHistoryFilter(params: {
   }
   if (params.clientCode) {
     where.clientCode = params.clientCode;
+  }
+  if (params.orderNumber) {
+    where.orderNumber = params.orderNumber;
+  }
+  if (params.ofId) {
+    where.pickList = { ofId: params.ofId, deletedAt: null };
   }
   if (params.status) {
     where.status = params.status;
@@ -215,31 +231,18 @@ export async function verifyStockReservations(
     return;
   }
 
-  try {
-    const result = (await (ctx as Context & {
-      call: <T>(action: string, params?: Record<string, unknown>) => Promise<T>;
-    }).call<StockReservationListResult>("stock.reservation.list", {
-      ofId: params.ofId,
-      siteCode: params.siteCode,
-      status: "ACTIVE",
-      accessToken: params.accessToken
-    })) as StockReservationListResult;
+  const result = await (ctx as Context & {
+    call: <T>(action: string, params?: Record<string, unknown>) => Promise<T>;
+  }).call<StockReservationListResult>("stock.reservation.list", {
+    ofId: params.ofId,
+    siteCode: params.siteCode,
+    status: "ACTIVE",
+    accessToken: params.accessToken
+  });
 
-    const active = (result.reservations || []).filter((r) => r.status === "ACTIVE");
-    if (active.length === 0) {
-      throw createError("STOCK_RESERVATION_MISSING");
-    }
-  } catch (error) {
-    const err = error as { code?: number | string; type?: string };
-    if (
-      err.code === 404 ||
-      err.code === 501 ||
-      err.type === "SERVICE_NOT_FOUND" ||
-      err.type === "SERVICE_NOT_AVAILABLE"
-    ) {
-      return;
-    }
-    throw error;
+  const active = (result.reservations || []).filter((r) => r.status === "ACTIVE");
+  if (active.length === 0) {
+    throw createError("STOCK_RESERVATION_MISSING");
   }
 }
 

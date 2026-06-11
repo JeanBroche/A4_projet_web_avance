@@ -59,7 +59,7 @@ const ShipmentService: ServiceSchema = {
     "picklist.create": {
       async handler(ctx: Context) {
         const params = parseParams(pickListCreateSchema, ctx.params);
-        const auth = requireLogistique(ctx, params.accessToken);
+        const auth = await requireLogistique(ctx, params.accessToken);
         assertSiteAccess(auth, params.siteCode);
 
         await verifyStockReservations(ctx, {
@@ -121,7 +121,7 @@ const ShipmentService: ServiceSchema = {
     "picklist.complete": {
       async handler(ctx: Context) {
         const params = parseParams(pickListCompleteSchema, ctx.params);
-        const auth = requireLogistique(ctx, params.accessToken);
+        const auth = await requireLogistique(ctx, params.accessToken);
 
         const pickList = await loadActivePickList(params.id);
         assertSiteAccess(auth, pickList.siteCode);
@@ -193,7 +193,7 @@ const ShipmentService: ServiceSchema = {
     "shipment.plan": {
       async handler(this: Service, ctx: Context) {
         const params = parseParams(shipmentPlanSchema, ctx.params);
-        const auth = requireLogistique(ctx, params.accessToken);
+        const auth = await requireLogistique(ctx, params.accessToken);
 
         const pickList = await loadActivePickList(params.pickListId);
         assertSiteAccess(auth, pickList.siteCode);
@@ -269,7 +269,7 @@ const ShipmentService: ServiceSchema = {
     "shipment.get": {
       async handler(ctx: Context) {
         const params = parseParams(shipmentByIdSchema, ctx.params);
-        const auth = requireAuth(ctx, params.accessToken);
+        const auth = await requireAuth(ctx, params.accessToken);
 
         const shipment = await loadActiveShipment(params.id);
         assertSiteAccess(auth, shipment.siteCode);
@@ -286,7 +286,7 @@ const ShipmentService: ServiceSchema = {
     "shipment.track": {
       async handler(ctx: Context) {
         const params = parseParams(shipmentByIdSchema, ctx.params);
-        const auth = requireAuth(ctx, params.accessToken);
+        const auth = await requireAuth(ctx, params.accessToken);
 
         const shipment = await loadActiveShipment(params.id);
         assertSiteAccess(auth, shipment.siteCode);
@@ -303,7 +303,7 @@ const ShipmentService: ServiceSchema = {
     "shipment.updateStatus": {
       async handler(this: Service, ctx: Context) {
         const params = parseParams(shipmentUpdateStatusSchema, ctx.params);
-        const auth = requireLogistique(ctx, params.accessToken);
+        const auth = await requireLogistique(ctx, params.accessToken);
 
         const shipment = await loadActiveShipment(params.id);
         assertSiteAccess(auth, shipment.siteCode);
@@ -344,9 +344,32 @@ const ShipmentService: ServiceSchema = {
         publishShipmentEvent(this, "shipment.status.changed", {
           id: updated.id,
           code: updated.code,
+          orderNumber: updated.orderNumber,
+          ofId: shipment.pickList?.ofId ?? null,
+          siteCode: updated.siteCode,
           fromStatus: shipment.status,
           toStatus: params.status
         });
+
+        const now = new Date();
+        if (
+          updated.plannedShipDate &&
+          updated.plannedShipDate < now &&
+          !["DELIVERED", "CANCELLED"].includes(updated.status)
+        ) {
+          const daysLate = Math.ceil(
+            (now.getTime() - updated.plannedShipDate.getTime()) / (24 * 60 * 60 * 1000)
+          );
+          publishShipmentEvent(this, "shipment.delivery.alert", {
+            id: updated.id,
+            code: updated.code,
+            orderNumber: updated.orderNumber,
+            siteCode: updated.siteCode,
+            status: updated.status,
+            plannedShipDate: updated.plannedShipDate,
+            daysLate
+          });
+        }
 
         await logShipmentAudit({
           action: "shipment.shipment.updateStatus",
@@ -377,7 +400,7 @@ const ShipmentService: ServiceSchema = {
     "shipment.history": {
       async handler(ctx: Context) {
         const params = parseParams(shipmentHistorySchema, ctx.params);
-        const auth = requireAuth(ctx, params.accessToken);
+        const auth = await requireAuth(ctx, params.accessToken);
 
         const effectiveSite = resolveSiteCode(params) || auth.siteId || undefined;
         if (effectiveSite) {

@@ -8,12 +8,12 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import { getErrorCode } from "@aeronexis/services-shared";
 import moleculerConfig from "../moleculer.config.js";
 import ReportingService from "../services/reporting.service.js";
+import { getKpiConfig } from "../src/lib/kpi-config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 
 process.env.JWT_SECRET ??= "ci-test-jwt-secret";
-// Keep cache disabled so each call hits the mocked downstream.
 delete process.env.REDIS_URL;
 
 const broker = new ServiceBroker({
@@ -28,6 +28,8 @@ const tokens = {
   commercial: "",
   admin: ""
 };
+
+let lastBatchListParams: Record<string, unknown> = {};
 
 function signTestToken(
   roles: string[],
@@ -49,21 +51,59 @@ async function callAction<T>(action: string, params?: Record<string, unknown>): 
   return broker.call(action, params) as Promise<T>;
 }
 
-const FIXED_NOW = new Date("2026-06-09T12:00:00Z");
+const FIXED_NOW = new Date();
 const dayMs = 24 * 60 * 60 * 1000;
 const inPast = (days: number) => new Date(FIXED_NOW.getTime() - days * dayMs);
 const inFuture = (days: number) => new Date(FIXED_NOW.getTime() + days * dayMs);
 
+let historyOrders: Array<Record<string, unknown>> = [];
+
 before(async () => {
+  historyOrders = [
+    {
+      id: "h1",
+      orderNumber: "CMD-100",
+      status: "VALIDATED",
+      isUrgent: false,
+      totalAmount: 150_000,
+      dueDate: inPast(2).toISOString(),
+      promisedDeliveryDate: null,
+      createdAt: inPast(5).toISOString(),
+      lines: []
+    },
+    {
+      id: "h2",
+      orderNumber: "CMD-101",
+      status: "IN_PRODUCTION",
+      isUrgent: false,
+      totalAmount: 250_000,
+      dueDate: inFuture(3).toISOString(),
+      promisedDeliveryDate: inFuture(3).toISOString(),
+      createdAt: inPast(10).toISOString(),
+      lines: []
+    },
+    {
+      id: "h3",
+      orderNumber: "CMD-102",
+      status: "DELIVERED",
+      isUrgent: false,
+      totalAmount: 90_000,
+      dueDate: inPast(1).toISOString(),
+      promisedDeliveryDate: inPast(1).toISOString(),
+      createdAt: inPast(8).toISOString(),
+      lines: []
+    }
+  ];
+
   broker.createService({
     name: "stock",
     actions: {
-      "alert.list": {
+      "level.list": {
         handler() {
           return [
-            { id: "a1", siteCode: "SITE-LYO", materialId: "MAT-1", resolvedAt: null },
-            { id: "a2", siteCode: "SITE-LYO", materialId: "MAT-2", resolvedAt: null },
-            { id: "a3", siteCode: "SITE-LYO", materialId: "MAT-3", resolvedAt: null }
+            { materialId: "MAT-1", code: "M1", siteCode: "SITE-LYO", available: 0 },
+            { materialId: "MAT-2", code: "M2", siteCode: "SITE-LYO", available: 12 },
+            { materialId: "MAT-3", code: "M3", siteCode: "SITE-LYO", available: 0 }
           ];
         }
       },
@@ -109,6 +149,7 @@ before(async () => {
               isUrgent: true,
               totalAmount: 100_000,
               dueDate: inFuture(2).toISOString(),
+              promisedDeliveryDate: inFuture(2).toISOString(),
               createdAt: inPast(1).toISOString()
             },
             {
@@ -118,43 +159,18 @@ before(async () => {
               isUrgent: true,
               totalAmount: 80_000,
               dueDate: inFuture(5).toISOString(),
+              promisedDeliveryDate: inFuture(5).toISOString(),
               createdAt: inPast(3).toISOString()
             }
           ];
         }
       },
       "order.history": {
-        handler() {
-          const items = [
-            {
-              id: "h1",
-              orderNumber: "CMD-100",
-              status: "VALIDATED",
-              isUrgent: false,
-              totalAmount: 150_000,
-              dueDate: inPast(2).toISOString(),
-              createdAt: inPast(5).toISOString()
-            },
-            {
-              id: "h2",
-              orderNumber: "CMD-101",
-              status: "IN_PRODUCTION",
-              isUrgent: false,
-              totalAmount: 250_000,
-              dueDate: inFuture(3).toISOString(),
-              createdAt: inPast(10).toISOString()
-            },
-            {
-              id: "h3",
-              orderNumber: "CMD-102",
-              status: "DELIVERED",
-              isUrgent: false,
-              totalAmount: 90_000,
-              dueDate: inPast(1).toISOString(),
-              createdAt: inPast(8).toISOString()
-            }
-          ];
-          return { total: items.length, limit: 500, offset: 0, items };
+        handler(ctx) {
+          const limit = Number(ctx.params.limit ?? 100);
+          const offset = Number(ctx.params.offset ?? 0);
+          const items = historyOrders.slice(offset, offset + limit);
+          return { total: historyOrders.length, limit, offset, items };
         }
       }
     }
@@ -164,7 +180,8 @@ before(async () => {
     name: "production",
     actions: {
       "batch.list": {
-        handler() {
+        handler(ctx) {
+          lastBatchListParams = ctx.params as Record<string, unknown>;
           const items = [
             {
               batch_id: "b1",
@@ -191,7 +208,7 @@ before(async () => {
               plannedEndAt: inPast(2).toISOString()
             }
           ];
-          return { total: items.length, limit: 100, offset: 0, items };
+          return { total: items.length, limit: 500, offset: 0, items };
         }
       }
     }
@@ -243,21 +260,25 @@ describe("RBAC", () => {
       "reporting.calcul.logistique.rupture",
       { accessToken: tokens.admin, siteCode: "SITE-LYO" }
     );
-    assert.equal(result.totalRuptureProducts, 3);
+    assert.equal(result.totalRuptureProducts, 2);
   });
 });
 
 describe("calcul.logistique", () => {
-  it("rupture counts active alerts", async () => {
+  it("rupture counts materials with available <= 0", async () => {
     const result = await callAction<{
       totalRuptureProducts: number;
-      materials: string[];
+      materials: Array<{ materialId: string; available: number }>;
     }>("reporting.calcul.logistique.rupture", {
       accessToken: tokens.direction,
       siteCode: "SITE-LYO"
     });
-    assert.equal(result.totalRuptureProducts, 3);
-    assert.deepEqual(result.materials, ["MAT-1", "MAT-2", "MAT-3"]);
+    assert.equal(result.totalRuptureProducts, 2);
+    assert.deepEqual(
+      result.materials.map((m) => m.materialId),
+      ["MAT-1", "MAT-3"]
+    );
+    assert.ok(result.materials.every((m) => m.available <= 0));
   });
 
   it("rotation aggregates consumptionPerDay and lists risk materials", async () => {
@@ -293,48 +314,69 @@ describe("calcul.commerciaux", () => {
     );
   });
 
-  it("delayRiskOrders filters active orders past their dueDate", async () => {
+  it("delayRiskOrders uses shared delay scoring with promisedDeliveryDate", async () => {
+    const config = getKpiConfig();
     const result = await callAction<{
       totalDelayRiskOrders: number;
-      orders: Array<{ orderNumber: string; status: string }>;
+      scoreThreshold: number;
+      orders: Array<{ orderNumber: string; score: number }>;
     }>("reporting.calcul.commerciaux.delayRiskOrders", {
       accessToken: tokens.direction,
       windowDays: 30
     });
-    assert.equal(result.totalDelayRiskOrders, 1);
-    assert.equal(result.orders[0]?.orderNumber, "CMD-100");
+    assert.equal(result.scoreThreshold, config.delayRiskScoreThreshold);
+    assert.equal(result.totalDelayRiskOrders, 2);
+    assert.deepEqual(
+      result.orders.map((o) => o.orderNumber).sort(),
+      ["CMD-100", "CMD-101"]
+    );
+    assert.ok(result.orders.every((o) => o.score >= config.delayRiskScoreThreshold));
   });
 });
 
 describe("calcul.finance", () => {
-  it("margin uses configured cost ratio", async () => {
+  it("margin uses target margin rate from config", async () => {
+    const config = getKpiConfig();
     const result = await callAction<{
       totalRevenue: number;
       estimatedCost: number;
       margin: number;
+      targetMarginRate: number;
       costRatio: number;
     }>("reporting.calcul.finance.margin", {
       accessToken: tokens.direction,
       windowDays: 30
     });
     assert.equal(result.totalRevenue, 490_000);
-    assert.equal(result.costRatio, 0.65);
-    assert.equal(result.estimatedCost, Math.round(490_000 * 0.65));
+    assert.equal(result.targetMarginRate, config.targetMarginRate);
+    assert.equal(result.costRatio, 1 - config.targetMarginRate);
+    assert.equal(result.estimatedCost, Math.round(490_000 * result.costRatio));
     assert.equal(result.margin, 490_000 - result.estimatedCost);
   });
 
-  it("totalDelay reuses late orders with penalty per order", async () => {
+  it("totalDelay applies variable penalty from days late and revenue", async () => {
+    const config = getKpiConfig();
     const result = await callAction<{
       totalDelays: number;
       estimatedDelayCost: number;
-      penaltyPerOrder: number;
+      orders: Array<{ orderNumber: string; daysLate: number; penalty: number }>;
     }>("reporting.calcul.finance.totalDelay", {
       accessToken: tokens.direction,
       windowDays: 30
     });
     assert.equal(result.totalDelays, 1);
-    assert.equal(result.penaltyPerOrder, 5_000);
-    assert.equal(result.estimatedDelayCost, 5_000);
+    assert.equal(result.orders[0]?.orderNumber, "CMD-100");
+    const daysLate = result.orders[0]?.daysLate ?? 0;
+    assert.ok(daysLate >= 2);
+    assert.equal(
+      result.estimatedDelayCost,
+      Math.round(
+        config.delayPenaltyBaseCentimes +
+          daysLate * config.delayPenaltyPerDayCentimes +
+          150_000 * config.delayPenaltyRevenueRatio
+      )
+    );
+    assert.equal(result.orders[0]?.penalty, result.estimatedDelayCost);
   });
 });
 
@@ -344,10 +386,12 @@ describe("calcul.production", () => {
       totalActiveBatches: number;
       averageProgress: number;
     }>("reporting.calcul.production.avancement", {
-      accessToken: tokens.direction
+      accessToken: tokens.direction,
+      siteCode: "SITE-LYO"
     });
     assert.equal(result.totalActiveBatches, 2);
     assert.equal(result.averageProgress, 50);
+    assert.equal(lastBatchListParams.siteCode, "SITE-LYO");
   });
 
   it("retardLots lists active batches past plannedEndAt", async () => {
@@ -355,9 +399,11 @@ describe("calcul.production", () => {
       lateBatches: number;
       batches: Array<{ batch_code: string }>;
     }>("reporting.calcul.production.retardLots", {
-      accessToken: tokens.direction
+      accessToken: tokens.direction,
+      siteCode: "SITE-PAR"
     });
     assert.equal(result.lateBatches, 1);
     assert.equal(result.batches[0]?.batch_code, "BATCH-002");
+    assert.equal(lastBatchListParams.siteCode, "SITE-PAR");
   });
 });

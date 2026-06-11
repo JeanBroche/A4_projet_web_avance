@@ -22,7 +22,10 @@ export function mapUser(user: UserWithRoles) {
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
+    /** FK interne vers auth.sites */
     siteId: user.siteId,
+    /** Code site aligné sur le JWT (ex. SITE-LYO) */
+    siteCode: user.site?.code ?? null,
     isActive: user.isActive,
     roles: mapRoles(user)
   };

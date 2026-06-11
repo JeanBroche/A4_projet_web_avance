@@ -21,14 +21,38 @@ const COLLECTIONS: CollectionSpec[] = [
     name: "audit_logs",
     indexes: [
       { key: { userId: 1, timestamp: -1 }, options: { name: "userId_1_timestamp_-1" } },
-      { key: { entity: 1, entityId: 1 }, options: { name: "entity_1_entityId_1" } }
+      { key: { entity: 1, entityId: 1 }, options: { name: "entity_1_entityId_1" } },
+      { key: { siteCode: 1, timestamp: -1 }, options: { name: "siteCode_1_timestamp_-1" } }
     ]
   },
   {
     name: "event_history",
     indexes: [
+      { key: { lotId: 1, timestamp: -1 }, options: { name: "lotId_1_timestamp_-1" } },
+      { key: { ofId: 1, timestamp: -1 }, options: { name: "ofId_1_timestamp_-1" } },
       { key: { correlationId: 1 }, options: { name: "correlationId_1" } },
       { key: { timestamp: -1 }, options: { name: "timestamp_-1" } }
+    ]
+  },
+  {
+    name: "critical_events",
+    indexes: [
+      { key: { severity: 1, timestamp: -1 }, options: { name: "severity_1_timestamp_-1" } },
+      { key: { siteCode: 1, timestamp: -1 }, options: { name: "siteCode_1_timestamp_-1" } }
+    ]
+  },
+  {
+    name: "lot_progress_audit",
+    indexes: [
+      { key: { lotId: 1 }, options: { name: "lotId_1", unique: true } },
+      { key: { ofId: 1 }, options: { name: "ofId_1" } }
+    ]
+  },
+  {
+    name: "document_attachments",
+    indexes: [
+      { key: { lotId: 1, uploadedAt: -1 }, options: { name: "lotId_1_uploadedAt_-1" } },
+      { key: { id: 1 }, options: { name: "id_1", unique: true } }
     ]
   }
 ];

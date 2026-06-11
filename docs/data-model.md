@@ -12,8 +12,8 @@ Cartographie architecture cible → microservices → persistance (M1).
 | Order | `services/order` | `aeronexis_order` | `order` | Client (+ Order/OrderLine en M5) |
 | Shipment | `services/shipment` | `aeronexis_shipment` | `shipment` | PickList, Shipment |
 | Reporting | `services/reporting` | PostgreSQL (M7) | `reporting` | KPI_Dashboard (pas de migration M1) |
-| Notification | `services/notification` | Redis + Kafka | -- | Pas de Prisma M1 |
-| Audit | `services/audit` | MongoDB | -- | Collections `audit_logs`, `event_history` provisionnees par [`@aeronexis/mongo-init`](../infra/mongo/init.ts) (issue M0 #9) |
+| Audit | `services/audit` | MongoDB + MinIO | -- | Collections audit + `document_attachments` ; fichiers dans bucket MinIO |
+| Notification | `services/notification` | Redis (inbox) | -- | Boite de reception par site (`notification:inbox:{siteCode}`) |
 
 ## Organisation Prisma
 
@@ -50,7 +50,7 @@ Extension `@aeronexis/db` : `createSoftDeleteExtension(Prisma)` — `delete` / `
 |-----------|-------------|------|
 | Bus inter-services | **Kafka** (`KAFKA_BROKERS`, transporter Moleculer) | RPC (`broker.call`) et evenements (`broker.emit`) entre microservices |
 | Cache KPI | **Redis** (`@aeronexis/redis-infra`) | TTL reporting (`withCache`) |
-| Sessions auth | **Redis** | Refresh tokens, index sessions, blacklist JWT access |
+| Sessions auth | **Redis** | Refresh tokens, index sessions, **blacklist JWT access** (`jti`) |
 | Verrous | **Redis** | Reservations stock, generation codes sequentiels |
 
 Package partage : [`packages/redis-infra`](../packages/redis-infra). Config Moleculer : [`packages/moleculer-config`](../packages/moleculer-config).
@@ -59,13 +59,51 @@ Smoke bus Kafka : `pnpm smoke:kafka` (Kafka doit etre demarre via `pnpm docker:u
 
 ## Topics Kafka (cible metier)
 
+Constantes canoniques : [`packages/shared/src/domain-events.ts`](../packages/shared/src/domain-events.ts) (`DomainEvents`).
+
 | Topic | Producteur | Consommateur |
 |-------|------------|--------------|
-| `stock.material.low` | Stock | Notification |
-| `production.manu_order.finished` | Production | Order |
+| `production.bom.created` | Production | — |
+| `production.batch.created` | Production | Audit (trace lot) |
+| `production.batch.progress` | Production | Audit |
+| `production.batch.anomaly_reported` | Production | Audit |
+| `production.manu_order.finished` | Production | Order, Audit |
+| `order.order.created` | Order | — |
+| `order.order.validated` | Order | — |
+| `order.order.rejected` | Order | — |
+| `order.order.priority.changed` | Order | — |
+| `order.order.start_production` | Order | — |
 | `order.order.finished` | Order | Shipment |
+| `order.order.shipped` | Order | — |
+| `order.order.delivered` | Order | — |
+| `stock.reserved` | Stock | Audit |
+| `stock.released` | Stock | Audit |
+| `stock.movement.recorded` | Stock | Audit |
+| `stock.material.low` | Stock | Notification |
+| `stock.supplier.delay.reported` | Stock | Notification |
+| `shipment.planned` | Shipment | Audit |
+| `shipment.status.changed` | Shipment | Order, Audit |
 | `shipment.delivery.alert` | Shipment | Notification |
+| `shipment.picklist.completed` | Shipment | Audit |
+| `shipment.picklist.auto_created` | Shipment | Audit |
 | `user.action.logged` | Tous MS | Audit (Mongo) |
+
+## MinIO (pieces jointes lot)
+
+| Composant | Technologie | Role |
+|-----------|-------------|------|
+| Stockage objet | **MinIO** (`MINIO_*`, bucket `aeronexis-docs`) | Fichiers binaires (certificats, rapports QC) |
+| Metadonnees | **MongoDB** (`document_attachments`) | Lien lotId ↔ cle objet |
+
+Package client : [`packages/storage`](../packages/storage) (`@aeronexis/storage`).
+
+Actions audit :
+
+| Action | Role | Description |
+|--------|------|-------------|
+| `audit.document.upload` | production, logistique, admin | Upload base64 → MinIO + enregistrement Mongo |
+| `audit.document.list` | production, logistique, admin | Liste des pieces jointes d'un lot |
+| `audit.document.url` | production, logistique, admin | URL pre-signee de telechargement |
 
 ## References cross-MS (M1)
 

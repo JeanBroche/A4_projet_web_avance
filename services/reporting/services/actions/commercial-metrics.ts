@@ -3,6 +3,9 @@ import { parseParams, requireDirection } from "@aeronexis/services-shared";
 import { baseKpiSchema, windowedKpiSchema } from "../../src/lib/schemas.js";
 import { callDownstream } from "../../src/lib/downstream.js";
 import { withCache } from "../../src/lib/cache.js";
+import { fetchOrdersInWindow } from "../../src/lib/order-fetch.js";
+import { getKpiConfig } from "../../src/lib/kpi-config.js";
+import { assessDelayRisk } from "../../src/lib/kpi-estimates.js";
 
 type OrderSummary = {
   id: string;
@@ -15,19 +18,10 @@ type OrderSummary = {
   createdAt: string | Date;
 };
 
-type OrderHistoryPage = {
-  total: number;
-  limit: number;
-  offset: number;
-  items: OrderSummary[];
-};
-
-const ACTIVE_STATUSES = ["DRAFT", "VALIDATED", "IN_PRODUCTION", "SHIPPED"];
-
 export const urgentOrdersCalculation = {
   async handler(ctx: Context) {
     const params = parseParams(baseKpiSchema, ctx.params);
-    requireDirection(ctx, params.accessToken);
+    await requireDirection(ctx, params.accessToken);
 
     return withCache(
       ctx.service!,
@@ -50,7 +44,8 @@ export const urgentOrdersCalculation = {
             id: o.id,
             orderNumber: o.orderNumber,
             status: o.status,
-            dueDate: o.dueDate ?? null
+            dueDate: o.dueDate ?? null,
+            promisedDeliveryDate: o.promisedDeliveryDate ?? null
           }))
         };
       }
@@ -61,50 +56,45 @@ export const urgentOrdersCalculation = {
 export const delayRiskOrdersCalculation = {
   async handler(ctx: Context) {
     const params = parseParams(windowedKpiSchema, ctx.params);
-    requireDirection(ctx, params.accessToken);
+    await requireDirection(ctx, params.accessToken);
 
     const windowDays = params.windowDays ?? 30;
+    const config = getKpiConfig();
+    const now = new Date();
+
     return withCache(
       ctx.service!,
       "calcul.commerciaux.delayRiskOrders",
       { siteCode: params.siteCode ?? null, windowDays },
       async () => {
-        const page = await callDownstream<OrderHistoryPage>(
-          ctx,
-          "order.order.history",
-          {
-            ...(params.siteCode ? { siteCode: params.siteCode } : {}),
-            limit: 500
-          },
-          params.accessToken
-        );
-
-        const now = new Date();
-        const windowStart = new Date(
-          now.getTime() - windowDays * 24 * 60 * 60 * 1000
-        );
-
-        const lateOrders = page.items.filter((order) => {
-          if (!ACTIVE_STATUSES.includes(order.status)) {
-            return false;
-          }
-          const due = order.dueDate ? new Date(order.dueDate) : null;
-          const created = new Date(order.createdAt);
-          if (created < windowStart) {
-            return false;
-          }
-          return due !== null && due < now;
+        const orders = await fetchOrdersInWindow(ctx, {
+          siteCode: params.siteCode,
+          windowDays,
+          accessToken: params.accessToken
         });
+
+        const atRisk = orders
+          .map((order) => ({
+            order,
+            risk: assessDelayRisk(order, now)
+          }))
+          .filter(({ risk }) => risk.score >= config.delayRiskScoreThreshold)
+          .sort((a, b) => b.risk.score - a.risk.score);
 
         return {
           siteCode: params.siteCode ?? null,
           windowDays,
-          totalDelayRiskOrders: lateOrders.length,
-          orders: lateOrders.map((o) => ({
-            id: o.id,
-            orderNumber: o.orderNumber,
-            status: o.status,
-            dueDate: o.dueDate ?? null
+          scoreThreshold: config.delayRiskScoreThreshold,
+          totalDelayRiskOrders: atRisk.length,
+          orders: atRisk.map(({ order, risk }) => ({
+            id: order.id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            dueDate: order.dueDate ?? null,
+            promisedDeliveryDate: order.promisedDeliveryDate ?? null,
+            score: risk.score,
+            daysRemaining: risk.daysRemaining,
+            factors: risk.factors
           }))
         };
       }

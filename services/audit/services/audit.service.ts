@@ -1,6 +1,7 @@
 import type { Service, ServiceSchema } from "moleculer";
 import { connectMongo, disconnectMongo, ensureIndexes } from "../src/db.js";
 import { auditActions } from "./actions/index.js";
+import { lotTraceEvents } from "./events/lot-trace-events.js";
 import { userActionLoggedEvent } from "./events/user-action-logged.js";
 
 const AuditService: ServiceSchema = {
@@ -17,7 +18,8 @@ const AuditService: ServiceSchema = {
   },
 
   events: {
-    "user.action.logged": userActionLoggedEvent
+    "user.action.logged": userActionLoggedEvent,
+    ...lotTraceEvents
   },
 
   actions: auditActions

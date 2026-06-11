@@ -1,6 +1,7 @@
 import type { Material } from "../generated/prisma/client.js";
 import { prisma } from "../db.js";
 import { createError } from "@aeronexis/services-shared";
+import { emitMaterialLowIfNeeded } from "./alert-notifier.js";
 
 export type DbClient =
   | typeof prisma
@@ -90,20 +91,33 @@ export async function evaluateThreshold(client: DbClient, materialId: string) {
   if (breaches) {
     const severity = available <= 0 ? "CRITICAL" : "WARNING";
     const message = `Stock disponible (${available}) sous le seuil minimum (${material.minimumStock})`;
+    let alert;
     if (openAlert) {
-      return client.stockAlert.update({
+      alert = await client.stockAlert.update({
         where: { id: openAlert.id },
         data: { severity, message }
       });
+    } else {
+      alert = await client.stockAlert.create({
+        data: {
+          materialId,
+          siteCode: material.siteCode,
+          severity,
+          message
+        }
+      });
     }
-    return client.stockAlert.create({
-      data: {
-        materialId,
-        siteCode: material.siteCode,
-        severity,
-        message
-      }
+    emitMaterialLowIfNeeded({
+      alertId: alert.id,
+      materialId,
+      materialCode: material.code,
+      siteCode: material.siteCode,
+      severity,
+      available,
+      minimum: material.minimumStock,
+      message
     });
+    return alert;
   }
   if (openAlert) {
     return client.stockAlert.update({

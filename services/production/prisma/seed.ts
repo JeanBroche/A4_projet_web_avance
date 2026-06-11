@@ -54,7 +54,8 @@ async function upsertDemoBomAndBatch() {
         material_id: "MAT-001",
         description: "Nomenclature palier PN-100",
         quantity: 1,
-        status: PROD_STATUSES.PENDING
+        status: PROD_STATUSES.PENDING,
+        siteCode: "SITE-LYO"
       }
     });
   }

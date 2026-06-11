@@ -9,15 +9,22 @@
     "call:ping": "node --import tsx ./node_modules/moleculer-cli/bin/moleculer.js call notification.ping -c moleculer.config.ts --id moleculer-cli --level error",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"process.exit(0)\"",
+    "test": "node --import tsx --test tests/**/*.test.ts",
     "build": "tsc --noEmit"
   },
   "dependencies": {
     "@aeronexis/moleculer-config": "workspace:*",
+    "@aeronexis/redis-infra": "workspace:*",
+    "@aeronexis/services-shared": "workspace:*",
+    "dotenv": "^17.4.2",
     "ioredis": "^5.11.0",
-    "moleculer": "^0.15.0"
+    "jsonwebtoken": "^9.0.3",
+    "kafkajs": "^2.2.4",
+    "moleculer": "^0.15.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.15.0",
     "moleculer-cli": "^0.8.2",
     "tsx": "^4.20.3",

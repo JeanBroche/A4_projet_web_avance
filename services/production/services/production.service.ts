@@ -1,7 +1,9 @@
 import type { Service, ServiceSchema } from "moleculer";
+import { DomainEvents } from "@aeronexis/shared";
 import { prisma } from "../src/db.js";
 import { initProductionAuditWriter, logProductionMutation } from "../src/lib/audit.js";
 import { publishProductionEvent } from "../src/lib/events.js";
+import { buildManuOrderFinishedPayload } from "../src/lib/production-integration.js";
 import {
   PROD_STATUSES,
   VALIDATION_ANOMALIES,
@@ -78,7 +80,8 @@ const ProductionService: ServiceSchema = {
     "bom.create": {
       async handler(ctx) {
         const params = parseParams(createBomSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
+        const siteCode = requireUserSiteCode(auth);
 
         const bom = await prisma.$transaction(async (tx) => {
           const bom_code = await generateBOMCode(tx);
@@ -88,12 +91,13 @@ const ProductionService: ServiceSchema = {
               material_id: params.material_id,
               description: params.description,
               quantity: params.quantity,
-              status: PROD_STATUSES.PENDING
+              status: PROD_STATUSES.PENDING,
+              siteCode
             }
           });
         });
 
-        publishProductionEvent(this, "bom.created", {
+        publishProductionEvent(this, DomainEvents.production.bomCreated, {
           bom_id: bom.id,
           bom_code: bom.bom_code,
           material_id: bom.material_id
@@ -118,7 +122,7 @@ const ProductionService: ServiceSchema = {
     "bom.list": {
       async handler(ctx) {
         const params = parseParams(listBomSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        await requireProduction(ctx, params.accessToken);
 
         const where = {
           deletedAt: null,
@@ -142,7 +146,7 @@ const ProductionService: ServiceSchema = {
     "bom.get": {
       async handler(ctx) {
         const params = parseParams(getBomSchema, ctx.params);
-        requireProduction(ctx, params.accessToken);
+        await requireProduction(ctx, params.accessToken);
 
         const bom = await loadBomByCode(prisma, params.bom_code);
         this.logger.info("BOM retrieved", {
@@ -156,7 +160,7 @@ const ProductionService: ServiceSchema = {
     "bom.update": {
       async handler(ctx) {
         const params = parseParams(updateBomSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const updatedBom = await prisma.$transaction(async (tx) => {
           const existingBom = await loadBomByCode(tx, params.bom_code);
@@ -193,7 +197,7 @@ const ProductionService: ServiceSchema = {
     "bom.delete": {
       async handler(ctx) {
         const params = parseParams(deleteBomSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const deletedBom = await prisma.$transaction(async (tx) => {
           const existingBom = await loadBomByCode(tx, params.bom_code);
@@ -222,7 +226,7 @@ const ProductionService: ServiceSchema = {
     "batch.create": {
       async handler(ctx) {
         const params = parseParams(createBatchSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const siteCode = requireUserSiteCode(auth);
 
@@ -251,10 +255,13 @@ const ProductionService: ServiceSchema = {
           return created;
         });
 
-        publishProductionEvent(this, "batch.created", {
+        publishProductionEvent(this, DomainEvents.production.batchCreated, {
           batch_id: batch.batch_id,
           batch_code: batch.batch_code,
-          bom_id: batch.bom_id
+          bom_id: batch.bom_id,
+          command_id: batch.command_id,
+          siteCode: batch.siteCode,
+          status: batch.status
         });
 
         this.logger.info("Batch created", {
@@ -277,7 +284,7 @@ const ProductionService: ServiceSchema = {
     "batch.list": {
       async handler(ctx) {
         const params = parseParams(listBatchSchema, ctx.params);
-        const auth = requireProductionRead(ctx, params.accessToken);
+        const auth = await requireProductionRead(ctx, params.accessToken);
         const effectiveSite = resolveEffectiveSite(auth, params);
 
         let bom_id: string | undefined;
@@ -310,7 +317,7 @@ const ProductionService: ServiceSchema = {
     "batch.get": {
       async handler(ctx) {
         const params = parseParams(getBatchSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const batch = await loadBatchByCode(prisma, params.batch_code);
         assertSiteAccess(auth, batch.siteCode);
@@ -325,7 +332,7 @@ const ProductionService: ServiceSchema = {
     "batch.update": {
       async handler(ctx) {
         const params = parseParams(updateBatchSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const updatedBatch = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchByCode(tx, params.batch_code);
@@ -374,7 +381,7 @@ const ProductionService: ServiceSchema = {
     "batch.delete": {
       async handler(ctx) {
         const params = parseParams(deleteBatchSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const deletedBatch = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchByCode(tx, params.batch_code);
@@ -405,7 +412,7 @@ const ProductionService: ServiceSchema = {
     "batch.progress": {
       async handler(ctx) {
         const params = parseParams(batchProgressSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const updated = await prisma.$transaction(async (tx) => {
           const existing = await loadBatchByCode(tx, params.batch_code);
@@ -431,11 +438,22 @@ const ProductionService: ServiceSchema = {
           return batch;
         });
 
-        publishProductionEvent(this, "batch.progress", {
+        publishProductionEvent(this, DomainEvents.production.batchProgress, {
           batch_id: updated.batch_id,
+          batch_code: updated.batch_code,
+          command_id: updated.command_id,
+          siteCode: updated.siteCode,
           progress: updated.progress,
           status: updated.status
         });
+
+        if (updated.status === PROD_STATUSES.COMPLETED) {
+          publishProductionEvent(
+            this,
+            DomainEvents.production.manuOrderFinished,
+            buildManuOrderFinishedPayload(updated)
+          );
+        }
 
         await logProductionMutation(auth, ctx.meta.correlationId, {
           action: "production.batch.progress",
@@ -452,7 +470,7 @@ const ProductionService: ServiceSchema = {
     "batch.reschedule": {
       async handler(ctx) {
         const params = parseParams(batchRescheduleSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         if (params.plannedEndAt < params.plannedStartAt) {
           throw createError("VALIDATION_ERROR", "plannedEndAt must be after plannedStartAt");
@@ -493,7 +511,7 @@ const ProductionService: ServiceSchema = {
     "batch.history": {
       async handler(ctx) {
         const params = parseParams(batchHistorySchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const batch = await loadBatchByCode(prisma, params.batch_code);
         assertSiteAccess(auth, batch.siteCode);
@@ -516,7 +534,7 @@ const ProductionService: ServiceSchema = {
     "batch.steps.list": {
       async handler(ctx) {
         const params = parseParams(batchStepsListSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const batch = await loadBatchByCode(prisma, params.batch_code);
         assertSiteAccess(auth, batch.siteCode);
@@ -532,7 +550,7 @@ const ProductionService: ServiceSchema = {
     "batch.steps.update": {
       async handler(ctx) {
         const params = parseParams(batchStepUpdateSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const step = await prisma.$transaction(async (tx) => {
           const batch = await loadBatchByCode(tx, params.batch_code);
@@ -571,7 +589,7 @@ const ProductionService: ServiceSchema = {
     "batch.addAnomalies": {
       async handler(ctx) {
         const params = parseParams(addBatchAnomalySchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const anomaly = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchById(tx, params.batch_id);
@@ -597,12 +615,17 @@ const ProductionService: ServiceSchema = {
             created.anomaly_code,
             authEmail(auth)
           );
-          return created;
+          return { anomaly: created, batch: existingBatch };
         });
 
-        publishProductionEvent(this, "batch.anomaly_reported", {
-          anomaly_id: anomaly.anomaly_id,
-          batch_id: anomaly.batch_id
+        publishProductionEvent(this, DomainEvents.production.batchAnomalyReported, {
+          anomaly_id: anomaly.anomaly.anomaly_id,
+          anomaly_code: anomaly.anomaly.anomaly_code,
+          batch_id: anomaly.anomaly.batch_id,
+          batch_code: anomaly.batch.batch_code,
+          command_id: anomaly.batch.command_id,
+          siteCode: anomaly.batch.siteCode,
+          description: params.description
         });
 
         this.logger.info("Batch anomaly added", {
@@ -613,18 +636,18 @@ const ProductionService: ServiceSchema = {
         await logProductionMutation(auth, ctx.meta.correlationId, {
           action: "production.batch.addAnomalies",
           entity: "Anomaly",
-          entityId: anomaly.anomaly_id,
-          metadata: { batch_id: params.batch_id, anomaly_code: anomaly.anomaly_code }
+          entityId: anomaly.anomaly.anomaly_id,
+          metadata: { batch_id: params.batch_id, anomaly_code: anomaly.anomaly.anomaly_code }
         });
 
-        return anomaly;
+        return anomaly.anomaly;
       }
     },
 
     "batch.updateAnomalies": {
       async handler(ctx) {
         const params = parseParams(updateBatchAnomalySchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const updatedAnomaly = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchById(tx, params.batch_id);
@@ -677,7 +700,7 @@ const ProductionService: ServiceSchema = {
     "product.create": {
       async handler(ctx) {
         const params = parseParams(createProductSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
         assertSiteAccess(auth, params.siteCode);
 
         const product = await prisma.productStock.create({
@@ -709,7 +732,7 @@ const ProductionService: ServiceSchema = {
     "product.get": {
       async handler(ctx) {
         const params = parseParams(getProductSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const product = await prisma.productStock.findFirst({
           where: { productCode: params.product_code, deletedAt: null }
@@ -725,7 +748,7 @@ const ProductionService: ServiceSchema = {
     "product.update": {
       async handler(ctx) {
         const params = parseParams(updateProductSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const updatedProduct = await prisma.$transaction(async (tx) => {
           const existingProduct = await loadActiveProduct(tx, params.product_code);
@@ -763,7 +786,7 @@ const ProductionService: ServiceSchema = {
     "product.delete": {
       async handler(ctx) {
         const params = parseParams(deleteProductSchema, ctx.params);
-        const auth = requireProduction(ctx, params.accessToken);
+        const auth = await requireProduction(ctx, params.accessToken);
 
         const deletedProduct = await prisma.$transaction(async (tx) => {
           const existingProduct = await loadActiveProduct(tx, params.product_code);

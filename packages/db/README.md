@@ -61,6 +61,6 @@ pnpm db:studio    # http://localhost:5555, schema PG `auth`
 | `pnpm db:seed` | `db:seed` sur les 5 MS |
 | `pnpm db:studio:auth` | Raccourci vers `pnpm --filter @aeronexis/auth run db:studio` (idem `:stock`, etc.) |
 
-Services **sans Prisma M1** : `reporting` (PG M7), `notification` (Redis/Kafka), `audit` (MongoDB).
+Services **sans Prisma M1** : `reporting` (PG M7), `audit` (MongoDB).
 
 Cartographie : [`docs/data-model.md`](../../docs/data-model.md).

@@ -13,6 +13,7 @@ import {
   ORDER_STATUSES,
 } from '../../src/lib/order-helpers.js';
 import { publishOrderEvent } from '../../src/lib/events.js';
+import { DomainEvents } from '@aeronexis/shared';
 import { logOrderAudit } from '../../src/lib/audit.js';
 
 type OrderCreateParams = z.infer<typeof orderCreateSchema>;
@@ -23,7 +24,7 @@ type AuthContextMeta = {
 export const orderCreateAction = {
   async handler(ctx: Context<OrderCreateParams, AuthContextMeta>) {
     const params = parseParams(orderCreateSchema, ctx.params);
-    const auth = requireCommercial(ctx, params.accessToken);
+    const auth = await requireCommercial(ctx, params.accessToken);
 
     const client = await loadActiveClient(prisma, params.clientId);
 
@@ -77,7 +78,7 @@ export const orderCreateAction = {
       });
     });
 
-    publishOrderEvent(ctx.service!, 'order.created', {
+    publishOrderEvent(ctx.service!, DomainEvents.order.created, {
       orderId: order.id,
       orderNumber: order.orderNumber,
       clientId: order.clientId,
