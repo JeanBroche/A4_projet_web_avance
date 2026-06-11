@@ -1,4 +1,4 @@
-export { getRedisClient, resetRedisClient } from "./client.js";
+export { ensureRedisConnected, getRedisClient, resetRedisClient } from "./client.js";
 export { withCache } from "./cache.js";
 export { withDistributedLock, LockTimeoutError } from "./lock.js";
 export { createSessionStore, getSessionStore } from "./sessions.js";

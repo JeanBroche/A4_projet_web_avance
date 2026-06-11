@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
+import { ensureRedisConnected } from "./client.js";
 import type { RedisClient } from "./types.js";
 import type { RefreshTokenRecord, SessionStore, SessionStoreOptions } from "./types.js";
 
@@ -34,6 +35,7 @@ export function createSessionStore(
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
     const record: RefreshTokenRecord = { userId, familyId, expiresAt };
 
+    await ensureRedisConnected(redis);
     await redis
       .multi()
       .set(refreshKey(prefix, tokenHash), JSON.stringify(record), "EX", ttlSeconds)

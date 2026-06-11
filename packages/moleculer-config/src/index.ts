@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BrokerOptions } from "moleculer";
 import { registerJwtBlacklistChecker } from "@aeronexis/services-shared";
-import { getRedisClient } from "@aeronexis/redis-infra";
+import { ensureRedisConnected, getRedisClient } from "@aeronexis/redis-infra";
 import correlationIdMiddleware from "./middlewares/correlation-id.js";
 import successEnvelopeMiddleware from "./middlewares/success-envelope.js";
 import errorEnvelopeMiddleware from "./middlewares/error-envelope.js";
@@ -22,6 +22,7 @@ function registerJwtRevocationChecker() {
   }
 
   registerJwtBlacklistChecker(async (jti) => {
+    await ensureRedisConnected(redis);
     const value = await redis.get(`auth:jwt:blacklist:${jti}`);
     return value !== null;
   });

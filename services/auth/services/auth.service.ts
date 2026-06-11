@@ -1,4 +1,5 @@
 import type { Service, ServiceSchema } from "moleculer";
+import { ensureRedisConnected, getRedisClient } from "@aeronexis/redis-infra";
 import { initAuthAuditWriter } from "../src/lib/audit.js";
 import {
   loginAction,
@@ -16,6 +17,14 @@ const AuthService: ServiceSchema = {
 
   started(this: Service) {
     initAuthAuditWriter(this);
+    const redis = getRedisClient(this.logger);
+    if (redis) {
+      void ensureRedisConnected(redis).catch((error) => {
+        this.logger.warn("Redis pre-connect failed", {
+          message: error instanceof Error ? error.message : String(error)
+        });
+      });
+    }
   },
 
   actions: {

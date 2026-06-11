@@ -75,13 +75,16 @@ const ApiService: ServiceSchema = {
       },
       {
         path: "/api",
-        ...createRouteHooks(false),
-        aliases: publicApiAliases
-      },
-      {
-        path: "/api",
         ...createRouteHooks(true),
-        aliases: protectedApiAliases
+        aliases: {
+          ...publicApiAliases,
+          ...protectedApiAliases
+        },
+        whitelist: [
+          "api.auth.login",
+          "api.auth.refresh",
+          "api.auth.logout"
+        ]
       }
     ]
   } as Record<string, unknown>,

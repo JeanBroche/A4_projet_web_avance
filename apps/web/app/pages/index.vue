@@ -6,7 +6,7 @@ definePageMeta({ layout: false })
 
 const { login, isLoading, error: authError } = useAuth()
 
-const email = ref('operateur@aeronexis.local')
+const email = ref('')
 const password = ref('')
 const validationError = ref<string | null>(null)
 const error = computed(() => validationError.value ?? authError.value)
@@ -44,7 +44,7 @@ async function onSubmit() {
 
       <UForm class="space-y-4" aria-labelledby="login-title" @submit.prevent="onSubmit">
         <UFormField label="Email" name="email">
-          <UInput v-model="email" type="email" placeholder="operateur@aeronexis.local" class="w-full" />
+          <UInput v-model="email" type="email" placeholder="email@exemple.com" class="w-full" />
         </UFormField>
 
         <UFormField label="Mot de passe" name="password">

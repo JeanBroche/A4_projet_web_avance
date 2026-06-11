@@ -34,8 +34,7 @@ Ce document relie les écrans implémentés aux rôles métier et aux composants
 
 ## Comptes démo
 
-**Gateway (soutenance)** : `[role]@aeronexis.local` / `SEED_ADMIN_PASSWORD`  
-**Mock offline** : `[role]123` — voir `apps/web/README.md`.
+Voir [`docs/seed-scenario.md`](../seed-scenario.md) (gateway) et [`apps/web/README.md`](../../apps/web/README.md) (mock offline).
 
 ## Accessibilité
 

@@ -12,6 +12,8 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
+    ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+    ollamaModel: process.env.OLLAMA_MODEL || 'mistral:latest',
     public: {
       apiBase: '/api',
       apiAdapter: process.env.NUXT_PUBLIC_API_ADAPTER || 'moleculer'

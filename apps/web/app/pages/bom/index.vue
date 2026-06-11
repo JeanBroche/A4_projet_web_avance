@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { createBomOrderSchema, createReservationSchema, firstZodError } from '~/lib/validation/schemas'
+import type { AiOfProposal } from '~/lib/validation/ai-of'
 import type { BomItem, BomStatus, ManufacturingOrder, Priority } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
@@ -35,6 +36,17 @@ const {
   cancelReservation
 } = useStock()
 const { canManageBatches, canManageBomOrders, canReserveMaterials, pageSubtitle } = useRoleCapabilities()
+const {
+  messages: assistantMessages,
+  isLoading: isAssistantLoading,
+  error: assistantError,
+  lastProposal,
+  sendMessage: sendAssistantMessage,
+  buildFormPatch,
+  reset: resetAssistant
+} = useOfAssistant()
+
+const createModalTab = ref<'form' | 'assistant'>('form')
 
 
 onMounted(async () => {
@@ -115,7 +127,20 @@ function openCreate() {
   newOf.value = { name: '', ofNumber: '', qty: 1, status: 'pending', priority: 'normal', emoji: '✈️' }
   newBomRow.value = { reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' }
   tempBom.value = []
+  createModalTab.value = 'form'
+  resetAssistant()
   isCreateOpen.value = true
+}
+
+function onAssistantSend(text: string) {
+  sendAssistantMessage(text, levels.value)
+}
+
+function onApplyProposal(proposal: AiOfProposal) {
+  const patch = buildFormPatch(proposal, ref => levelByReference(ref))
+  newOf.value = patch.of
+  tempBom.value = patch.bom
+  createModalTab.value = 'form'
 }
 
 function addBomRow() {
@@ -776,7 +801,7 @@ async function updateStatus(newStatus: Status) {
     </UModal>
 
     <!-- ═══ Modal création OF ═══ -->
-    <UModal v-model:open="isCreateOpen" :ui="modalUi('2xl')">
+    <UModal v-model:open="isCreateOpen" :ui="modalUi(canManageBomOrders ? '5xl' : '2xl')">
       <template #content>
         <div :class="MODAL_BODY">
 
@@ -790,6 +815,19 @@ async function updateStatus(newStatus: Status) {
               <p class="text-xs text-gray-400 mt-0.5">Renseigner les infos et la nomenclature (BOM)</p>
             </div>
           </div>
+
+          <UTabs
+            v-if="canManageBomOrders"
+            v-model="createModalTab"
+            :items="[
+              { label: 'Formulaire', value: 'form', icon: 'i-lucide-clipboard-list' },
+              { label: 'Assistant IA', value: 'assistant', icon: 'i-lucide-sparkles' }
+            ]"
+            class="mb-4 lg:hidden"
+          />
+
+          <div :class="canManageBomOrders ? 'lg:grid lg:grid-cols-2 lg:gap-6' : ''">
+            <div :class="canManageBomOrders && createModalTab !== 'form' ? 'hidden lg:block' : ''">
 
           <!-- Infos OF -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
@@ -881,6 +919,21 @@ async function updateStatus(newStatus: Status) {
             >
               Créer l'OF
             </UButton>
+          </div>
+
+            </div>
+
+            <OfAssistantPanel
+              v-if="canManageBomOrders"
+              :class="createModalTab !== 'assistant' ? 'hidden lg:flex' : 'flex'"
+              :messages="assistantMessages"
+              :is-loading="isAssistantLoading"
+              :error="assistantError"
+              :last-proposal="lastProposal"
+              :materials="levels"
+              @send="onAssistantSend"
+              @apply="onApplyProposal"
+            />
           </div>
 
         </div>

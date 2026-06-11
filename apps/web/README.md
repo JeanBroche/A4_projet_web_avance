@@ -20,8 +20,6 @@ Scénario seed : [`docs/seed-scenario.md`](../../docs/seed-scenario.md).
 
 Application : [http://localhost:3000](http://localhost:3000)
 
-Connexion : `[role]@aeronexis.local` avec le mot de passe `SEED_ADMIN_PASSWORD` (voir `.env` / seed auth).
-
 ## Architecture
 
 ```
@@ -44,16 +42,6 @@ NUXT_PUBLIC_API_ADAPTER=mock        # sans backend
 
 Voir [`apps/web/.env.example`](.env.example).
 
-### Comptes mock (mode offline uniquement)
-
-| Email | Mot de passe |
-|-------|--------------|
-| `operateur@aeronexis.local` | `operateur123` |
-| `logistique@aeronexis.local` | `logistique123` |
-| `commercial@aeronexis.local` | `commercial123` |
-| `direction@aeronexis.local` | `direction123` |
-| `admin@aeronexis.local` | `admin123` |
-
 ## Scénario soutenance (15 min) — Gateway
 
 | Étape | Compte | Page |
@@ -64,6 +52,19 @@ Voir [`apps/web/.env.example`](.env.example).
 | 4 | `direction@` | `/dashboard` : KPI multi-site + incidents |
 
 Points clés jury : adapter pattern, JWT + refresh, proxy `/api`, RBAC route + UI, mappers DTO côté front.
+
+## Assistant IA — création d'OF
+
+L'assistant Mistral (via Ollama local) pré-remplit le formulaire « Nouvel OF » sur `/bom` (rôles logistique / admin).
+
+```bash
+ollama pull mistral
+ollama serve   # écoute sur :11434
+```
+
+Variables optionnelles (`.env` racine) : `OLLAMA_BASE_URL`, `OLLAMA_MODEL`.
+
+Route Nitro : `POST /api/ai/of` (prioritaire sur le proxy gateway pour ce chemin).
 
 ## Scripts
 

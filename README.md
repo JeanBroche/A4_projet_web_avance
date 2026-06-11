@@ -9,6 +9,7 @@ Projet web avance (A4) : ERP modulaire pour composants mecaniques de haute preci
 - Node.js 20+
 - [pnpm](https://pnpm.io/) 11 (via Corepack : `corepack enable`)
 - Docker Desktop (environnement local)
+- [Ollama](https://ollama.com/) (optionnel — assistant IA pour creer des OF depuis `/bom`) : `ollama pull mistral` puis `ollama serve`
 
 ### Installation
 
