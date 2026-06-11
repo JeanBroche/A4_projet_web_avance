@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.service.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "noEmit": false
+  },
+  "include": ["moleculer.config.ts", "services/**/*.ts"]
+}
