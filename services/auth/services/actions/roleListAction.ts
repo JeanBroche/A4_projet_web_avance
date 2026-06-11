@@ -15,7 +15,7 @@ export const roleListAction = {
   async handler(ctx: Context<RoleListParams, AuthContextMeta>) {
     const params = parseParams(accessTokenSchema, ctx.params);
 
-    requireAdmin(ctx, params.accessToken);
+    await requireAdmin(ctx, params.accessToken);
 
     const roles = await prisma.role.findMany({
       orderBy: { code: 'asc' },

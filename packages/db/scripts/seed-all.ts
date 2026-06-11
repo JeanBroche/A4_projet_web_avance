@@ -1,7 +1,7 @@
-import { PRISMA_SERVICES } from "./services.js";
+import { SEED_SERVICES } from "./services.js";
 import { runPnpmScript } from "./run-pnpm.js";
 
-for (const service of PRISMA_SERVICES) {
+for (const service of SEED_SERVICES) {
   console.log(`\n>> db:seed (${service})`);
   runPnpmScript(service, "db:seed");
 }

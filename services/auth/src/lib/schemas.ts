@@ -22,7 +22,8 @@ export const refreshSchema = z.object({
 });
 
 export const logoutSchema = z.object({
-  refreshToken: z.string().min(1)
+  refreshToken: z.string().min(1),
+  accessToken: z.string().min(1).optional()
 });
 
 export const meSchema = z.object({

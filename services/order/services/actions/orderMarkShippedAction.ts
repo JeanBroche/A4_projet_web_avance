@@ -22,7 +22,7 @@ type ShipmentHistoryPage = {
 export const orderMarkShippedAction = {
   async handler(ctx: Context<OrderMarkShippedParams, AuthContextMeta>) {
     const params = parseParams(orderMarkShippedSchema, ctx.params);
-    const auth = requireLogistique(ctx, params.accessToken);
+    const auth = await requireLogistique(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);

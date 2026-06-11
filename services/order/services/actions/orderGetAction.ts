@@ -24,7 +24,7 @@ type AuthContextMeta = {
 export const orderGetAction = {
   async handler(ctx: Context<OrderGetParams, AuthContextMeta>) {
     const params = parseParams(orderByIdSchema, ctx.params);
-    const auth = requireAuth(ctx, params.accessToken);
+    const auth = await requireAuth(ctx, params.accessToken);
 
     const effectiveSite = resolveEffectiveSite(auth, params);
     const order = await loadActiveOrder(prisma, params.orderId);

@@ -20,7 +20,7 @@ type AuthContextMeta = {
 export const orderHistoryAction = {
   async handler(ctx: Context<OrderHistoryParams, AuthContextMeta>) {
     const params = parseParams(orderHistorySchema, ctx.params);
-    const auth = requireOrderRead(ctx, params.accessToken);
+    const auth = await requireOrderRead(ctx, params.accessToken);
 
     const effectiveSite = resolveEffectiveSite(auth, params);
 

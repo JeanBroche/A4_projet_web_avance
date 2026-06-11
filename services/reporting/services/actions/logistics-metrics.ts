@@ -4,11 +4,11 @@ import { baseKpiSchema, windowedKpiSchema } from "../../src/lib/schemas.js";
 import { callDownstream } from "../../src/lib/downstream.js";
 import { withCache } from "../../src/lib/cache.js";
 
-type AlertRow = {
-  id: string;
-  siteCode: string;
+type StockLevel = {
   materialId: string;
-  resolvedAt: string | null;
+  code: string;
+  siteCode: string;
+  available: number;
 };
 
 type ForecastRow = {
@@ -25,28 +25,32 @@ type ForecastRow = {
 export const ruptureStockCalculation = {
   async handler(ctx: Context) {
     const params = parseParams(baseKpiSchema, ctx.params);
-    requireDirection(ctx, params.accessToken);
+    await requireDirection(ctx, params.accessToken);
 
     return withCache(
       ctx.service!,
       "calcul.logistique.rupture",
       { siteCode: params.siteCode ?? null },
       async () => {
-        const alerts = await callDownstream<AlertRow[]>(
+        const levels = await callDownstream<StockLevel[]>(
           ctx,
-          "stock.alert.list",
+          "stock.level.list",
           {
-            ...(params.siteCode ? { siteCode: params.siteCode } : {}),
-            includeResolved: false
+            ...(params.siteCode ? { siteCode: params.siteCode } : {})
           },
           params.accessToken
         );
 
-        const totalRuptureProducts = alerts.length;
+        const ruptures = levels.filter((level) => level.available <= 0);
+
         return {
           siteCode: params.siteCode ?? null,
-          totalRuptureProducts,
-          materials: alerts.map((a) => a.materialId)
+          totalRuptureProducts: ruptures.length,
+          materials: ruptures.map((level) => ({
+            materialId: level.materialId,
+            code: level.code,
+            available: level.available
+          }))
         };
       }
     );
@@ -56,7 +60,7 @@ export const ruptureStockCalculation = {
 export const rotationStockCalculation = {
   async handler(ctx: Context) {
     const params = parseParams(windowedKpiSchema, ctx.params);
-    requireDirection(ctx, params.accessToken);
+    await requireDirection(ctx, params.accessToken);
 
     const windowDays = params.windowDays ?? 30;
     return withCache(

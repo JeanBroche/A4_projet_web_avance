@@ -66,6 +66,8 @@ export const shipmentUpdateStatusSchema = accessTokenSchema.extend({
 export const shipmentHistorySchema = accessTokenSchema.extend({
   siteCode: z.string().min(1).optional(),
   clientCode: z.string().min(1).optional(),
+  orderNumber: z.string().min(1).optional(),
+  ofId: z.string().min(1).optional(),
   status: shipmentStatusSchema.optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),

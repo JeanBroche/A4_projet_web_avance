@@ -10,7 +10,11 @@ export function assertSiteAccess(
     return;
   }
 
-  if (auth.siteId && auth.siteId !== resourceSiteCode) {
+  if (!auth.siteId) {
+    throw createError("FORBIDDEN", "User has no site assignment");
+  }
+
+  if (auth.siteId !== resourceSiteCode) {
     throw createError("FORBIDDEN", "Resource belongs to a different site");
   }
 }

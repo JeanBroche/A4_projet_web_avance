@@ -15,7 +15,7 @@ type AuthContextMeta = {
 export const orderDelayRiskAction = {
   async handler(ctx: Context<OrderDelayRiskParams, AuthContextMeta>) {
     const params = parseParams(orderDelayRiskSchema, ctx.params);
-    const auth = requireAuth(ctx, params.accessToken);
+    const auth = await requireAuth(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);

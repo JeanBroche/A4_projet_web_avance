@@ -197,7 +197,7 @@ export async function listCriticalEvents(db: Db, params: CriticalEventListParams
   return { items, total, limit, offset };
 }
 
-export const DEMO_LOT_ID = "LOT-2026-00001";
+export const DEMO_LOT_ID = "BATCH-SEED-001";
 
 export interface LotProgressDocument {
   lotId: string;
@@ -230,9 +230,9 @@ export async function seedDemoLot(db: Db) {
     {
       $set: {
         lotId: DEMO_LOT_ID,
-        ofId: "OF-SEED-001",
+        ofId: DEMO_LOT_ID,
         siteCode: "SITE-LYO",
-        status: "en_cours",
+        status: "IN_PROGRESS",
         productCode: "PROD-001",
         createdAt: baseTime,
         updatedAt: now
@@ -243,33 +243,33 @@ export async function seedDemoLot(db: Db) {
 
   const events: EventHistoryDocument[] = [
     {
-      type: "lot.created",
+      type: "production.batch.created",
       lotId: DEMO_LOT_ID,
-      ofId: "OF-SEED-001",
+      ofId: DEMO_LOT_ID,
       siteCode: "SITE-LYO",
-      payload: { status: "planifie" },
+      payload: { status: "PENDING", command_id: "CMD-2025-00001" },
       timestamp: baseTime
     },
     {
-      type: "lot.status.changed",
+      type: "production.batch.progress",
       lotId: DEMO_LOT_ID,
-      ofId: "OF-SEED-001",
+      ofId: DEMO_LOT_ID,
       siteCode: "SITE-LYO",
-      payload: { from: "planifie", to: "en_cours" },
+      payload: { progress: 25, status: "IN_PROGRESS" },
       timestamp: new Date("2026-01-15T09:30:00.000Z")
     },
     {
-      type: "stock.reservation.created",
+      type: "stock.reserved",
       lotId: DEMO_LOT_ID,
-      ofId: "OF-SEED-001",
+      ofId: DEMO_LOT_ID,
       siteCode: "SITE-LYO",
-      payload: { materialCode: "MAT-001", quantity: 10 },
+      payload: { materialCode: "MAT-001", quantity: 1 },
       timestamp: new Date("2026-01-15T10:00:00.000Z")
     },
     {
-      type: "shipment.shipment.planned",
+      type: "shipment.planned",
       lotId: DEMO_LOT_ID,
-      ofId: "OF-SEED-001",
+      ofId: DEMO_LOT_ID,
       siteCode: "SITE-LYO",
       payload: { orderNumber: "CMD-2025-00001", shipmentCode: "SHP-2025-00001" },
       timestamp: new Date("2026-01-16T14:00:00.000Z")

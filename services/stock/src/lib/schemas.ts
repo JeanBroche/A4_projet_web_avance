@@ -35,6 +35,15 @@ export const reservationByIdSchema = accessTokenSchema.extend({
   id: cuidLikeSchema
 });
 
+export const reservationListSchema = accessTokenSchema.extend({
+  ofId: z.string().min(1).optional(),
+  siteCode: siteCodeSchema.optional(),
+  siteId: siteCodeSchema.optional(),
+  status: z.enum(["ACTIVE", "RELEASED", "CANCELLED"]).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
 export const movementCreateSchema = accessTokenSchema.extend({
   materialId: materialIdSchema,
   siteCode: siteCodeSchema,

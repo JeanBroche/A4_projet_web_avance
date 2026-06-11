@@ -14,6 +14,7 @@ import {
 } from '../../src/lib/order-helpers.js';
 import { logOrderAudit } from '../../src/lib/audit.js';
 import { publishOrderEvent } from '../../src/lib/events.js';
+import { DomainEvents } from '@aeronexis/shared';
 
 type OrderRejectParams = z.infer<typeof orderRejectSchema>;
 type AuthContextMeta = {
@@ -23,7 +24,7 @@ type AuthContextMeta = {
 export const orderRejectAction = {
   async handler(ctx: Context<OrderRejectParams, AuthContextMeta>) {
     const params = parseParams(orderRejectSchema, ctx.params);
-    const auth = requireCommercial(ctx, params.accessToken);
+    const auth = await requireCommercial(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);
@@ -61,7 +62,7 @@ export const orderRejectAction = {
       return next;
     });
 
-    publishOrderEvent(ctx.service!, 'order.rejected', {
+    publishOrderEvent(ctx.service!, DomainEvents.order.rejected, {
       orderId: updated.id,
       orderNumber: updated.orderNumber,
       siteCode: updated.siteCode,

@@ -7,7 +7,7 @@ import { changeListSchema } from "../../src/lib/schemas.js";
 export const changeListAction: ActionSchema = {
   async handler(ctx) {
     const params = parseParams(changeListSchema, ctx.params);
-    requireAdmin(ctx, params.accessToken);
+    await requireAdmin(ctx, params.accessToken);
 
     const db = getDb();
     return listAuditChanges(db, params);

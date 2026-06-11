@@ -1,6 +1,6 @@
 import type { Context } from "moleculer";
 import { createError } from "./errorUtils.js";
-import { verifyAccessToken, type AccessTokenPayload } from "./jwtUtils.js";
+import { verifyAccessTokenWithBlacklist, type AccessTokenPayload } from "./jwtUtils.js";
 
 export function resolveAccessToken(accessToken: string | undefined | null, ctx: Context) {
   if (accessToken) {
@@ -28,22 +28,25 @@ export function resolveAccessToken(accessToken: string | undefined | null, ctx: 
   return null;
 }
 
-export function requireAuth(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+export async function requireAuth(
+  ctx: Context,
+  accessToken?: string | null
+): Promise<AccessTokenPayload> {
   const token = resolveAccessToken(accessToken ?? null, ctx);
 
   if (!token) {
     throw createError("TOKEN_INVALID");
   }
 
-  return verifyAccessToken(token);
+  return verifyAccessTokenWithBlacklist(token);
 }
 
-export function requireAnyRole(
+export async function requireAnyRole(
   ctx: Context,
   accessToken: string | undefined | null,
   roleCodes: string[]
-): AccessTokenPayload {
-  const payload = requireAuth(ctx, accessToken);
+): Promise<AccessTokenPayload> {
+  const payload = await requireAuth(ctx, accessToken);
   const roles = payload.roles || [];
 
   if (roles.includes("admin")) {
@@ -57,13 +60,19 @@ export function requireAnyRole(
   return payload;
 }
 
-export function requireCommercial(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+export async function requireCommercial(
+  ctx: Context,
+  accessToken?: string | null
+): Promise<AccessTokenPayload> {
   return requireAnyRole(ctx, accessToken ?? null, ["commercial"]);
 }
 
-
-export function requireRole(ctx: Context, accessToken: string | undefined | null, roleCode: string) {
-  const payload = requireAuth(ctx, accessToken);
+export async function requireRole(
+  ctx: Context,
+  accessToken: string | undefined | null,
+  roleCode: string
+) {
+  const payload = await requireAuth(ctx, accessToken);
 
   if (!payload.roles?.includes(roleCode)) {
     throw createError("FORBIDDEN");
@@ -72,42 +81,55 @@ export function requireRole(ctx: Context, accessToken: string | undefined | null
   return payload;
 }
 
-export function requireAdmin(ctx: Context, accessToken: string | undefined | null) {
+export async function requireAdmin(ctx: Context, accessToken: string | undefined | null) {
   return requireRole(ctx, accessToken, "admin");
 }
 
-export function requireProduction(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+export async function requireProduction(
+  ctx: Context,
+  accessToken?: string | null
+): Promise<AccessTokenPayload> {
   return requireAnyRole(ctx, accessToken ?? null, ["operateur"]);
 }
 
-export function requireDirection(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+export async function requireDirection(
+  ctx: Context,
+  accessToken?: string | null
+): Promise<AccessTokenPayload> {
   return requireAnyRole(ctx, accessToken ?? null, ["direction"]);
 }
 
-export function requireLogistique(ctx: Context, accessToken?: string | null): AccessTokenPayload {
+export async function requireLogistique(
+  ctx: Context,
+  accessToken?: string | null
+): Promise<AccessTokenPayload> {
   return requireAnyRole(ctx, accessToken ?? null, ["logistique"]);
 }
 
-/** Lecture stock : logistique ou direction. */
-export function requireStockRead(
+export async function requireStockRead(
   ctx: Context,
   accessToken?: string | null
-): AccessTokenPayload {
+): Promise<AccessTokenPayload> {
   return requireAnyRole(ctx, accessToken ?? null, ["logistique", "direction"]);
 }
 
-/** Lecture order : commercial ou direction. */
-export function requireOrderRead(
+export async function requireOrderRead(
   ctx: Context,
   accessToken?: string | null
-): AccessTokenPayload {
+): Promise<AccessTokenPayload> {
   return requireAnyRole(ctx, accessToken ?? null, ["commercial", "direction"]);
 }
 
-/** Lecture production (lots) : operateur ou direction. */
-export function requireProductionRead(
+export async function requireCommercialStats(
   ctx: Context,
   accessToken?: string | null
-): AccessTokenPayload {
+): Promise<AccessTokenPayload> {
+  return requireAnyRole(ctx, accessToken ?? null, ["commercial", "direction"]);
+}
+
+export async function requireProductionRead(
+  ctx: Context,
+  accessToken?: string | null
+): Promise<AccessTokenPayload> {
   return requireAnyRole(ctx, accessToken ?? null, ["operateur", "direction"]);
 }

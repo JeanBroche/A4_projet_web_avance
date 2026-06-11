@@ -18,7 +18,7 @@ type AuthContextMeta = { correlationId: string };
 export const orderMarkDeliveredAction = {
   async handler(ctx: Context<OrderMarkDeliveredParams, AuthContextMeta>) {
     const params = parseParams(orderMarkDeliveredSchema, ctx.params);
-    const auth = requireLogistique(ctx, params.accessToken);
+    const auth = await requireLogistique(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);

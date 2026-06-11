@@ -18,7 +18,7 @@ type AuthContextMeta = { correlationId: string };
 export const orderFinishAction = {
   async handler(ctx: Context<OrderFinishParams, AuthContextMeta>) {
     const params = parseParams(orderFinishSchema, ctx.params);
-    const auth = requireAnyRole(ctx, params.accessToken, ["operateur", "commercial"]);
+    const auth = await requireAnyRole(ctx, params.accessToken, ["operateur", "commercial"]);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);

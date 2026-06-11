@@ -33,7 +33,7 @@ export const meAction = {
   async handler(ctx: Context<MeParams, AuthContextMeta>) {
     const params = parseParams(meSchema, ctx.params);
 
-    const payload = requireAuth(ctx, params.accessToken);
+    const payload = await requireAuth(ctx, params.accessToken);
     const user = await findUserById(payload.sub);
 
     return {

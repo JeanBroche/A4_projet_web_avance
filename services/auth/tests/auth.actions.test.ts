@@ -167,10 +167,11 @@ describe("auth actions", () => {
     const login = await broker.call("auth.login", {
       email: adminEmail,
       password: adminPassword
-    }) as { refreshToken: string };
+    }) as { refreshToken: string; accessToken: string };
 
     const result = await broker.call("auth.logout", {
-      refreshToken: login.refreshToken
+      refreshToken: login.refreshToken,
+      accessToken: login.accessToken
     }) as { success: boolean };
 
     assert.equal(result.success, true);
@@ -179,6 +180,14 @@ describe("auth actions", () => {
       () =>
         broker.call("auth.refresh", {
           refreshToken: login.refreshToken
+        }),
+      (error) => getErrorCode(error) === "TOKEN_INVALID"
+    );
+
+    await assert.rejects(
+      () =>
+        broker.call("auth.me", {
+          accessToken: login.accessToken
         }),
       (error) => getErrorCode(error) === "TOKEN_INVALID"
     );

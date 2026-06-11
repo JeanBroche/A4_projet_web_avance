@@ -40,3 +40,19 @@ export const lotTraceSchema = accessTokenSchema.extend({
 });
 
 export const lotExportSchema = lotTraceSchema;
+
+export const documentUploadSchema = accessTokenSchema.extend({
+  lotId: z.string().regex(/^LOT-\d{4}-\d{5}$/, "lotId must match LOT-YYYY-NNNNN"),
+  filename: z.string().min(1).max(255),
+  contentType: z.string().min(1).max(128),
+  contentBase64: z.string().min(1)
+});
+
+export const documentListSchema = accessTokenSchema.extend({
+  lotId: z.string().regex(/^LOT-\d{4}-\d{5}$/, "lotId must match LOT-YYYY-NNNNN")
+});
+
+export const documentUrlSchema = accessTokenSchema.extend({
+  documentId: z.string().uuid(),
+  expiresSec: z.number().int().positive().max(86_400).optional()
+});

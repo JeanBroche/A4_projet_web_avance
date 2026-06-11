@@ -18,7 +18,7 @@ async function main() {
       clientCode: "CLI-001",
       siteCode: "SITE-LYO",
       status: "COMPLETED",
-      ofId: "OF-SEED-001"
+      ofId: "BATCH-SEED-001"
     },
     create: {
       id: "seed-picklist-001",
@@ -27,7 +27,7 @@ async function main() {
       clientCode: "CLI-001",
       siteCode: "SITE-LYO",
       status: "COMPLETED",
-      ofId: "OF-SEED-001",
+      ofId: "BATCH-SEED-001",
       lines: {
         create: [
           {

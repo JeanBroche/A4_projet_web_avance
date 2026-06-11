@@ -19,7 +19,7 @@ export const userListAction = {
   async handler(ctx: Context<UserListParams, AuthContextMeta>) {
     const params = parseParams(userListSchema, ctx.params);
 
-    requireAdmin(ctx, params.accessToken);
+    await requireAdmin(ctx, params.accessToken);
 
     const users = await prisma.user.findMany({
       where: {

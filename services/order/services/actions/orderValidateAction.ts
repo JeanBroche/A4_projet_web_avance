@@ -14,6 +14,7 @@ import {
 } from '../../src/lib/order-helpers.js';
 
 import { publishOrderEvent } from '../../src/lib/events.js';
+import { DomainEvents } from '@aeronexis/shared';
 import { logOrderAudit } from '../../src/lib/audit.js';
 
 type OrderValidateParams = z.infer<typeof orderValidateSchema>;
@@ -24,7 +25,7 @@ type AuthContextMeta = {
 export const orderValidateAction = {
   async handler(ctx: Context<OrderValidateParams, AuthContextMeta>) {
     const params = parseParams(orderValidateSchema, ctx.params);
-    const auth = requireCommercial(ctx, params.accessToken);
+    const auth = await requireCommercial(ctx, params.accessToken);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);
@@ -62,7 +63,7 @@ export const orderValidateAction = {
       return next;
     });
 
-    publishOrderEvent(ctx.service!, 'order.validated', {
+    publishOrderEvent(ctx.service!, DomainEvents.order.validated, {
       orderId: updated.id,
       orderNumber: updated.orderNumber,
       status: updated.status,

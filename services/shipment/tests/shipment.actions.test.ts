@@ -8,6 +8,7 @@ import jwt, { type SignOptions } from "jsonwebtoken";
 import { getErrorCode } from "@aeronexis/services-shared";
 import moleculerConfig from "../moleculer.config.js";
 import ShipmentService from "../services/shipment.service.js";
+import StockService from "../../stock/services/stock.service.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -57,19 +58,7 @@ function signTestToken(
 }
 
 before(async () => {
-  broker.createService({
-    name: "stock",
-    actions: {
-      "reservation.list": {
-        handler() {
-          return {
-            reservations: [{ ofId: "OF-SEED-001", status: "ACTIVE", quantity: 10 }]
-          };
-        }
-      }
-    }
-  });
-
+  broker.createService(StockService);
   broker.createService(ShipmentService);
   await broker.start();
 
@@ -123,7 +112,7 @@ describe("shipment.picklist.create", () => {
         accessToken: tokens.logistique,
         orderNumber,
         siteCode: "SITE-LYO",
-        ofId: "OF-SEED-001",
+        ofId: "BATCH-SEED-001",
         clientCode: "CLI-001",
         lines: [{ productCode: "PROD-001", quantity: 3 }]
       }
@@ -157,7 +146,7 @@ describe("shipment.picklist.complete", () => {
       accessToken: tokens.logistique,
       orderNumber: `CMD-COMPLETE-${Date.now()}`,
       siteCode: "SITE-LYO",
-      ofId: "OF-SEED-001",
+      ofId: "BATCH-SEED-001",
       lines: [{ productCode: "PROD-002", quantity: 1 }]
     });
 

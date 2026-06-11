@@ -7,7 +7,7 @@ import { eventListCriticalSchema } from "../../src/lib/schemas.js";
 export const eventListCriticalAction: ActionSchema = {
   async handler(ctx) {
     const params = parseParams(eventListCriticalSchema, ctx.params);
-    requireAdmin(ctx, params.accessToken);
+    await requireAdmin(ctx, params.accessToken);
 
     const db = getDb();
     return listCriticalEvents(db, params);

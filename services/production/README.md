@@ -108,7 +108,7 @@ Les tests sautent automatiquement si PostgreSQL n'est pas disponible. Ils utilis
 
 ## Kafka
 
-La publication d'evenements (`bom.created`, `batch.created`, `batch.progress`, `batch.anomaly_reported`) est branchee via [`src/lib/events.ts`](src/lib/events.ts) en mode stub (`production.event.pending`).
+La publication d'evenements (`production.bom.created`, `production.batch.created`, `production.batch.progress`, `production.batch.anomaly_reported`, `production.manu_order.finished`) est branchee via [`src/lib/events.ts`](src/lib/events.ts) avec les constantes `DomainEvents` de `@aeronexis/shared`.
 
 ## Docker
 

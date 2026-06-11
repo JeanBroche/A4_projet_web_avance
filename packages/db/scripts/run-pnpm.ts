@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
-import type { PrismaService } from "./services.js";
+import type { SeedService } from "./services.js";
 
-export function runPnpmScript(service: PrismaService, script: string): void {
+export function runPnpmScript(service: SeedService, script: string): void {
   const result = spawnSync("pnpm", ["--filter", service, "run", script], {
     stdio: "inherit",
     shell: true

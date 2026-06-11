@@ -245,6 +245,22 @@ describe("stock.reservation", () => {
       (error) => getErrorCode(error) === "RESERVATION_INACTIVE"
     );
   });
+  it("reservation.list filters by ofId and status", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const ofId = `OF-LIST-${Date.now()}`;
+    await broker.call("stock.reservation.create", {
+      accessToken: tokens.logistique,
+      ofId,
+      lines: [{ materialId: materialAcierId, qty: 1 }]
+    });
+    const listed = (await broker.call("stock.reservation.list", {
+      accessToken: tokens.logistique,
+      ofId,
+      status: "ACTIVE"
+    })) as { reservations: Array<{ ofId: string; status: string }> };
+    assert.ok(listed.reservations.length >= 1);
+    assert.ok(listed.reservations.every((r) => r.ofId === ofId && r.status === "ACTIVE"));
+  });
 });
 describe("stock.alert and threshold", () => {
   it("alert.list returns critical alert for MAT-002", async (t) => {

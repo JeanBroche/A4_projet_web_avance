@@ -13,6 +13,7 @@ import {
   ORDER_STATUSES,
   toOrderSummary
 } from "../../src/lib/order-helpers.js";
+import { DomainEvents } from "@aeronexis/shared";
 import { publishOrderEvent } from "../../src/lib/events.js";
 import { logOrderAudit } from "../../src/lib/audit.js";
 
@@ -28,7 +29,7 @@ type BatchCreated = {
 export const orderStartProductionAction = {
   async handler(ctx: Context<OrderStartProductionParams, AuthContextMeta>) {
     const params = parseParams(orderStartProductionSchema, ctx.params);
-    const auth = requireAnyRole(ctx, params.accessToken, ["commercial", "operateur"]);
+    const auth = await requireAnyRole(ctx, params.accessToken, ["commercial", "operateur"]);
 
     const order = await loadActiveOrder(prisma, params.orderId);
     assertSiteAccess(auth, order.siteCode);
@@ -78,7 +79,7 @@ export const orderStartProductionAction = {
       params.notes ?? "Production started"
     );
 
-    publishOrderEvent(ctx.service!, "order.order.start_production", {
+    publishOrderEvent(ctx.service!, DomainEvents.order.startProduction, {
       orderId: updated.id,
       orderNumber: updated.orderNumber,
       siteCode: updated.siteCode,

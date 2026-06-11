@@ -15,7 +15,7 @@ type AuthContextMeta = {
 export const clientStatsAction = {
   async handler(ctx: Context<ClientStatsParams, AuthContextMeta>) {
     const params = parseParams(clientStatsSchema, ctx.params);
-    const auth = requireAuth(ctx, params.accessToken);
+    const auth = await requireAuth(ctx, params.accessToken);
 
     const client = await loadActiveClient(prisma, params.clientId);
     assertSiteAccess(auth, client.siteCode);

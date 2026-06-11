@@ -17,7 +17,7 @@ type AuthContextMeta = {
 export const userUpdateAction = {
   async handler(ctx: Context<UserUpdateParams, AuthContextMeta>) {
     const params = parseParams(userUpdateSchema, ctx.params);
-    const auth = requireAdmin(ctx, params.accessToken);
+    const auth = await requireAdmin(ctx, params.accessToken);
 
     const existing = await prisma.user.findFirst({
       where: { id: params.id },

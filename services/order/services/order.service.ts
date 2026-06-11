@@ -1,6 +1,12 @@
 import type { Service, ServiceSchema } from "moleculer";
 import { initOrderAuditWriter } from "../src/lib/audit.js";
 import {
+  handleProductionFinished,
+  syncOrderFromShipmentStatus,
+  type ProductionFinishedPayload,
+  type ShipmentStatusChangedPayload
+} from "../src/lib/order-integration.js";
+import {
   orderCreateAction,
   orderGetAction,
   orderStatusAction,
@@ -59,6 +65,19 @@ const OrderService: ServiceSchema = {
     "order.markShipped": orderMarkShippedAction,
 
     "order.markDelivered": orderMarkDeliveredAction,
+  },
+
+  events: {
+    "production.manu_order.finished": {
+      async handler(this: Service, ctx: { params: ProductionFinishedPayload }) {
+        await handleProductionFinished(ctx as Parameters<typeof handleProductionFinished>[0]);
+      }
+    },
+    "shipment.status.changed": {
+      async handler(this: Service, ctx: { params: ShipmentStatusChangedPayload }) {
+        await syncOrderFromShipmentStatus(this, ctx.params);
+      }
+    }
   }
 };
 

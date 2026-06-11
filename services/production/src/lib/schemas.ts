@@ -6,6 +6,8 @@ const accessTokenSchema = z
 
 export const listBomSchema = accessTokenSchema.extend({
   status: z.string().min(1).optional(),
+  siteCode: z.string().min(1).optional(),
+  siteId: z.string().min(1).optional(),
   limit: z.number().int().positive().max(100).optional(),
   offset: z.number().int().min(0).optional()
 });
@@ -26,6 +28,8 @@ export const getBatchSchema = accessTokenSchema.extend({
 export const createBatchSchema = accessTokenSchema.extend({
   bom_code: z.string().min(1),
   command_id: z.string().min(1),
+  siteCode: z.string().min(1).optional(),
+  siteId: z.string().min(1).optional(),
   plannedStartAt: z.coerce.date().optional(),
   plannedEndAt: z.coerce.date().optional()
 });
@@ -86,7 +90,9 @@ export const getBomSchema = accessTokenSchema.extend({
 export const createBomSchema = accessTokenSchema.extend({
   material_id: z.string().min(1),
   description: z.string().min(1).optional(),
-  quantity: z.number().int().positive().default(1)
+  quantity: z.number().int().positive().default(1),
+  siteCode: z.string().min(1).optional(),
+  siteId: z.string().min(1).optional()
 });
 
 export const updateBomSchema = accessTokenSchema.extend({

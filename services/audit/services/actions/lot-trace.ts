@@ -7,7 +7,7 @@ import { lotTraceSchema } from "../../src/lib/schemas.js";
 export const lotTraceAction: ActionSchema = {
   async handler(ctx) {
     const params = parseParams(lotTraceSchema, ctx.params);
-    requireAdmin(ctx, params.accessToken);
+    await requireAdmin(ctx, params.accessToken);
 
     const db = getDb();
     return buildLotTrace(db, ctx, params.lotId, params.accessToken);

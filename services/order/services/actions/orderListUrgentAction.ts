@@ -19,7 +19,7 @@ type AuthContextMeta = {
 export const orderListUrgentAction = {
   async handler(ctx: Context<OrderListUrgentParams, AuthContextMeta>) {
     const params = parseParams(orderListUrgentSchema, ctx.params);
-    const auth = requireOrderRead(ctx, params.accessToken);
+    const auth = await requireOrderRead(ctx, params.accessToken);
 
     const effectiveSite = resolveEffectiveSite(auth, params);
 

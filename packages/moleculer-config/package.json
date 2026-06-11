@@ -21,6 +21,8 @@
     "test": "node -e \"process.exit(0)\""
   },
   "dependencies": {
+    "@aeronexis/redis-infra": "workspace:*",
+    "@aeronexis/services-shared": "workspace:*",
     "dotenv": "^17.4.2",
     "kafkajs": "^2.2.4",
     "moleculer": "^0.15.0"
