@@ -31,13 +31,49 @@ export function useAuth() {
     }
   }
 
+  async function refreshSession() {
+    const refreshToken = session.value.refreshToken
+    if (!refreshToken) {
+      clear()
+      return false
+    }
+    try {
+      const result = await adapters.auth.refresh(refreshToken)
+      persist({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user
+      })
+      return true
+    } catch {
+      clear()
+      return false
+    }
+  }
+
+  async function restoreSession() {
+    if (!session.value.accessToken && !session.value.refreshToken) return
+
+    if (session.value.accessToken) {
+      try {
+        const user = await adapters.auth.me(session.value.accessToken)
+        persist({ ...session.value, user })
+        return
+      } catch {
+        // token expired — try refresh
+      }
+    }
+
+    await refreshSession()
+  }
+
   async function logout() {
     const refreshToken = session.value.refreshToken
     if (refreshToken) {
       try {
-        await adapters.auth.logout(refreshToken)
+        await adapters.auth.logout(refreshToken, session.value.accessToken)
       } catch {
-        // ignore logout errors in mock mode
+        // ignore logout errors
       }
     }
     clear()
@@ -62,6 +98,8 @@ export function useAuth() {
     error,
     login,
     logout,
+    refreshSession,
+    restoreSession,
     switchRole
   }
 }

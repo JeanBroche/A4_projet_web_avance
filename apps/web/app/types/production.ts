@@ -18,7 +18,6 @@ export interface ManufacturingOrder {
   qty: number
   status: BomStatus
   priority: Priority
-  hasBomAnomaly: boolean
   bom: BomItem[]
 }
 
@@ -34,6 +33,15 @@ export interface Batch {
   hasAnomaly: boolean
   createdAt: string
   bom: BomItem[]
+}
+
+export interface Product {
+  id: string
+  productCode: string
+  description: string
+  quantity: number
+  reservedQuantity: number
+  siteCode: string
 }
 
 export interface CreateManufacturingOrderInput {
@@ -59,9 +67,18 @@ export interface CreateBatchInput {
   emoji: string
 }
 
-export interface ReportBomAnomalyInput {
-  bomOrderId: number
+export interface CreateProductInput {
+  productCode: string
   description: string
+  quantity: number
+  siteCode?: string
+}
+
+export interface UpdateProductInput {
+  productCode: string
+  description?: string
+  quantity?: number
+  siteCode?: string
 }
 
 export interface ReportAnomalyInput {

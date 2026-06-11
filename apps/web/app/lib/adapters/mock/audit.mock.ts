@@ -18,6 +18,19 @@ export function createMockAuditAdapter(): AuditAdapter {
     async traceLot(lotNumber) {
       await simulateDelay(120)
       return buildMockLotTrace(lotNumber)
+    },
+
+    async listCriticalEvents() {
+      await simulateDelay(80)
+      return getMockActivities()
+        .filter(a => a.type === 'anomaly')
+        .map((a, index) => ({ ...a, id: index + 1, date: new Date(a.date) }))
+    },
+
+    async exportLot(lotNumber) {
+      await simulateDelay(100)
+      const trace = buildMockLotTrace(lotNumber)
+      return JSON.stringify(trace, null, 2)
     }
   }
 }

@@ -4,6 +4,7 @@ import {
   createMockTokens,
   findMockAccount,
   findMockUserByToken,
+  MOCK_ACCOUNTS,
   switchMockRole
 } from '~/fixtures/auth/users'
 import type { AuthAdapter } from '~/lib/adapters/types'
@@ -29,6 +30,19 @@ export function createMockAuthAdapter(): AuthAdapter {
         userId: account.user.id,
         user: account.user.name
       })
+      return { ...tokens, user: account.user }
+    },
+
+    async refresh(refreshToken: string) {
+      await simulateDelay(150)
+      const userId = activeSessions.get(refreshToken) ?? refreshToken.replace('mock-refresh-', '')
+      const account = MOCK_ACCOUNTS.find(a => a.user.id === userId)
+      if (!account) {
+        throw new ApiClientError('AUTH_UNAUTHORIZED', 'Session invalide ou expirée')
+      }
+      const tokens = createMockTokens(userId)
+      activeSessions.delete(refreshToken)
+      activeSessions.set(tokens.refreshToken, userId)
       return { ...tokens, user: account.user }
     },
 

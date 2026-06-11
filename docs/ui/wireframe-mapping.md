@@ -29,12 +29,13 @@ Ce document relie les écrans implémentés aux rôles métier et aux composants
 
 1. **Opérateur** — `/bom` consulter OF → `/batch` créer lot lié → signaler anomalie → **traçabilité complète**
 2. **Logistique** — `/inventaire/spare` stock + réservations → `/bom` réserver matières → `/delivery` expédition
-3. **Commercial** — `/commands` valider commande → planifier expédition
-4. **Direction** — `/dashboard` KPI → clic incident → page source → `/activity` historique
+3. **Commercial** — `/commands` valider commande urgente → indicateur risque retard → `/delivery`
+4. **Direction** — `/dashboard` KPI (filtre site) → incidents critiques → `/activity`
 
 ## Comptes démo
 
-Voir `apps/web/README.md` — `[role]@aeronexis.local` / `[role]123`.
+**Gateway (soutenance)** : `[role]@aeronexis.local` / `SEED_ADMIN_PASSWORD`  
+**Mock offline** : `[role]123` — voir `apps/web/README.md`.
 
 ## Accessibilité
 

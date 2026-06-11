@@ -31,12 +31,30 @@ export function useReporting() {
     error.value = null
     try {
       const consolidated = scope === 'ALL'
-      dashboard.value = await adapters.reporting.getDashboard({
-        consolidated,
-        siteCode: reportingSiteCode(scope)
-      })
+      const [kpiDashboard, criticalEvents] = await Promise.all([
+        adapters.reporting.getDashboard({
+          consolidated,
+          siteCode: reportingSiteCode(scope)
+        }),
+        adapters.audit.listCriticalEvents().catch(() => [])
+      ])
+      dashboard.value = kpiDashboard
       if (dashboard.value) {
         dashboard.value.siteLabel = dashboardSiteLabel(scope)
+        const auditIncidents = criticalEvents.map(ev => ({
+          id: `audit-${ev.id}`,
+          label: ev.title,
+          detail: ev.description,
+          severity: 'error' as const,
+          targetRoute: '/activity'
+        }))
+        const merged = [...dashboard.value.criticalIncidents, ...auditIncidents]
+        const seen = new Set<string>()
+        dashboard.value.criticalIncidents = merged.filter((inc) => {
+          if (seen.has(inc.id)) return false
+          seen.add(inc.id)
+          return true
+        }).slice(0, 8)
       }
       status.value = 'success'
     } catch (e) {

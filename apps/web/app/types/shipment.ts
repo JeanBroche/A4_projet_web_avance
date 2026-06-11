@@ -21,4 +21,5 @@ export interface CreateShipmentInput {
   estimatedDelivery: string
   emoji: string
   orderNumber?: string
+  productCode?: string
 }

@@ -1,11 +1,10 @@
 import { syncNotificationsAfterMutation } from '~/lib/notifications-sync'
 import { toFailureResult } from '~/lib/api/envelope'
+import type { StockAlert } from '~/lib/adapters/types'
 import type {
   AsyncStatus,
   CreateReservationInput,
-  CreateReturnItemInput,
   CreateStockLevelInput,
-  ReturnItem,
   RuptureForecast,
   StockLevel,
   StockReservation,
@@ -17,8 +16,8 @@ export function useStock() {
   const adapters = useAdapters()
 
   const levels = ref<StockLevel[]>([])
-  const returned = ref<ReturnItem[]>([])
   const reservations = ref<StockReservation[]>([])
+  const alerts = ref<StockAlert[]>([])
   const status = ref<AsyncStatus>('idle')
   const error = ref<string | null>(null)
   const isMutating = ref(false)
@@ -41,18 +40,25 @@ export function useStock() {
     }
   }
 
+  async function refreshAlerts() {
+    try {
+      alerts.value = await adapters.stock.listAlerts()
+    } catch {
+      alerts.value = []
+    }
+  }
+
   async function refresh() {
     status.value = 'pending'
     error.value = null
     try {
-      const [levelsData, returnedData, reservationsData] = await Promise.all([
+      const [levelsData, reservationsData] = await Promise.all([
         adapters.stock.listLevels(),
-        adapters.stock.listReturned(),
         adapters.stock.listReservations()
       ])
       levels.value = levelsData
-      returned.value = returnedData
       reservations.value = reservationsData
+      await Promise.all([refreshAlerts(), refreshRuptureForecast(), refreshSupplierDelays()])
       status.value = 'success'
     } catch (e) {
       const failure = toFailureResult(e)
@@ -85,19 +91,6 @@ export function useStock() {
   async function fetchReservationsForOf(ofId: string) {
     const list = await adapters.stock.listReservations(ofId)
     return list.filter(r => r.status === 'ACTIVE')
-  }
-
-  async function refreshReturned() {
-    status.value = 'pending'
-    error.value = null
-    try {
-      returned.value = await adapters.stock.listReturned()
-      status.value = 'success'
-    } catch (e) {
-      const failure = toFailureResult(e)
-      status.value = 'failure'
-      error.value = failure.message
-    }
   }
 
   function activeReservationsFor(ofId: string) {
@@ -139,36 +132,6 @@ export function useStock() {
     try {
       await adapters.stock.deleteLevel(id)
       await refreshLevels()
-    } finally {
-      isMutating.value = false
-    }
-  }
-
-  async function createReturned(input: CreateReturnItemInput) {
-    isMutating.value = true
-    try {
-      await adapters.stock.createReturned(input)
-      await refreshReturned()
-    } finally {
-      isMutating.value = false
-    }
-  }
-
-  async function updateReturned(id: number, qty: number, state: ReturnItem['state']) {
-    isMutating.value = true
-    try {
-      await adapters.stock.updateReturned(id, qty, state)
-      await refreshReturned()
-    } finally {
-      isMutating.value = false
-    }
-  }
-
-  async function deleteReturned(id: number) {
-    isMutating.value = true
-    try {
-      await adapters.stock.deleteReturned(id)
-      await refreshReturned()
     } finally {
       isMutating.value = false
     }
@@ -235,27 +198,38 @@ export function useStock() {
     }
   }
 
+  async function registerReturn(materialReference: string, quantity: number, reason?: string) {
+    isMutating.value = true
+    error.value = null
+    try {
+      await adapters.stock.createReturnMovement(materialReference, quantity, reason)
+      await refresh()
+    } catch (e) {
+      error.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   return {
     levels,
-    returned,
     reservations,
+    alerts,
     status,
     error,
     isMutating,
     refresh,
     refreshLevels,
     refreshReservations,
+    refreshAlerts,
     fetchReservationsForOf,
-    refreshReturned,
     activeReservationsFor,
     hasActiveReservations,
     levelByReference,
     createLevel,
     updateLevel,
     deleteLevel,
-    createReturned,
-    updateReturned,
-    deleteReturned,
     createReservation,
     releaseReservation,
     cancelReservation,
@@ -263,6 +237,7 @@ export function useStock() {
     supplierDelays,
     refreshRuptureForecast,
     refreshSupplierDelays,
-    reportSupplierDelay
+    reportSupplierDelay,
+    registerReturn
   }
 }

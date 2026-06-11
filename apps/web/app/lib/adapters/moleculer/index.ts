@@ -8,13 +8,16 @@ import { createMoleculerAuditAdapter } from './audit.moleculer'
 import { createMoleculerReportingAdapter } from './reporting.moleculer'
 import { createMoleculerNotificationAdapter } from './notification.moleculer'
 
-export function createMoleculerAdapters(getToken: () => string | null): Adapters {
+export function createMoleculerAdapters(
+  getToken: () => string | null,
+  getSiteCode: () => string
+): Adapters {
   return {
     auth: createMoleculerAuthAdapter(),
-    stock: createMoleculerStockAdapter(getToken),
-    production: createMoleculerProductionAdapter(getToken),
-    order: createMoleculerOrderAdapter(getToken),
-    shipment: createMoleculerShipmentAdapter(getToken),
+    stock: createMoleculerStockAdapter(getToken, getSiteCode),
+    production: createMoleculerProductionAdapter(getToken, getSiteCode),
+    order: createMoleculerOrderAdapter(getToken, getSiteCode),
+    shipment: createMoleculerShipmentAdapter(getToken, getSiteCode),
     audit: createMoleculerAuditAdapter(getToken),
     reporting: createMoleculerReportingAdapter(getToken),
     notification: createMoleculerNotificationAdapter(getToken)

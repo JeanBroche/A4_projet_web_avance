@@ -8,7 +8,7 @@ import { documentUrlSchema } from "../../src/lib/schemas.js";
 export const documentUrlAction: ActionSchema = {
   async handler(ctx) {
     const params = parseParams(documentUrlSchema, ctx.params);
-    await requireAnyRole(ctx, params.accessToken, ["production", "logistique", "admin"]);
+    await requireAnyRole(ctx, params.accessToken, ["operateur", "logistique", "admin"]);
 
     const db = getDb();
     const record = await findDocumentById(db, params.documentId);

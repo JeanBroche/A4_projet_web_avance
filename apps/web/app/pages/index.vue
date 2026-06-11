@@ -6,8 +6,10 @@ definePageMeta({ layout: false })
 
 const { login, isLoading, error: authError } = useAuth()
 
+const config = useRuntimeConfig()
 const email = ref('operateur@aeronexis.local')
-const password = ref('operateur123')
+const password = ref('')
+const isGatewayMode = computed(() => config.public.apiAdapter === 'moleculer')
 const validationError = ref<string | null>(null)
 const error = computed(() => validationError.value ?? authError.value)
 
@@ -66,7 +68,12 @@ async function onSubmit() {
       </UForm>
 
       <p class="text-xs text-gray-400 text-center mt-4">
-        Comptes démo : operateur@, logistique@, commercial@, direction@, admin@ — mot de passe : [role]123
+        <template v-if="isGatewayMode">
+          Gateway : comptes seed ([role]@aeronexis.local) — mot de passe <code>SEED_ADMIN_PASSWORD</code>
+        </template>
+        <template v-else>
+          Mode mock : mot de passe <code>[role]123</code> (ex. operateur123)
+        </template>
       </p>
     </div>
   </div>

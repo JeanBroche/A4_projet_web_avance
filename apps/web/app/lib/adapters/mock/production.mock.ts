@@ -3,13 +3,15 @@ import { appendMockActivity } from '~/lib/adapters/mock/audit-store'
 import { getMockActorName } from '~/lib/adapters/mock/mock-actor'
 import { createInitialBatches } from '~/fixtures/production/batches'
 import { createInitialBomOrders } from '~/fixtures/production/bom'
+import { createInitialProducts } from '~/fixtures/production/products'
 import type { ProductionAdapter } from '~/lib/adapters/types'
 import { getMockStockLevels } from '~/lib/adapters/mock/stock.mock'
-import type { Batch, BatchStatus, BomItem, CreateBatchInput, CreateManufacturingOrderInput, ManufacturingOrder, ReportBomAnomalyInput } from '~/types'
+import type { Batch, BatchStatus, BomItem, CreateBatchInput, CreateManufacturingOrderInput, CreateProductInput, ManufacturingOrder, Product, UpdateProductInput } from '~/types'
 import { ApiClientError } from '~/lib/api/envelope'
 
 const bomStore: ManufacturingOrder[] = createInitialBomOrders()
 const batchStore: Batch[] = createInitialBatches()
+let productStore: Product[] = createInitialProducts()
 let nextBomId = 7
 let nextBatchId = 3
 let nextLotNum = 3
@@ -26,16 +28,16 @@ function syncBomStock(bom: BomItem[]): BomItem[] {
   }))
 }
 
-function detectBomAnomaly(bom: BomItem[]): boolean {
-  return syncBomStock(bom).some(item => item.qtyStock < item.qtyNeeded)
-}
-
 export function getMockBomOrders(): ManufacturingOrder[] {
   return bomStore
 }
 
 export function getMockBatches(): Batch[] {
   return batchStore
+}
+
+export function getMockProducts(): Product[] {
+  return productStore
 }
 
 export function createMockProductionAdapter(): ProductionAdapter {
@@ -51,8 +53,7 @@ export function createMockProductionAdapter(): ProductionAdapter {
       const order: ManufacturingOrder = {
         id: nextBomId++,
         ...input,
-        bom,
-        hasBomAnomaly: detectBomAnomaly(bom)
+        bom
       }
       bomStore.unshift(order)
       appendMockActivity({
@@ -70,11 +71,7 @@ export function createMockProductionAdapter(): ProductionAdapter {
       const idx = bomStore.findIndex(o => o.id === input.id)
       if (idx === -1) throw new ApiClientError('NOT_FOUND', 'OF introuvable')
       const bom = syncBomStock(input.bom)
-      bomStore[idx] = {
-        ...bomStore[idx]!,
-        bom,
-        hasBomAnomaly: detectBomAnomaly(bom)
-      }
+      bomStore[idx] = { ...bomStore[idx]!, bom }
       const order = bomStore[idx]!
       appendMockActivity({
         type: 'bom_validated',
@@ -177,20 +174,48 @@ export function createMockProductionAdapter(): ProductionAdapter {
       return batchStore[idx]!
     },
 
-    async reportBomAnomaly(input: ReportBomAnomalyInput) {
+    async listProducts() {
       await simulateDelay()
-      const idx = bomStore.findIndex(o => o.id === input.bomOrderId)
-      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'OF introuvable')
-      bomStore[idx] = { ...bomStore[idx]!, hasBomAnomaly: true }
-      const order = bomStore[idx]!
-      appendMockActivity({
-        type: 'anomaly',
-        title: 'Incident nomenclature',
+      return [...productStore]
+    },
+
+    async getProduct(productCode) {
+      await simulateDelay()
+      const product = productStore.find(p => p.productCode === productCode)
+      if (!product) throw new ApiClientError('NOT_FOUND', 'Produit introuvable')
+      return product
+    },
+
+    async createProduct(input: CreateProductInput) {
+      await simulateDelay()
+      const product: Product = {
+        id: `prod-${Date.now()}`,
+        productCode: input.productCode,
         description: input.description,
-        user: getMockActorName(),
-        meta: order.ofNumber
-      })
-      return order
+        quantity: input.quantity,
+        reservedQuantity: 0,
+        siteCode: input.siteCode ?? 'SITE-LYO'
+      }
+      productStore.unshift(product)
+      return product
+    },
+
+    async updateProduct(input: UpdateProductInput) {
+      await simulateDelay()
+      const idx = productStore.findIndex(p => p.productCode === input.productCode)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Produit introuvable')
+      productStore[idx] = {
+        ...productStore[idx]!,
+        description: input.description ?? productStore[idx]!.description,
+        quantity: input.quantity ?? productStore[idx]!.quantity,
+        siteCode: input.siteCode ?? productStore[idx]!.siteCode
+      }
+      return productStore[idx]!
+    },
+
+    async deleteProduct(productCode) {
+      await simulateDelay()
+      productStore = productStore.filter(p => p.productCode !== productCode)
     }
   }
 }

@@ -14,7 +14,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: '/api',
-      apiAdapter: process.env.NUXT_PUBLIC_API_ADAPTER || 'mock'
+      apiAdapter: process.env.NUXT_PUBLIC_API_ADAPTER || 'moleculer'
     }
   },
 

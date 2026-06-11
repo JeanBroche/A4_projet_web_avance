@@ -7,7 +7,7 @@ import { documentListSchema } from "../../src/lib/schemas.js";
 export const documentListAction: ActionSchema = {
   async handler(ctx) {
     const params = parseParams(documentListSchema, ctx.params);
-    await requireAnyRole(ctx, params.accessToken, ["production", "logistique", "admin"]);
+    await requireAnyRole(ctx, params.accessToken, ["operateur", "logistique", "admin"]);
 
     const db = getDb();
     const items = await findDocumentsByLotId(db, params.lotId);

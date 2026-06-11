@@ -9,7 +9,7 @@ export const documentUploadAction: ActionSchema = {
   async handler(this: Service, ctx) {
     const params = parseParams(documentUploadSchema, ctx.params);
     const auth = await requireAnyRole(ctx, params.accessToken, [
-      "production",
+      "operateur",
       "logistique",
       "admin"
     ]);

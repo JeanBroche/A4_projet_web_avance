@@ -9,7 +9,6 @@ import {
 } from '~/lib/adapters/mock/reservation-store'
 import { CATEGORY_EMOJI, createInitialParts } from '~/fixtures/stock/parts'
 import { createInitialReservations } from '~/fixtures/stock/reservations'
-import { createInitialReturned } from '~/fixtures/stock/returned'
 import type { StockAdapter } from '~/lib/adapters/types'
 import { ApiClientError } from '~/lib/api/envelope'
 import {
@@ -17,18 +16,14 @@ import {
   getMockSupplierDelays
 } from '~/lib/adapters/mock/supplier-delay-store'
 import type {
-  CreateReturnItemInput,
   CreateStockLevelInput,
-  ReturnItem,
   RuptureForecast,
   StockLevel,
   SupplierDelayInput
 } from '~/types'
 
 let partsStore: StockLevel[] = createInitialParts()
-let returnedStore: ReturnItem[] = createInitialReturned()
 let nextPartId = 11
-let nextReturnId = 7
 
 seedMockReservations(createInitialReservations())
 
@@ -51,10 +46,6 @@ const reservationDeps = {
 
 export function getMockStockLevels(): StockLevel[] {
   return partsStore
-}
-
-function formatDate(): string {
-  return new Date().toLocaleDateString('fr-FR')
 }
 
 function toApiError(error: unknown): never {
@@ -112,41 +103,6 @@ export function createMockStockAdapter(): StockAdapter {
     async deleteLevel(id: number) {
       await simulateDelay()
       partsStore = partsStore.filter(p => p.id !== id)
-    },
-
-    async listReturned() {
-      await simulateDelay()
-      return [...returnedStore]
-    },
-
-    async createReturned(input: CreateReturnItemInput) {
-      await simulateDelay()
-      const item: ReturnItem = {
-        id: nextReturnId++,
-        emoji: '📦',
-        name: input.name,
-        reference: input.reference,
-        qty: input.qty,
-        state: input.state,
-        reason: input.reason,
-        date: formatDate(),
-        of: input.of
-      }
-      returnedStore.unshift(item)
-      return item
-    },
-
-    async updateReturned(id: number, qty: number, state: ReturnItem['state']) {
-      await simulateDelay()
-      const idx = returnedStore.findIndex(i => i.id === id)
-      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Article retourné introuvable')
-      returnedStore[idx] = { ...returnedStore[idx]!, qty, state }
-      return returnedStore[idx]!
-    },
-
-    async deleteReturned(id: number) {
-      await simulateDelay()
-      returnedStore = returnedStore.filter(i => i.id !== id)
     },
 
     async listReservations(ofId?: string) {
@@ -250,6 +206,32 @@ export function createMockStockAdapter(): StockAdapter {
     async listSupplierDelays() {
       await simulateDelay(60)
       return getMockSupplierDelays()
+    },
+
+    async listConsolidatedLevels() {
+      await simulateDelay()
+      return partsStore.map(syncLevel)
+    },
+
+    async listAlerts() {
+      await simulateDelay(60)
+      return partsStore
+        .filter(p => p.available < p.minQty)
+        .map(p => ({
+          id: `alert-${p.reference}`,
+          materialCode: p.reference,
+          materialName: p.name,
+          severity: p.available === 0 ? 'critical' as const : 'warning' as const,
+          message: p.available === 0 ? 'Rupture de stock' : 'Stock sous le seuil minimum'
+        }))
+    },
+
+    async createReturnMovement(materialReference, quantity) {
+      await simulateDelay()
+      const idx = partsStore.findIndex(p => p.reference === materialReference || String(p.id) === materialReference)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Référence introuvable')
+      const part = partsStore[idx]!
+      partsStore[idx] = syncLevel({ ...part, qty: part.qty + quantity })
     }
   }
 }

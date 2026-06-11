@@ -53,13 +53,18 @@ export const createOrderSchema = z.object({
   emoji: z.string().min(1)
 })
 
-export const createReturnedSchema = z.object({
-  name: z.string().trim().min(1, 'Désignation requise'),
-  reference: z.string().trim().min(1, 'Référence requise'),
-  qty: z.coerce.number().int().min(1, 'Quantité minimale : 1'),
-  state: z.enum(['neuf', 'usagé', 'défectueux']),
-  reason: z.enum(['défaut_fabrication', 'erreur_commande', 'non_conforme', 'excédent']),
-  of: z.string().optional()
+export const createProductSchema = z.object({
+  productCode: z.string().trim().min(1, 'Code produit requis'),
+  description: z.string().trim().min(1, 'Description requise'),
+  quantity: z.coerce.number().int().min(0, 'Quantité invalide'),
+  siteCode: z.string().trim().optional()
+})
+
+export const updateProductSchema = z.object({
+  productCode: z.string().trim().min(1),
+  description: z.string().trim().min(1).optional(),
+  quantity: z.coerce.number().int().min(0).optional(),
+  siteCode: z.string().trim().optional()
 })
 
 export const createShipmentSchema = z.object({

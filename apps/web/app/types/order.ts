@@ -28,6 +28,7 @@ export interface CreateOrderInput {
   carrier: string
   emoji: string
   priority?: OrderPriority
+  productCode?: string
 }
 
 export interface ClientStats {

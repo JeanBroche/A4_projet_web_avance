@@ -49,20 +49,6 @@ function buildLiveNotifications(): AppNotification[] {
     }
   }
 
-  for (const o of getMockOrders()) {
-    if (o.hasAnomaly) {
-      items.push({
-        id: `order-anomaly-${o.id}`,
-        severity: 'warning',
-        title: 'Anomalie commande',
-        message: `${o.orderNumber} — ${o.client}`,
-        source: 'order',
-        read: false,
-        createdAt: new Date(now - 5400000)
-      })
-    }
-  }
-
   for (const b of getMockBatches()) {
     if (b.hasAnomaly) {
       items.push({
@@ -73,20 +59,6 @@ function buildLiveNotifications(): AppNotification[] {
         source: 'production',
         read: false,
         createdAt: new Date(now - 900000)
-      })
-    }
-  }
-
-  for (const of_ of getMockBomOrders()) {
-    if (of_.hasBomAnomaly) {
-      items.push({
-        id: `bom-anomaly-${of_.id}`,
-        severity: 'warning',
-        title: 'Rupture nomenclature',
-        message: `${of_.ofNumber} — matières insuffisantes`,
-        source: 'production',
-        read: false,
-        createdAt: new Date(now - 10800000)
       })
     }
   }
@@ -106,11 +78,26 @@ function buildLiveNotifications(): AppNotification[] {
   return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 }
 
+const readMockIds = new Set<string>()
+
 export function createMockNotificationAdapter(): NotificationAdapter {
   return {
     async list() {
       await simulateDelay(80)
-      return buildLiveNotifications()
+      return buildLiveNotifications().map(n => ({
+        ...n,
+        read: readMockIds.has(n.id)
+      }))
+    },
+
+    async markAsRead(id) {
+      await simulateDelay(50)
+      readMockIds.add(id)
+    },
+
+    async unreadCount() {
+      await simulateDelay(50)
+      return buildLiveNotifications().filter(n => !readMockIds.has(n.id)).length
     }
   }
 }

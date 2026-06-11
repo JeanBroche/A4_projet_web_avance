@@ -41,21 +41,6 @@ export interface CreateReservationInput {
   lines: CreateReservationLineInput[]
 }
 
-export type ReturnState = 'neuf' | 'usagé' | 'défectueux'
-export type ReturnReason = 'défaut_fabrication' | 'erreur_commande' | 'non_conforme' | 'excédent'
-
-export interface ReturnItem {
-  id: number
-  emoji: string
-  name: string
-  reference: string
-  qty: number
-  state: ReturnState
-  reason: ReturnReason
-  date: string
-  of?: string
-}
-
 export interface CreateStockLevelInput {
   name: string
   reference: string
@@ -65,15 +50,6 @@ export interface CreateStockLevelInput {
   qty: number
   unit: StockUnit
   minQty: number
-}
-
-export interface CreateReturnItemInput {
-  name: string
-  reference: string
-  qty: number
-  state: ReturnState
-  reason: ReturnReason
-  of?: string
 }
 
 /** Score de risque de rupture (0 = faible, 100 = critique). */

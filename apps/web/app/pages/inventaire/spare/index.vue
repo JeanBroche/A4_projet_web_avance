@@ -10,9 +10,9 @@ const UButton = resolveComponent('UButton')
 const UBadge  = resolveComponent('UBadge')
 
 const {
-  levels, reservations, status, error, isMutating,
-  refreshLevels, refreshReservations, refreshRuptureForecast,
-  ruptureForecast, reportSupplierDelay,
+  levels, reservations, alerts, status, error, isMutating,
+  refresh, reportSupplierDelay,
+  ruptureForecast,
   createLevel, updateLevel, deleteLevel
 } = useStock()
 const { canManageStock, pageSubtitle } = useRoleCapabilities()
@@ -21,9 +21,7 @@ const activeReservations = computed(() =>
   reservations.value.filter(r => r.status === 'ACTIVE')
 )
 
-onMounted(async () => {
-  await Promise.all([refreshLevels(), refreshReservations(), refreshRuptureForecast()])
-})
+onMounted(() => refresh())
 
 const topRuptureRisks = computed(() =>
   ruptureForecast.value.filter(f => f.score >= 30).slice(0, 5)
@@ -241,7 +239,7 @@ function openEdit(p: Part) {
 async function confirmEdit() {
   if (!editTarget.value) return
   await updateLevel(editTarget.value.id, editQty.value)
-  await refreshRuptureForecast()
+  await refresh()
   isEditModalOpen.value = false
 }
 
@@ -281,7 +279,7 @@ async function confirmDelete() {
       </div>
 
       <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
-      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refreshLevels">Réessayer</UButton>
+      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refresh">Réessayer</UButton>
 
       <div v-if="status === 'pending'" class="space-y-3 mb-5">
         <USkeleton v-for="i in 4" :key="i" class="h-16 w-full" />
@@ -307,13 +305,32 @@ async function confirmDelete() {
         </div>
       </div>
 
+      <UCard v-if="status !== 'pending' && alerts.length > 0" class="border-none shadow-sm mb-5">
+        <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+          <UIcon name="i-lucide-bell-ring" class="text-red-500" />
+          Alertes stock (gateway)
+        </h2>
+        <ul class="space-y-2">
+          <li
+            v-for="alert in alerts.slice(0, 6)"
+            :key="alert.id"
+            class="text-sm flex items-start gap-2"
+          >
+            <UBadge :color="alert.severity === 'critical' ? 'error' : 'warning'" variant="soft" size="xs">
+              {{ alert.materialCode }}
+            </UBadge>
+            <span class="text-gray-600">{{ alert.message }}</span>
+          </li>
+        </ul>
+      </UCard>
+
       <UCard v-if="status !== 'pending' && topRuptureRisks.length > 0" class="border-none shadow-sm mb-5">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
             <UIcon name="i-lucide-gauge" class="text-[#F57C00]" />
             Prévision de rupture (30 j)
           </h2>
-          <UButton size="xs" variant="ghost" icon="i-lucide-refresh-cw" @click="refreshRuptureForecast" />
+          <UButton size="xs" variant="ghost" icon="i-lucide-refresh-cw" @click="refresh" />
         </div>
         <div class="space-y-3">
           <div v-for="item in topRuptureRisks" :key="item.reference">

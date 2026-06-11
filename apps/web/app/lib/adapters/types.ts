@@ -7,7 +7,7 @@ import type {
   CreateBatchInput,
   CreateManufacturingOrderInput,
   CreateOrderInput,
-  CreateReturnItemInput,
+  CreateProductInput,
   CreateShipmentInput,
   CreateStockLevelInput,
   KpiDashboard,
@@ -19,16 +19,15 @@ import type {
   OrderHistoryEntry,
   OrderPriority,
   OrderStatus,
-  OrderValidationStatus,
+  Product,
   ReportAnomalyInput,
-  ReportBomAnomalyInput,
   ReportingDashboardOptions,
   RuptureForecast,
   SupplierDelay,
   SupplierDelayInput,
   UpdateBomOrderInput,
+  UpdateProductInput,
   AppNotification,
-  ReturnItem,
   Shipment,
   DeliveryStatus,
   CreateReservationInput,
@@ -40,20 +39,27 @@ import type {
 
 export interface AuthAdapter {
   login(credentials: LoginCredentials): Promise<LoginResult>
-  logout(refreshToken: string): Promise<void>
+  refresh(refreshToken: string): Promise<LoginResult>
+  logout(refreshToken: string, accessToken?: string | null): Promise<void>
   me(accessToken: string): Promise<User>
   switchRole?(userId: string, role: UserRole): Promise<User>
 }
 
+export interface StockAlert {
+  id: string
+  materialCode: string
+  materialName: string
+  severity: 'warning' | 'critical'
+  message: string
+}
+
 export interface StockAdapter {
   listLevels(): Promise<StockLevel[]>
+  listConsolidatedLevels(): Promise<StockLevel[]>
+  listAlerts(): Promise<StockAlert[]>
   createLevel(input: CreateStockLevelInput): Promise<StockLevel>
   updateLevel(id: number, qty: number): Promise<StockLevel>
   deleteLevel(id: number): Promise<void>
-  listReturned(): Promise<ReturnItem[]>
-  createReturned(input: CreateReturnItemInput): Promise<ReturnItem>
-  updateReturned(id: number, qty: number, state: ReturnItem['state']): Promise<ReturnItem>
-  deleteReturned(id: number): Promise<void>
   listReservations(ofId?: string): Promise<StockReservation[]>
   createReservation(input: CreateReservationInput): Promise<StockReservation[]>
   releaseReservation(id: number): Promise<StockReservation>
@@ -61,6 +67,7 @@ export interface StockAdapter {
   getRuptureForecast(): Promise<RuptureForecast[]>
   reportSupplierDelay(input: SupplierDelayInput): Promise<SupplierDelay>
   listSupplierDelays(): Promise<SupplierDelay[]>
+  createReturnMovement(materialId: string, quantity: number, reason?: string): Promise<void>
 }
 
 export interface ProductionAdapter {
@@ -73,7 +80,11 @@ export interface ProductionAdapter {
   updateBatchStatus(id: number, status: BatchStatus): Promise<Batch>
   reportAnomaly(input: ReportAnomalyInput): Promise<Batch>
   clearAnomaly(batchId: number): Promise<Batch>
-  reportBomAnomaly(input: ReportBomAnomalyInput): Promise<ManufacturingOrder>
+  listProducts(): Promise<Product[]>
+  getProduct(productCode: string): Promise<Product>
+  createProduct(input: CreateProductInput): Promise<Product>
+  updateProduct(input: UpdateProductInput): Promise<Product>
+  deleteProduct(productCode: string): Promise<void>
 }
 
 export interface AppendActivityInput {
@@ -85,6 +96,12 @@ export interface AppendActivityInput {
   meta?: string
 }
 
+export interface OrderDelayRisk {
+  orderId: number
+  riskLevel: 'low' | 'medium' | 'high'
+  message: string
+}
+
 export interface OrderAdapter {
   list(): Promise<Order[]>
   create(input: CreateOrderInput): Promise<Order>
@@ -92,10 +109,9 @@ export interface OrderAdapter {
   validate(id: number): Promise<Order>
   reject(id: number): Promise<Order>
   changePriority(id: number, priority: OrderPriority): Promise<Order>
-  reportAnomaly(id: number): Promise<Order>
-  clearAnomaly(id: number): Promise<Order>
   getClientStats(client: string): Promise<ClientStats>
   getOrderHistory(orderId: number): Promise<OrderHistoryEntry[]>
+  getDelayRisk(orderId: number): Promise<OrderDelayRisk | null>
 }
 
 export interface ShipmentAdapter {
@@ -106,8 +122,10 @@ export interface ShipmentAdapter {
 
 export interface AuditAdapter {
   listActivities(): Promise<Activity[]>
+  listCriticalEvents(): Promise<Activity[]>
   append(input: AppendActivityInput): Promise<Activity>
   traceLot(lotNumber: string): Promise<LotTraceTimeline>
+  exportLot(lotNumber: string): Promise<string>
 }
 
 export interface ReportingAdapter {
@@ -116,6 +134,8 @@ export interface ReportingAdapter {
 
 export interface NotificationAdapter {
   list(): Promise<AppNotification[]>
+  markAsRead(id: string): Promise<void>
+  unreadCount(): Promise<number>
 }
 
 export interface Adapters {

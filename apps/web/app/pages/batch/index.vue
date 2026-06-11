@@ -5,7 +5,7 @@ import type { Batch, BatchStatus, BomItem, Priority } from '~/types'
 definePageMeta({ layout: 'sidebar' })
 
 const { batches, bomOrders, status, error, isMutating, refreshBatches, refreshBom, createBatch, updateBatchStatus, reportAnomaly, clearAnomaly } = useProduction()
-const { timeline, status: traceStatus, error: traceError, trace, reset: resetTrace } = useLotTrace()
+const { timeline, status: traceStatus, error: traceError, trace, reset: resetTrace, exportTrace } = useLotTrace()
 const { canManageBatches, pageSubtitle } = useRoleCapabilities()
 const route = useRoute()
 
@@ -145,6 +145,11 @@ async function openTraceModal() {
 function closeTraceModal() {
   isTraceModalOpen.value = false
   resetTrace()
+}
+
+async function downloadTraceExport() {
+  if (!selected.value) return
+  await exportTrace(selected.value.lotNumber)
 }
 
 function formatTraceDate(d: Date) {
@@ -361,7 +366,16 @@ function formatTraceDate(d: Date) {
             Aucun événement de traçabilité.
           </p>
 
-          <div class="flex justify-end pt-4 mt-4 border-t border-gray-100">
+          <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-gray-100">
+            <UButton
+              v-if="timeline"
+              icon="i-lucide-download"
+              variant="outline"
+              color="primary"
+              @click="downloadTraceExport"
+            >
+              Exporter
+            </UButton>
             <UButton variant="ghost" color="neutral" @click="closeTraceModal">Fermer</UButton>
           </div>
         </div>

@@ -27,6 +27,7 @@ type SmokeCase = {
 
 const restSmokeCases: SmokeCase[] = [
   { name: 'stock levels', path: '/api/stock/levels' },
+  { name: 'stock reservations', path: '/api/stock/reservations' },
   { name: 'order history', path: '/api/commercial/orders/history' },
   { name: 'production BOM', path: '/api/production/bom' },
   { name: 'production batches', path: '/api/production/batches' },
@@ -57,8 +58,13 @@ async function main() {
     throw new Error(`POST /api/auth/login failed: ${login.response.status} ${JSON.stringify(login.body)}`)
   }
 
-  const loginData = login.body as { data?: { accessToken?: string }; accessToken?: string }
-  const token = loginData.data?.accessToken ?? loginData.accessToken
+  const loginPayload = login.body as {
+    data?: { accessToken?: string, refreshToken?: string }
+    accessToken?: string
+    refreshToken?: string
+  }
+  const token = loginPayload.data?.accessToken ?? loginPayload.accessToken
+  const refreshToken = loginPayload.data?.refreshToken ?? loginPayload.refreshToken
   if (!token) {
     throw new Error('Login response missing accessToken')
   }
@@ -71,6 +77,24 @@ async function main() {
     throw new Error(`GET /api/auth/me failed: ${me.response.status}`)
   }
   console.log('✓ GET /api/auth/me')
+
+  const refresh = await request('/api/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken })
+  })
+  if (!refresh.response.ok) {
+    throw new Error(`POST /api/auth/refresh failed: ${refresh.response.status}`)
+  }
+  console.log('✓ POST /api/auth/refresh (public)')
+
+  const kpiSite = await request('/api/reporting/kpis/logistique/rupture?siteCode=SITE-LYO', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (!kpiSite.response.ok) {
+    console.warn(`⚠ KPI rupture with siteCode — ${kpiSite.response.status} (optionnel)`)
+  } else {
+    console.log('✓ GET /api/reporting/kpis/logistique/rupture?siteCode=SITE-LYO')
+  }
 
   for (const testCase of restSmokeCases) {
     const result = await request(testCase.path, {

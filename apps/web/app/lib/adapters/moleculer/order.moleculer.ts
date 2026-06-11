@@ -1,50 +1,211 @@
-/**
- * Adapter Moleculer — Order
- * Routes gateway prévues :
- *   GET    /api/orders                    → order.list
- *   POST   /api/orders                    → order.create
- *   PATCH  /api/orders/:id/status          → order.status
- *   POST   /api/orders/:id/validate       → order.order.validated
- *   POST   /api/orders/:id/reject         → order.order.rejected
- *   PATCH  /api/orders/:id/priority       → order.order.priority.changed
- */
 import { useApiClient } from '~/lib/api/client'
 import type { OrderAdapter } from '~/lib/adapters/types'
+import {
+  mapClientStatsToUi,
+  mapOrderHistoryToUi,
+  mapOrderToUi,
+  mapUiStatusToBackend
+} from '~/lib/mappers/order'
+import { isCuidLike, resolveStringIdByNumeric } from '~/lib/mappers/resolve-id'
+import { toNumericId } from '~/lib/mappers/id'
 
-export function createMoleculerOrderAdapter(getToken: () => string | null): OrderAdapter {
+export function createMoleculerOrderAdapter(
+  getToken: () => string | null,
+  getSiteCode: () => string
+): OrderAdapter {
   const { request } = useApiClient()
   const token = () => getToken()
+  const siteCode = () => getSiteCode()
+
+  async function resolveOrderId(numericOrCuid: number | string): Promise<string | null> {
+    if (isCuidLike(String(numericOrCuid))) return String(numericOrCuid)
+    const history = await request<{ items?: Array<Record<string, unknown>> }>(
+      '/commercial/orders/history',
+      { accessToken: token(), params: { limit: 200, siteCode: siteCode() } }
+    )
+    return resolveStringIdByNumeric(history.items ?? [], numericOrCuid)
+  }
+
+  async function resolveProductCode(): Promise<string> {
+    try {
+      const codes = import.meta.client
+        ? JSON.parse(sessionStorage.getItem('aeronexis-product-codes') ?? '[]') as string[]
+        : []
+      if (codes[0]) return codes[0]
+    } catch {
+      // ignore
+    }
+    return 'PROD-GENERIC'
+  }
 
   return {
-    list() {
-      return request('/orders', { accessToken: token() })
+    async list() {
+      const history = await request<{ items?: Array<Parameters<typeof mapOrderToUi>[0]> }>(
+        '/commercial/orders/history',
+        { accessToken: token(), params: { limit: 100, siteCode: siteCode() } }
+      )
+      const orders = history.items ?? []
+      if (orders.length === 0) {
+        const urgent = await request<Array<Parameters<typeof mapOrderToUi>[0]>>(
+          '/commercial/orders/urgent',
+          { accessToken: token(), params: { siteCode: siteCode() } }
+        )
+        return (urgent ?? []).map(mapOrderToUi)
+      }
+      return orders.map(mapOrderToUi)
     },
-    create(input) {
-      return request('/orders', { method: 'POST', body: input, accessToken: token() })
+
+    async create(input) {
+      const clients = await request<Array<Record<string, unknown>>>('/commercial/clients', {
+        accessToken: token(),
+        params: { siteCode: siteCode() }
+      })
+      let client = clients.find(c => c.name === input.client || c.code === input.client)
+      if (!client) {
+        client = await request<Record<string, unknown>>('/commercial/clients', {
+          method: 'PUT',
+          body: {
+            code: input.client.toUpperCase().replace(/\s+/g, '-').slice(0, 20),
+            name: input.client,
+            siteCode: siteCode()
+          },
+          accessToken: token()
+        })
+      }
+      const productCode = input.productCode ?? await resolveProductCode()
+      const order = await request<Parameters<typeof mapOrderToUi>[0]>('/commercial/orders', {
+        method: 'POST',
+        body: {
+          clientId: client.id,
+          siteCode: siteCode(),
+          isUrgent: input.priority === 'urgent',
+          lines: [{
+            productCode,
+            description: input.destination,
+            quantity: input.itemsCount,
+            unitPrice: 10000
+          }]
+        },
+        accessToken: token()
+      })
+      return mapOrderToUi(order)
     },
-    updateStatus(id, status) {
-      return request(`/orders/${id}/status`, { method: 'PATCH', body: { status }, accessToken: token() })
+
+    async updateStatus(id, status) {
+      const orderId = await resolveOrderId(id)
+      if (!orderId) throw new Error('NOT_FOUND')
+      const backendStatus = mapUiStatusToBackend(status)
+      if (backendStatus === 'SHIPPED') {
+        await request(`/commercial/orders/${encodeURIComponent(orderId)}/mark-shipped`, {
+          method: 'POST',
+          accessToken: token()
+        })
+      } else if (backendStatus === 'DELIVERED') {
+        await request(`/commercial/orders/${encodeURIComponent(orderId)}/mark-delivered`, {
+          method: 'POST',
+          accessToken: token()
+        })
+      }
+      const order = await request<Parameters<typeof mapOrderToUi>[0]>(
+        `/commercial/orders/${encodeURIComponent(orderId)}`,
+        { accessToken: token() }
+      )
+      return mapOrderToUi(order)
     },
-    validate(id) {
-      return request(`/orders/${id}/validate`, { method: 'POST', accessToken: token() })
+
+    async validate(id) {
+      const orderId = await resolveOrderId(id)
+      if (!orderId) throw new Error('NOT_FOUND')
+      const order = await request<Parameters<typeof mapOrderToUi>[0]>(
+        `/commercial/orders/${encodeURIComponent(orderId)}/validate`,
+        { method: 'POST', accessToken: token() }
+      )
+      return mapOrderToUi(order)
     },
-    reject(id) {
-      return request(`/orders/${id}/reject`, { method: 'POST', accessToken: token() })
+
+    async reject(id) {
+      const orderId = await resolveOrderId(id)
+      if (!orderId) throw new Error('NOT_FOUND')
+      const order = await request<Parameters<typeof mapOrderToUi>[0]>(
+        `/commercial/orders/${encodeURIComponent(orderId)}/reject`,
+        {
+          method: 'POST',
+          body: { reason: 'Rejected via UI' },
+          accessToken: token()
+        }
+      )
+      return mapOrderToUi(order)
     },
-    changePriority(id, priority) {
-      return request(`/orders/${id}/priority`, { method: 'PATCH', body: { priority }, accessToken: token() })
+
+    async changePriority(id, priority) {
+      const orderId = await resolveOrderId(id)
+      if (!orderId) throw new Error('NOT_FOUND')
+      const order = await request<Parameters<typeof mapOrderToUi>[0]>(
+        `/commercial/orders/${encodeURIComponent(orderId)}/priority`,
+        {
+          method: 'PATCH',
+          body: { isUrgent: priority === 'urgent' },
+          accessToken: token()
+        }
+      )
+      return mapOrderToUi(order)
     },
-    reportAnomaly(id) {
-      return request(`/orders/${id}/anomaly`, { method: 'POST', accessToken: token() })
+
+    async getClientStats(client) {
+      const clients = await request<Array<Record<string, unknown>>>('/commercial/clients', {
+        accessToken: token(),
+        params: { siteCode: siteCode() }
+      })
+      const match = clients.find(c => c.name === client || c.code === client)
+      if (!match?.id) throw new Error('NOT_FOUND')
+      const stats = await request<Parameters<typeof mapClientStatsToUi>[0]>(
+        `/commercial/clients/${encodeURIComponent(String(match.id))}/stats`,
+        { accessToken: token() }
+      )
+      return mapClientStatsToUi(stats)
     },
-    clearAnomaly(id) {
-      return request(`/orders/${id}/anomaly`, { method: 'DELETE', accessToken: token() })
+
+    async getOrderHistory(orderId) {
+      const id = await resolveOrderId(orderId)
+      if (!id) throw new Error('NOT_FOUND')
+      const history = await request<
+        Array<Parameters<typeof mapOrderHistoryToUi>[0][number]>
+        | { items?: Array<Parameters<typeof mapOrderHistoryToUi>[0][number]> }
+      >(
+        `/commercial/orders/${encodeURIComponent(id)}/status`,
+        { accessToken: token() }
+      )
+      const entries = Array.isArray(history) ? history : (history.items ?? [])
+      return mapOrderHistoryToUi(entries)
     },
-    getClientStats(client) {
-      return request(`/orders/clients/${encodeURIComponent(client)}/stats`, { accessToken: token() })
-    },
-    getOrderHistory(orderId) {
-      return request(`/orders/${orderId}/history`, { accessToken: token() })
+
+    async getDelayRisk(orderId) {
+      const id = await resolveOrderId(orderId)
+      if (!id) return null
+      try {
+        const risk = await request<{
+          riskLevel?: string
+          level?: string
+          message?: string
+          score?: number
+        }>(
+          `/commercial/orders/${encodeURIComponent(id)}/delay-risk`,
+          { accessToken: token() }
+        )
+        const level = (risk.riskLevel ?? risk.level ?? 'low').toLowerCase()
+        const riskLevel = level === 'high' || level === 'critical'
+          ? 'high'
+          : level === 'medium' || level === 'warning'
+            ? 'medium'
+            : 'low'
+        return {
+          orderId: toNumericId(id),
+          riskLevel,
+          message: risk.message ?? 'Analyse du risque de retard'
+        }
+      } catch {
+        return null
+      }
     }
   }
 }

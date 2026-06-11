@@ -5,7 +5,7 @@ import {
   createSiteMarginOrders
 } from '~/fixtures/reporting/dashboard'
 import type { ReportingDashboardOptions } from '~/types'
-import { getMockBatches, getMockBomOrders } from '~/lib/adapters/mock/production.mock'
+import { getMockBatches } from '~/lib/adapters/mock/production.mock'
 import { getMockOrders } from '~/lib/adapters/mock/order.mock'
 import { getMockShipments } from '~/lib/adapters/mock/shipment.mock'
 import { getMockStockLevels } from '~/lib/adapters/mock/stock.mock'
@@ -14,14 +14,11 @@ import type { CriticalIncident } from '~/types'
 
 function computeLiveMetrics() {
   const batches = getMockBatches()
-  const bomAnomalies =
-    getMockBomOrders().filter(o => o.hasBomAnomaly).length
-    + batches.filter(b => b.hasAnomaly).length
+  const bomAnomalies = batches.filter(b => b.hasAnomaly).length
 
   const delayedShipments = getMockShipments().filter(
     s => s.status === 'delayed' || s.delayDays > 0
   ).length
-  const blockedOrders = getMockOrders().filter(o => o.hasAnomaly).length
   const lowStock = getMockStockLevels().filter(p => p.available > 0 && p.available < p.minQty).length
   const outOfStock = getMockStockLevels().filter(p => p.available === 0).length
 
@@ -61,20 +58,9 @@ function computeLiveMetrics() {
       targetQuery: { id: String(b.id) }
     })
   }
-  for (const o of getMockBomOrders().filter(x => x.hasBomAnomaly)) {
-    criticalIncidents.push({
-      id: `bom-${o.id}`,
-      label: 'Anomalie nomenclature',
-      detail: `${o.ofNumber} — ${o.name}`,
-      severity: 'warning',
-      targetRoute: '/bom',
-      targetQuery: { of: o.ofNumber }
-    })
-  }
-
   return {
     bomAnomalies,
-    delayedOrders: delayedShipments + blockedOrders + lowStock + outOfStock,
+    delayedOrders: delayedShipments + lowStock + outOfStock,
     yieldRate,
     criticalIncidents: criticalIncidents.slice(0, 8)
   }

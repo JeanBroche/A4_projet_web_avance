@@ -28,5 +28,17 @@ export function useLotTrace() {
     error.value = null
   }
 
-  return { timeline, status, error, trace, reset }
+  async function exportTrace(lotNumber: string) {
+    const content = await adapters.audit.exportLot(lotNumber)
+    if (!import.meta.client) return
+    const blob = new Blob([content], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `trace-${lotNumber}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return { timeline, status, error, trace, reset, exportTrace }
 }

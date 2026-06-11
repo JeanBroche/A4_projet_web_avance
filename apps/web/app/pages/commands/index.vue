@@ -9,7 +9,6 @@ type PreparedOrder = Order
 const {
   orders, status, error, isMutating, refresh, create,
   updateStatus: updateOrderStatus, validate, reject, changePriority,
-  reportAnomaly, clearAnomaly,
   clientStats, orderHistory, loadClientStats, loadOrderHistory
 } = useOrders()
 
@@ -71,6 +70,8 @@ const carrierOptions = ['DHL Aviation', 'FedEx Priority', 'Geodis', 'UPS Cargo']
 
 const search = ref('')
 const selected = ref<PreparedOrder | null>(null)
+const delayRisk = ref<{ riskLevel: 'low' | 'medium' | 'high', message: string } | null>(null)
+const adapters = useAdapters()
 
 // États des Modales
 const isModalOpen = ref(false)
@@ -99,10 +100,12 @@ const filteredOrders = computed(() =>
 async function openModal(order: PreparedOrder) {
   selected.value = orders.value.find(item => item.id === order.id) || null
   isModalOpen.value = true
+  delayRisk.value = null
   if (selected.value) {
     await Promise.all([
       loadClientStats(selected.value.client),
-      loadOrderHistory(selected.value.id)
+      loadOrderHistory(selected.value.id),
+      adapters.order.getDelayRisk(selected.value.id).then(r => { delayRisk.value = r })
     ])
   }
 }
@@ -166,17 +169,6 @@ async function handleReject(order: PreparedOrder) {
 
 async function handlePriorityChange(order: PreparedOrder, priority: OrderPriority) {
   await changePriority(order.id, priority)
-  if (selected.value?.id === order.id) {
-    selected.value = orders.value.find(o => o.id === order.id) ?? null
-  }
-}
-
-async function toggleAnomaly(order: PreparedOrder) {
-  if (order.hasAnomaly) {
-    await clearAnomaly(order.id)
-  } else {
-    await reportAnomaly(order.id)
-  }
   if (selected.value?.id === order.id) {
     selected.value = orders.value.find(o => o.id === order.id) ?? null
   }
@@ -290,7 +282,6 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
               </div>
             </div>
 
-            <div v-if="order.hasAnomaly" class="w-2 h-2 rounded-full bg-red-500 animate-ping absolute top-3 right-3" />
           </div>
 
           <div class="space-y-2 mb-4 text-xs text-gray-600">
@@ -320,17 +311,6 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
                 {{ statusConfig[order.status].label }}
               </UButton>
             </UDropdownMenu>
-
-            <UTooltip :text="order.hasAnomaly ? 'Retirer l\'anomalie' : 'Déclarer une anomalie'">
-              <UButton
-                :icon="order.hasAnomaly ? 'i-lucide-alert-octagon' : 'i-lucide-alert-triangle'"
-                :color="order.hasAnomaly ? 'error' : 'neutral'"
-                :variant="order.hasAnomaly ? 'solid' : 'ghost'"
-                size="xs"
-                :aria-label="order.hasAnomaly ? 'Retirer l\'anomalie' : 'Déclarer une anomalie'"
-                @click="toggleAnomaly(order)"
-              />
-            </UTooltip>
           </div>
         </UCard>
       </div>
@@ -351,9 +331,6 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
                 <h2 id="order-detail-title" class="text-lg sm:text-xl font-bold text-gray-800 break-all">{{ selected.orderNumber }}</h2>
                 <div class="flex flex-wrap items-center gap-2 mt-0.5">
                   <span class="text-sm font-semibold text-[#0F62BC]">{{ selected.client }}</span>
-                  <span v-if="selected.hasAnomaly" class="text-xs bg-red-50 text-red-600 font-medium px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <UIcon name="i-lucide-alert-octagon" /> Bloqué (Anomalie)
-                  </span>
                 </div>
               </div>
             </div>
@@ -383,13 +360,13 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
           />
 
           <UAlert
-            v-if="selected.hasAnomaly"
-            icon="i-lucide-alert-triangle"
-            color="error"
+            v-if="delayRisk && delayRisk.riskLevel !== 'low'"
+            icon="i-lucide-triangle-alert"
+            :color="delayRisk.riskLevel === 'high' ? 'error' : 'warning'"
             variant="soft"
-            title="Alerte logistique"
-            description="L'expédition de cette commande est suspendue suite au signalement d'une anomalie sur le colisage."
-            class="mb-6"
+            title="Risque de retard"
+            :description="delayRisk.message"
+            class="mb-4"
           />
 
           <div class="bg-gray-50 rounded-2xl p-4 space-y-3 mb-6">
@@ -518,17 +495,6 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
                   Rejeter
                 </UButton>
               </template>
-              <UButton
-                v-if="canManageOrders"
-                :icon="selected.hasAnomaly ? 'i-lucide-check-circle' : 'i-lucide-alert-triangle'"
-                :color="selected.hasAnomaly ? 'success' : 'error'"
-                variant="subtle"
-                size="sm"
-                :aria-label="selected.hasAnomaly ? 'Lever le blocage anomalie' : 'Signaler une anomalie'"
-                @click="toggleAnomaly(selected!)"
-              >
-                {{ selected.hasAnomaly ? 'Lever le blocage' : 'Signaler une anomalie' }}
-              </UButton>
             </div>
             
             <UButton class="bg-[#0F62BC] text-white hover:bg-[#156FD4]" @click="isModalOpen = false">

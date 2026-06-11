@@ -88,28 +88,6 @@ export function useOrders() {
     }
   }
 
-  async function reportAnomaly(id: number) {
-    isMutating.value = true
-    try {
-      await adapters.order.reportAnomaly(id)
-      await refresh()
-      await syncNotificationsAfterMutation()
-    } finally {
-      isMutating.value = false
-    }
-  }
-
-  async function clearAnomaly(id: number) {
-    isMutating.value = true
-    try {
-      await adapters.order.clearAnomaly(id)
-      await refresh()
-      await syncNotificationsAfterMutation()
-    } finally {
-      isMutating.value = false
-    }
-  }
-
   async function loadClientStats(client: string) {
     try {
       clientStats.value = await adapters.order.getClientStats(client)
@@ -139,8 +117,6 @@ export function useOrders() {
     validate,
     reject,
     changePriority,
-    reportAnomaly,
-    clearAnomaly,
     loadClientStats,
     loadOrderHistory
   }

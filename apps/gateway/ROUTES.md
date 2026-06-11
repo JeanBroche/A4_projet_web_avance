@@ -17,6 +17,7 @@ Proxy HTTP 1:1 vers les actions Moleculer. Pas de BFF : le front Nuxt mappe les 
 | `POST` | `/api/stock/movements` | `stock.movement.create` |
 | `GET` | `/api/stock/movements` | `stock.movement.list` |
 | `POST` | `/api/stock/reservations` | `stock.reservation.create` |
+| `GET` | `/api/stock/reservations` | `stock.reservation.list` |
 | `POST` | `/api/stock/reservations/:id/release` | `stock.reservation.release` |
 | `POST` | `/api/stock/reservations/:id/cancel` | `stock.reservation.cancel` |
 | `GET` | `/api/stock/alerts` | `stock.alert.list` |

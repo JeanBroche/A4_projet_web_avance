@@ -7,6 +7,7 @@ export const restStockRoutes: RouteDefinition[] = [
   { method: "POST", path: "stock/movements", action: "stock.movement.create", layer: "REST" },
   { method: "GET", path: "stock/movements", action: "stock.movement.list", layer: "REST" },
   { method: "POST", path: "stock/reservations", action: "stock.reservation.create", layer: "REST" },
+  { method: "GET", path: "stock/reservations", action: "stock.reservation.list", layer: "REST" },
   { method: "POST", path: "stock/reservations/:id/release", action: "stock.reservation.release", layer: "REST" },
   { method: "POST", path: "stock/reservations/:id/cancel", action: "stock.reservation.cancel", layer: "REST" },
   { method: "GET", path: "stock/alerts", action: "stock.alert.list", layer: "REST" },

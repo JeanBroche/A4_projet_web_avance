@@ -23,6 +23,7 @@ import {
   movementListSchema,
   reservationByIdSchema,
   reservationCreateSchema,
+  reservationListSchema,
   supplierDelayListSchema,
   supplierDelayNotifySchema,
   thresholdUpsertSchema,
@@ -332,6 +333,29 @@ const StockService: ServiceSchema = {
     "reservation.cancel": {
       async handler(ctx) {
         return releaseOrCancel.call(this, ctx, "CANCELLED");
+      }
+    },
+    "reservation.list": {
+      async handler(ctx) {
+        const params = parseParams(reservationListSchema, ctx.params);
+        const auth = await requireStockRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
+        const reservations = await prisma.stockReservation.findMany({
+          where: {
+            ...(effectiveSite ? { siteCode: effectiveSite } : {}),
+            ...(params.ofId ? { ofId: params.ofId } : {}),
+            ...(params.status ? { status: params.status } : {})
+          },
+          orderBy: { createdAt: "desc" },
+          take: params.limit ?? 100,
+          skip: params.offset ?? 0,
+          include: {
+            material: {
+              select: { code: true, description: true, unit: true, siteCode: true }
+            }
+          }
+        });
+        return { reservations };
       }
     },
     "alert.list": {

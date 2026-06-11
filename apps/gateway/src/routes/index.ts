@@ -1,5 +1,5 @@
 import type { RouteDefinition } from "./types.js";
-import { restAuthRoutes } from "./auth.routes.js";
+import { restAuthPublicRoutes, restAuthRoutes } from "./auth.routes.js";
 import { restStockRoutes } from "./stock.routes.js";
 import { restOrderRoutes } from "./order.routes.js";
 import { restProductionRoutes } from "./production.routes.js";
@@ -17,7 +17,9 @@ import { restAuditAliases } from "./audit.routes.js";
 import { restNotificationAliases } from "./notification.routes.js";
 
 export const publicApiAliases = {
-  "POST auth/login": "auth.login"
+  "POST auth/login": "auth.login",
+  "POST auth/refresh": "auth.refresh",
+  "POST auth/logout": "auth.logout"
 } as const;
 
 export const protectedApiAliases = {
@@ -33,6 +35,7 @@ export const protectedApiAliases = {
 
 export const allRouteDefinitions: RouteDefinition[] = [
   { method: "POST", path: "auth/login", action: "auth.login", layer: "REST" },
+  ...restAuthPublicRoutes,
   ...restAuthRoutes,
   ...restStockRoutes,
   ...restOrderRoutes,

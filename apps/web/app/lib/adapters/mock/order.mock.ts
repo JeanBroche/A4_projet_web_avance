@@ -117,30 +117,6 @@ export function createMockOrderAdapter(): OrderAdapter {
       return order
     },
 
-    async reportAnomaly(id: number) {
-      await simulateDelay()
-      const idx = ordersStore.findIndex(o => o.id === id)
-      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Commande introuvable')
-      ordersStore[idx] = { ...ordersStore[idx]!, hasAnomaly: true }
-      const order = ordersStore[idx]!
-      appendMockActivity({
-        type: 'anomaly',
-        title: 'Anomalie commande',
-        description: `Anomalie logistique sur ${order.orderNumber}.`,
-        user: getMockActorName(),
-        meta: order.orderNumber
-      })
-      return order
-    },
-
-    async clearAnomaly(id: number) {
-      await simulateDelay()
-      const idx = ordersStore.findIndex(o => o.id === id)
-      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Commande introuvable')
-      ordersStore[idx] = { ...ordersStore[idx]!, hasAnomaly: false }
-      return ordersStore[idx]!
-    },
-
     async getClientStats(client: string) {
       await simulateDelay(80)
       const clientOrders = ordersStore.filter(o => o.client === client)
@@ -222,6 +198,24 @@ export function createMockOrderAdapter(): OrderAdapter {
         })
       }
       return history.sort((a, b) => a.at.getTime() - b.at.getTime())
+    },
+
+    async getDelayRisk(orderId: number) {
+      await simulateDelay(60)
+      const order = ordersStore.find(o => o.id === orderId)
+      if (!order) return null
+      if (order.priority === 'urgent' || order.hasAnomaly) {
+        return {
+          orderId,
+          riskLevel: 'high' as const,
+          message: 'Commande urgente ou flux impacté'
+        }
+      }
+      return {
+        orderId,
+        riskLevel: 'low' as const,
+        message: 'Délai dans les normes'
+      }
     }
   }
 }

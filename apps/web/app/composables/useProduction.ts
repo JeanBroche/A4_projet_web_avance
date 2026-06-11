@@ -6,8 +6,11 @@ import type {
   BatchStatus,
   CreateBatchInput,
   CreateManufacturingOrderInput,
+  CreateProductInput,
   ManufacturingOrder,
-  UpdateBomOrderInput
+  Product,
+  UpdateBomOrderInput,
+  UpdateProductInput
 } from '~/types'
 
 export function useProduction() {
@@ -15,6 +18,7 @@ export function useProduction() {
 
   const bomOrders = ref<ManufacturingOrder[]>([])
   const batches = ref<Batch[]>([])
+  const products = ref<Product[]>([])
   const status = ref<AsyncStatus>('idle')
   const error = ref<string | null>(null)
   const isMutating = ref(false)
@@ -37,6 +41,19 @@ export function useProduction() {
     error.value = null
     try {
       batches.value = await adapters.production.listBatches()
+      status.value = 'success'
+    } catch (e) {
+      const failure = toFailureResult(e)
+      status.value = 'failure'
+      error.value = failure.message
+    }
+  }
+
+  async function refreshProducts() {
+    status.value = 'pending'
+    error.value = null
+    try {
+      products.value = await adapters.production.listProducts()
       status.value = 'success'
     } catch (e) {
       const failure = toFailureResult(e)
@@ -119,11 +136,31 @@ export function useProduction() {
     }
   }
 
-  async function reportBomAnomaly(bomOrderId: number, description: string) {
+  async function createProduct(input: CreateProductInput) {
     isMutating.value = true
     try {
-      await adapters.production.reportBomAnomaly({ bomOrderId, description })
-      await refreshBom()
+      await adapters.production.createProduct(input)
+      await refreshProducts()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function updateProduct(input: UpdateProductInput) {
+    isMutating.value = true
+    try {
+      await adapters.production.updateProduct(input)
+      await refreshProducts()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function deleteProduct(productCode: string) {
+    isMutating.value = true
+    try {
+      await adapters.production.deleteProduct(productCode)
+      await refreshProducts()
     } finally {
       isMutating.value = false
     }
@@ -132,11 +169,13 @@ export function useProduction() {
   return {
     bomOrders,
     batches,
+    products,
     status,
     error,
     isMutating,
     refreshBom,
     refreshBatches,
+    refreshProducts,
     createBomOrder,
     updateBomOrder,
     updateBomOrderStatus,
@@ -144,6 +183,8 @@ export function useProduction() {
     updateBatchStatus,
     reportAnomaly,
     clearAnomaly,
-    reportBomAnomaly
+    createProduct,
+    updateProduct,
+    deleteProduct
   }
 }

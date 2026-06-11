@@ -1,29 +1,48 @@
-/**
- * Adapter Moleculer — Auth
- * Routes gateway prévues (issue #5) :
- *   POST /api/auth/login    → auth.login
- *   POST /api/auth/refresh  → auth.refresh
- *   POST /api/auth/logout   → auth.logout
- *   GET  /api/auth/me       → auth.me
- */
 import { useApiClient } from '~/lib/api/client'
 import type { AuthAdapter } from '~/lib/adapters/types'
-import type { LoginCredentials } from '~/types'
+import { mapAuthUser, mapLoginResult } from '~/lib/mappers/auth'
+import type { LoginCredentials, User } from '~/types'
 
 export function createMoleculerAuthAdapter(): AuthAdapter {
   const { request } = useApiClient()
 
   return {
-    login(credentials: LoginCredentials) {
-      return request('/auth/login', { method: 'POST', body: credentials })
+    async login(credentials: LoginCredentials) {
+      const data = await request<Parameters<typeof mapLoginResult>[0]>('/auth/login', {
+        method: 'POST',
+        body: credentials
+      })
+      return mapLoginResult(data)
     },
 
-    logout(refreshToken: string) {
-      return request('/auth/logout', { method: 'POST', body: { refreshToken } })
+    async refresh(refreshToken: string) {
+      const data = await request<Parameters<typeof mapLoginResult>[0]>('/auth/refresh', {
+        method: 'POST',
+        body: { refreshToken }
+      })
+      return mapLoginResult(data)
     },
 
-    me(accessToken: string) {
-      return request('/auth/me', { accessToken })
+    async logout(refreshToken: string, accessToken?: string | null) {
+      await request('/auth/logout', {
+        method: 'POST',
+        body: { refreshToken, ...(accessToken ? { accessToken } : {}) }
+      })
+    },
+
+    async me(accessToken: string) {
+      const data = await request<{
+        user: {
+          id: string
+          email: string
+          firstName?: string | null
+          lastName?: string | null
+          siteCode?: string | null
+          roles?: Array<{ code: string, label?: string }>
+        }
+        roles?: Array<{ code: string, label?: string }>
+      }>('/auth/me', { accessToken })
+      return mapAuthUser(data.user, data.roles)
     }
   }
 }
