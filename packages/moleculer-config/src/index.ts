@@ -45,7 +45,12 @@ export function createConfig(overrides: BrokerOptions = {}): BrokerOptions {
         colors: false
       }
     },
-    transporter: `Kafka://${process.env.KAFKA_BROKERS || "localhost:9092"}` as BrokerOptions["transporter"],
+    transporter: {
+      type: "Kafka",
+      options: {
+        bootstrapBrokers: [process.env.KAFKA_BROKERS || "kafka:9092"]
+      }
+    },
     serializer: "JSON",
     middlewares,
     ...overrides

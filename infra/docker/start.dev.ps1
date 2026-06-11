@@ -1,0 +1,1 @@
+docker compose -f docker-compose.dev.yml -f docker-compose.apps.yml up -d

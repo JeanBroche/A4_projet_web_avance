@@ -8,12 +8,14 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.service.json ./
 
 COPY packages/moleculer-config ./packages/moleculer-config
 COPY packages/services-shared ./packages/services-shared
+COPY packages/shared ./packages/shared
 COPY packages/redis-infra ./packages/redis-infra
+COPY packages/storage ./packages/storage
 
-COPY services/notification ./services/notification
+COPY apps/gateway ./apps/gateway
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @aeronexis/notification run build
+RUN pnpm --filter @aeronexis/gateway run build
 
 FROM node:24-alpine AS runner
 
@@ -24,6 +26,8 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app ./
 
-WORKDIR /app/services/notification
+WORKDIR /app/apps/gateway
+
+EXPOSE 4000
 
 CMD ["pnpm", "start"]

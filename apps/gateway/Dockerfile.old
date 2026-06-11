@@ -1,0 +1,52 @@
+# ==========================================================
+#                           1 BASE                          
+# ==========================================================
+FROM node:24-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable pnpm
+
+# ==========================================================
+#                           2 DEPS                          
+# ==========================================================
+FROM base AS deps
+WORKDIR /repo
+
+COPY tsconfig.service.json pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+
+RUN pnpm install --frozen-lockfile
+
+COPY packages/moleculer-config ./packages/moleculer-config
+COPY apps/gateway ./apps/gateway
+
+# ==========================================================
+#                          3 BUILD                          
+# ==========================================================
+FROM deps AS builder
+
+RUN pnpm --filter @aeronexis/moleculer-config build
+
+RUN pnpm --filter gateway build
+
+RUN pnpm --filter gateway deploy --legacy --prod /app/deploy
+
+# ==========================================================
+#                          4 RUNNER                         
+# ==========================================================
+FROM node:24-alpine AS runner
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 moleculer \
+ && adduser  --system --uid 1001 moleculer
+
+WORKDIR /app
+
+COPY --from=builder --chown=moleculer:moleculer /app/deploy .
+
+USER moleculer
+
+EXPOSE 4000
+
+CMD ["node_modules/.bin/moleculer-runner", \
+     "--config", "dist/moleculer.config.js", \
+     "dist/services/*.service.js"]
