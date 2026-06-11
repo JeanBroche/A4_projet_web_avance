@@ -67,7 +67,6 @@ export interface StockAdapter {
   getRuptureForecast(): Promise<RuptureForecast[]>
   reportSupplierDelay(input: SupplierDelayInput): Promise<SupplierDelay>
   listSupplierDelays(): Promise<SupplierDelay[]>
-  createReturnMovement(materialId: string, quantity: number, reason?: string): Promise<void>
 }
 
 export interface ProductionAdapter {

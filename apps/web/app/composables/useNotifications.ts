@@ -1,8 +1,7 @@
 import type { AppNotification } from '~/types'
 
-const readIds = useState<string[]>('notifications:read', () => [])
-
 export function useNotifications() {
+  const readIds = useState<string[]>('notifications:read', () => [])
   const adapters = useAdapters()
   const { canViewNotifications } = useRoleCapabilities()
   const config = useRuntimeConfig()

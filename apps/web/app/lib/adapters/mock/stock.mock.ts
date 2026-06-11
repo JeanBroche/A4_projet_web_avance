@@ -224,14 +224,6 @@ export function createMockStockAdapter(): StockAdapter {
           severity: p.available === 0 ? 'critical' as const : 'warning' as const,
           message: p.available === 0 ? 'Rupture de stock' : 'Stock sous le seuil minimum'
         }))
-    },
-
-    async createReturnMovement(materialReference, quantity) {
-      await simulateDelay()
-      const idx = partsStore.findIndex(p => p.reference === materialReference || String(p.id) === materialReference)
-      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Référence introuvable')
-      const part = partsStore[idx]!
-      partsStore[idx] = syncLevel({ ...part, qty: part.qty + quantity })
     }
   }
 }

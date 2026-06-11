@@ -1,1 +1,1 @@
-export { publicApiAliases, protectedApiAliases, allRouteDefinitions } from "./routes/index.js";
+export { publicApiAliases, protectedApiAliases, allRouteDefinitions, apiRouteWhitelist } from "./routes/index.js";

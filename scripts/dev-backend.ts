@@ -57,6 +57,9 @@ async function main() {
       ? "Batched startup on Windows — use pnpm dev:backend:parallel for all-at-once."
       : ""
   );
+  console.log(
+    "Tip: run pnpm dev:backend:stop before restarting to avoid Moleculer nodeID conflicts."
+  );
 
   await startInBatches(MICROSERVICES);
   await new Promise((resolve) => setTimeout(resolve, GATEWAY_DELAY_MS));

@@ -198,20 +198,6 @@ export function useStock() {
     }
   }
 
-  async function registerReturn(materialReference: string, quantity: number, reason?: string) {
-    isMutating.value = true
-    error.value = null
-    try {
-      await adapters.stock.createReturnMovement(materialReference, quantity, reason)
-      await refresh()
-    } catch (e) {
-      error.value = toFailureResult(e).message
-      throw e
-    } finally {
-      isMutating.value = false
-    }
-  }
-
   return {
     levels,
     reservations,
@@ -237,7 +223,6 @@ export function useStock() {
     supplierDelays,
     refreshRuptureForecast,
     refreshSupplierDelays,
-    reportSupplierDelay,
-    registerReturn
+    reportSupplierDelay
   }
 }

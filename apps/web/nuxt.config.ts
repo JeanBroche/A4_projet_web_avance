@@ -5,6 +5,10 @@ export default defineNuxtConfig({
     '@nuxt/ui'
   ],
 
+  ui: {
+    fonts: false
+  },
+
   devtools: {
     enabled: true
   },
@@ -12,6 +16,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
+    gatewayUrl: process.env.GATEWAY_URL || 'http://localhost:4000',
     ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
     ollamaModel: process.env.OLLAMA_MODEL || 'mistral:latest',
     public: {
@@ -25,15 +30,6 @@ export default defineNuxtConfig({
   },
 
   compatibilityDate: '2025-01-15',
-
-  nitro: {
-    devProxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true
-      }
-    }
-  },
 
   eslint: {
     config: {

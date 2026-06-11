@@ -50,11 +50,11 @@ export function applyHttpMeta(ctx: Context, req: IncomingRequest) {
     meta.correlationId = correlationId;
   }
 
-  if (ctx.params && typeof ctx.params === "object") {
-    const params = normalizeMsParams(ctx.params as Record<string, unknown>);
-    if (meta.accessToken && !params.accessToken) {
-      params.accessToken = meta.accessToken;
-    }
-    ctx.params = params;
+  const params = normalizeMsParams(
+    ctx.params && typeof ctx.params === "object" ? (ctx.params as Record<string, unknown>) : {}
+  );
+  if (meta.accessToken && !params.accessToken) {
+    params.accessToken = meta.accessToken;
   }
+  ctx.params = params;
 }

@@ -3,7 +3,7 @@ import ApiGateway from "moleculer-web";
 import { authorizeRequest } from "../src/authorize.js";
 import { applyHttpMeta } from "../src/http.js";
 import { formatHttpError } from "../src/errors.js";
-import { publicApiAliases, protectedApiAliases } from "../src/routes.js";
+import { publicApiAliases, protectedApiAliases, apiRouteWhitelist } from "../src/routes.js";
 import { authFacadeActions } from "../src/facades/auth.facade.js";
 import { checkGatewayHealth } from "../src/health.js";
 
@@ -25,7 +25,7 @@ function createRouteHooks(requireAuth: boolean) {
       _res: unknown
     ) {
       const meta = ctx.meta as Record<string, unknown>;
-      meta.$req = req;
+      meta.$req = { headers: req.headers };
       applyHttpMeta(ctx, req);
     },
     async onAuthorize(
@@ -80,11 +80,7 @@ const ApiService: ServiceSchema = {
           ...publicApiAliases,
           ...protectedApiAliases
         },
-        whitelist: [
-          "api.auth.login",
-          "api.auth.refresh",
-          "api.auth.logout"
-        ]
+        whitelist: [...apiRouteWhitelist]
       }
     ]
   } as Record<string, unknown>,

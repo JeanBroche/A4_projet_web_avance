@@ -64,7 +64,7 @@ ollama serve   # écoute sur :11434
 
 Variables optionnelles (`.env` racine) : `OLLAMA_BASE_URL`, `OLLAMA_MODEL`.
 
-Route Nitro : `POST /api/ai/of` (prioritaire sur le proxy gateway pour ce chemin).
+Route Nitro : `POST /api/ai/of` (`server/routes/api/ai/of.post.ts`, prioritaire sur le proxy gateway).
 
 ## Scripts
 

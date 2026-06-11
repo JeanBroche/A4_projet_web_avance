@@ -18,6 +18,7 @@
     "dev:audit": "pnpm --filter @aeronexis/audit dev",
     "dev:notification": "pnpm --filter @aeronexis/notification dev",
     "dev:backend": "node --import tsx scripts/dev-backend.ts",
+    "dev:backend:stop": "node --import tsx scripts/stop-backend.ts",
     "backend": "pnpm dev:backend",
     "typecheck:scripts": "tsc --project scripts/tsconfig.json",
     "dev:backend:parallel": "pnpm --parallel --filter @aeronexis/auth --filter @aeronexis/stock --filter @aeronexis/order --filter @aeronexis/production --filter @aeronexis/shipment --filter @aeronexis/reporting --filter @aeronexis/audit --filter @aeronexis/notification --filter @aeronexis/gateway dev",

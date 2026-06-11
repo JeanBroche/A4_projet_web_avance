@@ -47,4 +47,20 @@ export const allRouteDefinitions: RouteDefinition[] = [
   ...restNotificationRoutes
 ];
 
+/** moleculer-web whitelist — must include every proxied MS action pattern (not only gateway facade). */
+export const apiRouteWhitelist = [
+  "api.auth.login",
+  "api.auth.refresh",
+  "api.auth.logout",
+  "api.health",
+  "auth.**",
+  "stock.**",
+  "order.**",
+  "production.**",
+  "shipment.**",
+  "reporting.**",
+  "audit.**",
+  "notification.**"
+] as const;
+
 export * from "./types.js";

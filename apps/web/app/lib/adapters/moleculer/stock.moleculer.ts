@@ -235,21 +235,6 @@ export function createMoleculerStockAdapter(
         { params: { siteCode: siteCode() } }
       )
       return (items ?? []).map(mapSupplierDelayToUi)
-    },
-
-    async createReturnMovement(materialId, quantity, reason) {
-      const resolved = await resolveMaterialId(materialId)
-      if (!resolved) throw new Error('NOT_FOUND')
-      await request('/stock/movements', {
-        method: 'POST',
-        body: {
-          materialId: resolved,
-          siteCode: siteCode(),
-          type: 'IN',
-          quantity,
-          reason: reason ?? 'Retour article'
-        }
-      })
     }
   }
 }

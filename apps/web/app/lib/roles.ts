@@ -32,7 +32,6 @@ export const ROUTE_ROLES: Record<string, UserRole[]> = {
   '/inventaire': ['operateur', 'logistique', 'admin'],
   '/inventaire/spare': ['operateur', 'logistique', 'admin'],
   '/inventaire/products': ['operateur', 'logistique', 'admin'],
-  '/inventaire/returned': ['operateur', 'logistique', 'admin'],
   '/bom': ['operateur', 'logistique', 'admin'],
   '/batch': ['operateur', 'admin'],
   '/commands': ['commercial', 'admin'],

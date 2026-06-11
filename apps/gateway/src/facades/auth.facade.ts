@@ -1,5 +1,6 @@
 import type { Context, Service } from "moleculer";
 import { Errors } from "moleculer";
+import { unwrapResponse } from "@aeronexis/services-shared";
 import {
   clearAuthResponseCookies,
   getRefreshTokenFromRequest,
@@ -27,7 +28,9 @@ function getRequest(ctx: Context): { headers?: Record<string, string | string[] 
 export const authFacadeActions = {
   "auth.login": {
     async handler(this: Service, ctx: Context) {
-      const result = (await ctx.call("auth.login", ctx.params)) as AuthTokensResult;
+      const result = unwrapResponse(
+        await ctx.call("auth.login", ctx.params)
+      ) as AuthTokensResult;
       setAuthResponseCookies(ctx.meta as Record<string, unknown>, result.accessToken, result.refreshToken);
       return {
         user: result.user,
@@ -43,7 +46,9 @@ export const authFacadeActions = {
         throw new MoleculerClientError("Missing refresh token cookie", 401, "TOKEN_INVALID");
       }
 
-      const result = (await ctx.call("auth.refresh", { refreshToken })) as AuthTokensResult;
+      const result = unwrapResponse(
+        await ctx.call("auth.refresh", { refreshToken })
+      ) as AuthTokensResult;
       setAuthResponseCookies(ctx.meta as Record<string, unknown>, result.accessToken, result.refreshToken);
       return {
         user: result.user,

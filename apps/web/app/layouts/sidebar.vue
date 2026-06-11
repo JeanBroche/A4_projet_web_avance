@@ -33,8 +33,7 @@ const homeRoute = computed(() =>
 
 const inventaireChildren = [
   { label: 'Pièces détachées', icon: 'i-uil:screw', to: '/inventaire/spare' },
-  { label: 'Produits finis', icon: 'i-lucide-package-check', to: '/inventaire/products' },
-  { label: 'Articles retournés', icon: 'i-lucide-rotate-ccw', to: '/inventaire/returned' }
+  { label: 'Produits finis', icon: 'i-lucide-package-check', to: '/inventaire/products' }
 ]
 
 function getItems(state: 'collapsed' | 'expanded') {
