@@ -1,5 +1,10 @@
 import { simulateDelay } from '~/lib/api/client'
-import { computeKpiDashboard, createInitialMarginOrders } from '~/fixtures/reporting/dashboard'
+import {
+  computeKpiDashboard,
+  createConsolidatedMarginOrders,
+  createSiteMarginOrders
+} from '~/fixtures/reporting/dashboard'
+import type { ReportingDashboardOptions } from '~/types'
 import { getMockBatches, getMockBomOrders } from '~/lib/adapters/mock/production.mock'
 import { getMockOrders } from '~/lib/adapters/mock/order.mock'
 import { getMockShipments } from '~/lib/adapters/mock/shipment.mock'
@@ -31,7 +36,9 @@ function computeLiveMetrics() {
       id: `stock-${p.reference}`,
       label: 'Rupture stock',
       detail: `${p.name} (${p.reference})`,
-      severity: 'error'
+      severity: 'error',
+      targetRoute: '/inventaire/spare',
+      targetQuery: { ref: p.reference }
     })
   }
   for (const s of getMockShipments().filter(x => x.status === 'delayed')) {
@@ -39,15 +46,29 @@ function computeLiveMetrics() {
       id: `ship-${s.id}`,
       label: 'Expédition en retard',
       detail: `${s.shipmentNumber} — ${s.client}`,
-      severity: 'error'
+      severity: 'error',
+      targetRoute: '/delivery',
+      targetQuery: { id: String(s.id) }
     })
   }
   for (const b of batches.filter(x => x.hasAnomaly)) {
     criticalIncidents.push({
       id: `batch-${b.id}`,
       label: 'Incident lot',
-      detail: `${b.lotNumber} — ${b.productName}`,
-      severity: 'warning'
+      detail: `${b.lotNumber} — ${b.productName} (OF ${b.ofNumber})`,
+      severity: 'warning',
+      targetRoute: '/batch',
+      targetQuery: { id: String(b.id) }
+    })
+  }
+  for (const o of getMockBomOrders().filter(x => x.hasBomAnomaly)) {
+    criticalIncidents.push({
+      id: `bom-${o.id}`,
+      label: 'Anomalie nomenclature',
+      detail: `${o.ofNumber} — ${o.name}`,
+      severity: 'warning',
+      targetRoute: '/bom',
+      targetQuery: { of: o.ofNumber }
     })
   }
 
@@ -61,9 +82,23 @@ function computeLiveMetrics() {
 
 export function createMockReportingAdapter(): ReportingAdapter {
   return {
-    async getDashboard() {
+    async getDashboard(options?: ReportingDashboardOptions) {
       await simulateDelay()
-      return computeKpiDashboard(createInitialMarginOrders(), computeLiveMetrics())
+      const consolidated = options?.consolidated ?? false
+      const siteCode = options?.siteCode ?? 'SITE-LYO'
+      const effectiveSite = siteCode === 'SITE-HQ' ? 'SITE-LYO' : siteCode
+      const margins = consolidated
+        ? createConsolidatedMarginOrders()
+        : createSiteMarginOrders(effectiveSite)
+      const metrics = computeLiveMetrics()
+      const dashboard = computeKpiDashboard(margins, metrics)
+      if (consolidated) {
+        return {
+          ...dashboard,
+          delayedOrders: metrics.delayedOrders + 1
+        }
+      }
+      return dashboard
     }
   }
 }

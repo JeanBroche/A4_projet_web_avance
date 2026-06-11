@@ -37,7 +37,8 @@ export const ROUTE_ROLES: Record<string, UserRole[]> = {
   '/commands': ['commercial', 'admin'],
   '/delivery': ['commercial', 'logistique', 'admin'],
   '/activity': ['operateur', 'logistique', 'commercial', 'direction', 'admin'],
-  '/dashboard': ['direction', 'admin']
+  '/dashboard': ['direction', 'admin'],
+  '/notifications': ['logistique', 'direction', 'admin']
 }
 
 function normalizePath(path: string): string {

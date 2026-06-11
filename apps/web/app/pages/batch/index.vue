@@ -4,10 +4,25 @@ import type { Batch, BatchStatus, BomItem, Priority } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
 
-const { batches, status, error, isMutating, refreshBatches, createBatch, updateBatchStatus, reportAnomaly, clearAnomaly } = useProduction()
+const { batches, bomOrders, status, error, isMutating, refreshBatches, refreshBom, createBatch, updateBatchStatus, reportAnomaly, clearAnomaly } = useProduction()
+const { timeline, status: traceStatus, error: traceError, trace, reset: resetTrace } = useLotTrace()
 const { canManageBatches, pageSubtitle } = useRoleCapabilities()
+const route = useRoute()
 
-onMounted(() => refreshBatches())
+onMounted(async () => {
+  await Promise.all([refreshBatches(), refreshBom()])
+  const batchId = route.query.id
+  if (batchId) {
+    const lot = batches.value.find(b => b.id === Number(batchId))
+    if (lot) openModal(lot)
+  }
+})
+
+const ofOptions = computed(() =>
+  bomOrders.value
+    .filter(o => o.status !== 'done')
+    .map(o => ({ label: `${o.ofNumber} — ${o.name}`, value: o.ofNumber }))
+)
 
 const statusConfig = {
   pending:     { label: 'Planifié',  icon: 'i-lucide-clock',         class: 'text-gray-400 bg-gray-100' },
@@ -34,11 +49,13 @@ const selected = ref<Batch | null>(null)
 
 // Gestionnaires d'ouverture des Modales
 const isModalOpen = ref(false)
+const isTraceModalOpen = ref(false)
 const isCreateModalOpen = ref(false)
 const createFormError = ref<string | null>(null)
 
 // Données du formulaire réactif pour la création
 const createForm = ref({
+  ofNumber: '',
   productName: '',
   qty: 1,
   priority: 'normal' as Priority,
@@ -58,9 +75,18 @@ function openModal(batch: Batch) {
   isModalOpen.value = true
 }
 
+function onSelectOf(ofNumber: string) {
+  const of = bomOrders.value.find(o => o.ofNumber === ofNumber)
+  if (!of) return
+  createForm.value.ofNumber = ofNumber
+  createForm.value.productName = of.name
+  createForm.value.emoji = of.emoji
+  createForm.value.qty = of.qty
+}
+
 function openCreateModal() {
-  // Réinitialisation du formulaire à l'ouverture
   createForm.value = {
+    ofNumber: '',
     productName: '',
     qty: 1,
     priority: 'normal',
@@ -101,6 +127,28 @@ function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
   if (item.qtyStock === 0) return 'out'
   if (item.qtyStock < item.qtyNeeded) return 'low'
   return 'ok'
+}
+
+const traceSourceIcon: Record<string, string> = {
+  production: 'i-lucide-factory',
+  stock: 'i-lucide-package',
+  shipment: 'i-lucide-truck',
+  audit: 'i-lucide-scroll-text'
+}
+
+async function openTraceModal() {
+  if (!selected.value) return
+  isTraceModalOpen.value = true
+  await trace(selected.value.lotNumber)
+}
+
+function closeTraceModal() {
+  isTraceModalOpen.value = false
+  resetTrace()
+}
+
+function formatTraceDate(d: Date) {
+  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
@@ -160,7 +208,8 @@ function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
             </div>
             
             <h3 class="font-bold text-gray-800">{{ lot.lotNumber }}</h3>
-            <p class="text-sm text-gray-500 mb-4">{{ lot.productName }}</p>
+            <p class="text-sm text-gray-500">{{ lot.productName }}</p>
+            <p class="text-xs font-mono text-[#0F62BC] mb-4">{{ lot.ofNumber }}</p>
             
             <div class="flex items-center justify-between pt-3 border-t border-gray-50">
               <span class="text-xs font-medium text-gray-400">Qté: {{ lot.qty }}</span>
@@ -187,6 +236,7 @@ function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
               <div>
                 <h2 id="batch-detail-title" class="text-lg sm:text-xl font-bold text-gray-800 break-all">{{ selected.lotNumber }}</h2>
                 <p class="text-sm text-[#0F62BC] font-medium">{{ selected.productName }}</p>
+                <p class="text-xs font-mono text-gray-400 mt-0.5">OF {{ selected.ofNumber }}</p>
               </div>
             </div>
             
@@ -252,9 +302,67 @@ function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
             </div>
           </div>
 
-          <div class="flex justify-between items-center pt-4 border-t border-gray-100">
+          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 pt-4 border-t border-gray-100">
             <p class="text-xs text-gray-400">Créé le {{ selected.createdAt }}</p>
-            <UButton variant="ghost" color="neutral" @click="isModalOpen = false">Fermer</UButton>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                icon="i-lucide-git-branch"
+                color="primary"
+                variant="soft"
+                size="sm"
+                @click="openTraceModal"
+              >
+                Traçabilité complète
+              </UButton>
+              <UButton variant="ghost" color="neutral" @click="isModalOpen = false">Fermer</UButton>
+            </div>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="isTraceModalOpen" :ui="modalUi('2xl')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="batch-trace-title">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h2 id="batch-trace-title" class="text-lg font-bold text-gray-800">Traçabilité du lot</h2>
+              <p v-if="timeline" class="text-sm text-gray-500 mt-0.5">
+                {{ timeline.lotNumber }} — OF {{ timeline.ofNumber }}
+              </p>
+            </div>
+            <UButton icon="i-lucide-x" color="neutral" variant="ghost" aria-label="Fermer la traçabilité" @click="closeTraceModal" />
+          </div>
+
+          <UAlert v-if="traceError" color="error" variant="soft" :title="traceError" class="mb-4" />
+
+          <div v-if="traceStatus === 'pending'" class="space-y-3">
+            <USkeleton v-for="i in 4" :key="i" class="h-14 w-full" />
+          </div>
+
+          <ol v-else-if="timeline?.events.length" class="relative border-s border-gray-200 ms-3 space-y-4">
+            <li v-for="ev in timeline.events" :key="ev.id" class="ms-4">
+              <span class="absolute -start-1.5 mt-1.5 flex size-3 rounded-full bg-[#0F62BC]" />
+              <div class="flex items-start gap-2">
+                <UIcon :name="traceSourceIcon[ev.source] ?? 'i-lucide-circle'" class="size-4 text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p class="text-sm font-semibold text-gray-800">{{ ev.title }}</p>
+                  <p class="text-xs text-gray-500 mt-0.5">{{ ev.description }}</p>
+                  <p class="text-[11px] text-gray-400 mt-1">
+                    {{ formatTraceDate(ev.at) }}
+                    <span v-if="ev.actor"> — {{ ev.actor }}</span>
+                  </p>
+                </div>
+              </div>
+            </li>
+          </ol>
+
+          <p v-else-if="traceStatus === 'success'" class="text-sm text-gray-400 text-center py-8">
+            Aucun événement de traçabilité.
+          </p>
+
+          <div class="flex justify-end pt-4 mt-4 border-t border-gray-100">
+            <UButton variant="ghost" color="neutral" @click="closeTraceModal">Fermer</UButton>
           </div>
         </div>
       </template>
@@ -272,10 +380,19 @@ function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
           </div>
 
           <div class="space-y-4 mb-6">
-            <div>
-              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Désignation de la pièce</label>
+            <UFormField label="Ordre de fabrication parent *" name="ofNumber">
+              <USelectMenu
+                v-model="createForm.ofNumber"
+                :items="ofOptions"
+                value-key="value"
+                placeholder="Sélectionner un OF"
+                class="w-full"
+                @update:model-value="onSelectOf"
+              />
+            </UFormField>
+            <UFormField label="Désignation de la pièce *" name="productName">
               <UInput v-model="createForm.productName" placeholder="Ex: Support de train d'atterrissage" icon="i-lucide-layers" />
-            </div>
+            </UFormField>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -305,7 +422,7 @@ function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
             <UButton
               class="bg-[#F57C00] hover:bg-[#e06d00] text-white w-full sm:w-auto"
               icon="i-lucide-check"
-              :disabled="!createForm.productName.trim()"
+              :disabled="!createForm.ofNumber || !createForm.productName.trim()"
               :loading="isMutating"
               @click="submitCreateBatch"
             >

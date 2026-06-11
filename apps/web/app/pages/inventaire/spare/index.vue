@@ -9,10 +9,69 @@ definePageMeta({ layout: 'sidebar' })
 const UButton = resolveComponent('UButton')
 const UBadge  = resolveComponent('UBadge')
 
-const { levels, status, error, isMutating, refreshLevels, createLevel, updateLevel, deleteLevel } = useStock()
+const {
+  levels, reservations, status, error, isMutating,
+  refreshLevels, refreshReservations, refreshRuptureForecast,
+  ruptureForecast, reportSupplierDelay,
+  createLevel, updateLevel, deleteLevel
+} = useStock()
 const { canManageStock, pageSubtitle } = useRoleCapabilities()
 
-onMounted(() => refreshLevels())
+const activeReservations = computed(() =>
+  reservations.value.filter(r => r.status === 'ACTIVE')
+)
+
+onMounted(async () => {
+  await Promise.all([refreshLevels(), refreshReservations(), refreshRuptureForecast()])
+})
+
+const topRuptureRisks = computed(() =>
+  ruptureForecast.value.filter(f => f.score >= 30).slice(0, 5)
+)
+
+const isDelayModalOpen = ref(false)
+const delayFormError = ref<string | null>(null)
+const delayForm = ref({
+  materialReference: '',
+  supplier: '',
+  delayDays: 3,
+  comment: ''
+})
+
+const materialOptions = computed(() =>
+  parts.value.map(p => ({ label: `${p.reference} — ${p.name}`, value: p.reference }))
+)
+
+function openDelayModal() {
+  delayForm.value = { materialReference: parts.value[0]?.reference ?? '', supplier: '', delayDays: 3, comment: '' }
+  delayFormError.value = null
+  isDelayModalOpen.value = true
+}
+
+async function submitSupplierDelay() {
+  delayFormError.value = null
+  if (!delayForm.value.materialReference || !delayForm.value.supplier.trim()) {
+    delayFormError.value = 'Référence et fournisseur requis'
+    return
+  }
+  if (delayForm.value.delayDays < 1) {
+    delayFormError.value = 'Le retard doit être d\'au moins 1 jour'
+    return
+  }
+  await reportSupplierDelay({
+    materialReference: delayForm.value.materialReference,
+    supplier: delayForm.value.supplier.trim(),
+    delayDays: delayForm.value.delayDays,
+    comment: delayForm.value.comment.trim() || undefined
+  })
+  isDelayModalOpen.value = false
+}
+
+function ruptureColor(score: number) {
+  if (score >= 80) return 'error' as const
+  if (score >= 50) return 'warning' as const
+  return 'primary' as const
+}
 
 const parts = levels
 type Unit = StockUnit
@@ -182,6 +241,7 @@ function openEdit(p: Part) {
 async function confirmEdit() {
   if (!editTarget.value) return
   await updateLevel(editTarget.value.id, editQty.value)
+  await refreshRuptureForecast()
   isEditModalOpen.value = false
 }
 
@@ -209,10 +269,15 @@ async function confirmDelete() {
           <h1 class="text-xl sm:text-2xl font-bold text-[#0F62BC]">Stock pièces & matières</h1>
           <p class="text-xs sm:text-sm text-gray-400 mt-0.5">{{ pageSubtitle || 'Composants, visserie, matières premières' }}</p>
         </div>
-        <UButton v-if="canManageStock" icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium flex-shrink-0" @click="openCreate">
-          <span class="hidden sm:inline">Ajouter une pièce</span>
-          <span class="sm:hidden">Ajouter</span>
-        </UButton>
+        <div v-if="canManageStock" class="flex flex-col sm:flex-row gap-2 shrink-0">
+          <UButton icon="i-lucide-truck" size="sm" variant="outline" @click="openDelayModal">
+            Retard fournisseur
+          </UButton>
+          <UButton icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium" @click="openCreate">
+            <span class="hidden sm:inline">Ajouter une pièce</span>
+            <span class="sm:hidden">Ajouter</span>
+          </UButton>
+        </div>
       </div>
 
       <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
@@ -239,6 +304,57 @@ async function confirmDelete() {
         <div class="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl p-3 sm:p-4">
           <p class="text-xs text-gray-400 mb-1">En rupture</p>
           <p class="text-xl sm:text-2xl font-semibold text-red-500">{{ stats.out }}</p>
+        </div>
+      </div>
+
+      <UCard v-if="status !== 'pending' && topRuptureRisks.length > 0" class="border-none shadow-sm mb-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <UIcon name="i-lucide-gauge" class="text-[#F57C00]" />
+            Prévision de rupture (30 j)
+          </h2>
+          <UButton size="xs" variant="ghost" icon="i-lucide-refresh-cw" @click="refreshRuptureForecast" />
+        </div>
+        <div class="space-y-3">
+          <div v-for="item in topRuptureRisks" :key="item.reference">
+            <div class="flex justify-between text-xs mb-1">
+              <span class="font-medium text-gray-700 truncate">{{ item.name }}</span>
+              <span class="font-mono text-gray-400 ml-2">{{ item.reference }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <UProgress :model-value="item.score" :max="100" :color="ruptureColor(item.score)" size="sm" class="flex-1" />
+              <span class="text-xs font-bold w-8 text-right">{{ item.score }}</span>
+            </div>
+            <p class="text-[11px] text-gray-400 mt-0.5">
+              {{ item.available }} {{ item.unit }} dispo
+              <span v-if="item.estimatedDaysUntilRupture !== null"> — ~{{ item.estimatedDaysUntilRupture }} j restants</span>
+            </p>
+          </div>
+        </div>
+      </UCard>
+
+      <div v-if="status !== 'pending' && activeReservations.length > 0" class="mb-5">
+        <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+          <UIcon name="i-lucide-bookmark" class="text-indigo-500" />
+          Réservations actives ({{ activeReservations.length }})
+        </h2>
+        <div class="space-y-2">
+          <UCard
+            v-for="res in activeReservations"
+            :key="res.id"
+            class="border-none shadow-sm"
+            :ui="{ body: 'py-2.5 px-3' }"
+          >
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm">
+              <div>
+                <span class="font-medium text-gray-800">{{ res.materialName }}</span>
+                <span class="text-xs font-mono text-gray-400 ml-2">{{ res.materialId }}</span>
+              </div>
+              <div class="text-xs text-gray-500">
+                {{ res.quantity }} {{ res.unit }} — OF <span class="font-mono text-indigo-600">{{ res.ofId }}</span>
+              </div>
+            </div>
+          </UCard>
         </div>
       </div>
 
@@ -461,6 +577,40 @@ async function confirmDelete() {
           <div class="flex justify-end gap-2">
             <UButton variant="ghost" color="neutral" @click="isDeleteModalOpen = false">Annuler</UButton>
             <UButton icon="i-lucide-trash-2" color="error" aria-label="Confirmer la suppression" @click="confirmDelete">Supprimer</UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="isDelayModalOpen" :ui="modalUi('md')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="supplier-delay-title">
+          <h3 id="supplier-delay-title" class="text-lg font-semibold text-[#0F62BC] mb-4">Déclarer un retard fournisseur</h3>
+          <div class="space-y-4">
+            <UFormField label="Matière *" name="materialReference">
+              <USelectMenu
+                v-model="delayForm.materialReference"
+                :items="materialOptions"
+                value-key="value"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Fournisseur *" name="supplier">
+              <UInput v-model="delayForm.supplier" placeholder="Ex : SKF Aerospace" />
+            </UFormField>
+            <UFormField label="Retard (jours) *" name="delayDays">
+              <UInput v-model.number="delayForm.delayDays" type="number" min="1" />
+            </UFormField>
+            <UFormField label="Commentaire" name="comment">
+              <UTextarea v-model="delayForm.comment" :rows="2" placeholder="Détail du retard…" />
+            </UFormField>
+          </div>
+          <p v-if="delayFormError" class="text-red-500 text-sm mt-3" role="alert">{{ delayFormError }}</p>
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" @click="isDelayModalOpen = false">Annuler</UButton>
+            <UButton class="bg-[#F57C00] hover:bg-[#e06d00] text-white" :loading="isMutating" @click="submitSupplierDelay">
+              Enregistrer
+            </UButton>
           </div>
         </div>
       </template>

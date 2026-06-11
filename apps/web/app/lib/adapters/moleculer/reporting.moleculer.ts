@@ -1,8 +1,8 @@
 /**
  * Adapter Moleculer — Reporting
  * Routes gateway prévues :
- *   GET /api/v1/reporting/kpis    → reporting.calcul.*
- *   GET /api/v1/reporting/margins → reporting.calcul.finance.margin
+ *   GET /api/reporting/kpis    → reporting.calcul.*
+ *   GET /api/reporting/margins → reporting.calcul.finance.margin
  */
 import { useApiClient } from '~/lib/api/client'
 import type { ReportingAdapter } from '~/lib/adapters/types'
@@ -12,8 +12,14 @@ export function createMoleculerReportingAdapter(getToken: () => string | null): 
   const token = () => getToken()
 
   return {
-    getDashboard() {
-      return request('/v1/reporting/kpis', { accessToken: token() })
+    getDashboard(options) {
+      return request('/reporting/kpis', {
+        accessToken: token(),
+        params: {
+          consolidated: options?.consolidated,
+          siteCode: options?.siteCode
+        }
+      })
     }
   }
 }

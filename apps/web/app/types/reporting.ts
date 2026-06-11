@@ -13,6 +13,8 @@ export interface CriticalIncident {
   label: string
   detail: string
   severity: 'warning' | 'error'
+  targetRoute?: string
+  targetQuery?: Record<string, string>
 }
 
 export interface KpiDashboard {
@@ -24,4 +26,11 @@ export interface KpiDashboard {
   yieldRate: number
   marginOrders: MarginData[]
   criticalIncidents: CriticalIncident[]
+  /** Présent en vue consolidée multi-sites */
+  siteLabel?: string
+}
+
+export interface ReportingDashboardOptions {
+  consolidated?: boolean
+  siteCode?: string
 }

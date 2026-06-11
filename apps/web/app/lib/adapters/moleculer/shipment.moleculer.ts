@@ -1,9 +1,9 @@
 /**
  * Adapter Moleculer — Shipment
  * Routes gateway prévues :
- *   GET  /api/v1/shipments              → shipment.get / history
- *   POST /api/v1/shipments              → picklist.create
- *   PATCH /api/v1/shipments/:id/status  → shipment.updateStatus
+ *   GET  /api/shipments              → shipment.get / history
+ *   POST /api/shipments              → picklist.create
+ *   PATCH /api/shipments/:id/status  → shipment.updateStatus
  */
 import { useApiClient } from '~/lib/api/client'
 import type { ShipmentAdapter } from '~/lib/adapters/types'
@@ -14,13 +14,13 @@ export function createMoleculerShipmentAdapter(getToken: () => string | null): S
 
   return {
     list() {
-      return request('/v1/shipments', { accessToken: token() })
+      return request('/shipments', { accessToken: token() })
     },
     create(input) {
-      return request('/v1/shipments', { method: 'POST', body: input, accessToken: token() })
+      return request('/shipments', { method: 'POST', body: input, accessToken: token() })
     },
     updateStatus(id, status) {
-      return request(`/v1/shipments/${id}/status`, { method: 'PATCH', body: { status }, accessToken: token() })
+      return request(`/shipments/${id}/status`, { method: 'PATCH', body: { status }, accessToken: token() })
     }
   }
 }

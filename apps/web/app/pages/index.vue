@@ -38,9 +38,9 @@ async function onSubmit() {
         <AppLogo class="h-12 sm:h-16 w-auto max-w-full" />
       </div>
 
-      <h2 id="login-title" class="text-xl sm:text-2xl font-bold text-primary text-center mb-6">
+      <h1 id="login-title" class="text-xl sm:text-2xl font-bold text-primary text-center mb-6">
         Connexion
-      </h2>
+      </h1>
 
       <UForm class="space-y-4" aria-labelledby="login-title" @submit.prevent="onSubmit">
         <UFormField label="Email" name="email">

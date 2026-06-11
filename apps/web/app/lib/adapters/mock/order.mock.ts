@@ -3,7 +3,14 @@ import { appendMockActivity } from '~/lib/adapters/mock/audit-store'
 import { getMockActorName } from '~/lib/adapters/mock/mock-actor'
 import { createInitialOrders } from '~/fixtures/order/commands'
 import type { OrderAdapter } from '~/lib/adapters/types'
-import type { CreateOrderInput, Order, OrderPriority, OrderStatus } from '~/types'
+import type {
+  ClientStats,
+  CreateOrderInput,
+  Order,
+  OrderHistoryEntry,
+  OrderPriority,
+  OrderStatus
+} from '~/types'
 import { ApiClientError } from '~/lib/api/envelope'
 
 const ordersStore: Order[] = createInitialOrders()
@@ -132,6 +139,89 @@ export function createMockOrderAdapter(): OrderAdapter {
       if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Commande introuvable')
       ordersStore[idx] = { ...ordersStore[idx]!, hasAnomaly: false }
       return ordersStore[idx]!
+    },
+
+    async getClientStats(client: string) {
+      await simulateDelay(80)
+      const clientOrders = ordersStore.filter(o => o.client === client)
+      if (clientOrders.length === 0) {
+        throw new ApiClientError('NOT_FOUND', 'Client introuvable')
+      }
+      const delivered = clientOrders.filter(o => o.status === 'delivered').length
+      const urgent = clientOrders.filter(o => o.priority === 'urgent').length
+      const leadDays = clientOrders.map((o) => {
+        const created = new Date(o.createdAt).getTime()
+        const delivery = new Date(o.deliveryDate).getTime()
+        return Math.max(1, Math.round((delivery - created) / 86400000))
+      })
+      const averageLeadDays = Math.round(
+        leadDays.reduce((a, b) => a + b, 0) / leadDays.length
+      )
+      return {
+        client,
+        orderCount: clientOrders.length,
+        deliveredCount: delivered,
+        urgentCount: urgent,
+        averageLeadDays,
+        totalRevenueEstimate: clientOrders.length * 12500
+      } satisfies ClientStats
+    },
+
+    async getOrderHistory(orderId: number) {
+      await simulateDelay(80)
+      const order = ordersStore.find(o => o.id === orderId)
+      if (!order) throw new ApiClientError('NOT_FOUND', 'Commande introuvable')
+
+      const history: OrderHistoryEntry[] = [
+        {
+          at: new Date(order.createdAt),
+          label: 'Création',
+          description: `Commande ${order.orderNumber} enregistrée`
+        }
+      ]
+      if (order.validationStatus === 'validated') {
+        history.push({
+          at: new Date(Date.now() - 5 * 86400000),
+          label: 'Validation commerciale',
+          description: 'Commande approuvée pour production'
+        })
+      }
+      if (order.validationStatus === 'rejected') {
+        history.push({
+          at: new Date(Date.now() - 5 * 86400000),
+          label: 'Rejet',
+          description: 'Commande refusée par le commercial'
+        })
+      }
+      if (order.priority === 'urgent') {
+        history.push({
+          at: new Date(Date.now() - 4 * 86400000),
+          label: 'Commande spéciale',
+          description: 'Priorité urgente activée'
+        })
+      }
+      if (order.status === 'shipped' || order.status === 'delivered') {
+        history.push({
+          at: new Date(Date.now() - 2 * 86400000),
+          label: 'Expédition',
+          description: `Colis confié à ${order.carrier}`
+        })
+      }
+      if (order.status === 'delivered') {
+        history.push({
+          at: new Date(order.deliveryDate),
+          label: 'Livraison',
+          description: `Livré à ${order.destination}`
+        })
+      }
+      if (order.hasAnomaly) {
+        history.push({
+          at: new Date(Date.now() - 86400000),
+          label: 'Anomalie',
+          description: 'Flux logistique suspendu'
+        })
+      }
+      return history.sort((a, b) => a.at.getTime() - b.at.getTime())
     }
   }
 }

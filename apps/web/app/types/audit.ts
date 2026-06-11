@@ -21,3 +21,22 @@ export interface Activity {
   date: Date
   meta?: string
 }
+
+export type LotTraceSource = 'production' | 'stock' | 'shipment' | 'audit'
+
+export interface LotTraceEvent {
+  id: string
+  at: Date
+  source: LotTraceSource
+  title: string
+  description: string
+  actor?: string
+}
+
+export interface LotTraceTimeline {
+  lotId: string
+  lotNumber: string
+  ofNumber: string
+  productName: string
+  events: LotTraceEvent[]
+}

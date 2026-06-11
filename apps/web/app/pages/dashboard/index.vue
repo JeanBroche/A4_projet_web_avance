@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { DASHBOARD_SITE_OPTIONS, type DashboardSiteScope } from '~/lib/sites'
+
 definePageMeta({ layout: 'sidebar' })
 
-const { dashboard, status, error, refresh } = useReporting()
+const { dashboard, status, error, selectedSiteScope, refresh, setSiteScope } = useReporting()
 const { pageSubtitle } = useRoleCapabilities()
 
+const siteOptions = [...DASHBOARD_SITE_OPTIONS]
+
 onMounted(() => refresh())
+
+async function onSiteScopeChange(scope: DashboardSiteScope) {
+  await setSiteScope(scope)
+}
 
 const marginOrders = computed(() => dashboard.value?.marginOrders ?? [])
 const criticalIncidents = computed(() => dashboard.value?.criticalIncidents ?? [])
@@ -24,14 +32,37 @@ function getMarginColor(percent: number) {
   if (percent < 30) return 'warning' // Marge moyenne (Orange)
   return 'success'                   // Marge excellente (Vert/Bleu Nuxt UI)
 }
+
+function openIncident(inc: import('~/types').CriticalIncident) {
+  if (!inc.targetRoute) return
+  navigateTo({ path: inc.targetRoute, query: inc.targetQuery })
+}
 </script>
 
 <template>
   <div class="mx-auto w-full max-w-6xl">
-      <div class="mb-5 sm:mb-6">
+      <div class="mb-5 sm:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 :class="PAGE_TITLE">Performance & Alertes</h1>
           <p :class="PAGE_SUBTITLE">{{ pageSubtitle || 'KPI production, stocks, marges et incidents critiques' }}</p>
+          <p v-if="kpis.siteLabel" class="text-xs text-[#0F62BC] font-medium mt-1 flex items-center gap-1">
+            <UIcon name="i-lucide-building-2" class="size-3.5" />
+            {{ kpis.siteLabel }}
+          </p>
+        </div>
+        <div class="w-full sm:w-auto min-w-[12rem]">
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">
+            Périmètre KPI
+          </label>
+          <USelectMenu
+            :model-value="selectedSiteScope"
+            :items="siteOptions"
+            value-key="value"
+            icon="i-lucide-building-2"
+            class="w-full"
+            aria-label="Sélectionner le site pour les indicateurs"
+            @update:model-value="onSiteScopeChange"
+          />
         </div>
       </div>
 
@@ -119,8 +150,10 @@ function getMarginColor(percent: number) {
           <UCard
             v-for="inc in criticalIncidents"
             :key="inc.id"
-            class="border-none shadow-sm"
+            class="border-none shadow-sm transition-shadow"
+            :class="inc.targetRoute ? 'cursor-pointer hover:shadow-md' : ''"
             :ui="{ body: 'py-3 px-4' }"
+            @click="openIncident(inc)"
           >
             <div class="flex items-start gap-3">
               <UIcon
@@ -128,9 +161,13 @@ function getMarginColor(percent: number) {
                 :class="inc.severity === 'error' ? 'text-red-500' : 'text-orange-500'"
                 class="size-4 mt-0.5 shrink-0"
               />
-              <div>
+              <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold text-gray-800">{{ inc.label }}</p>
                 <p class="text-xs text-gray-500 mt-0.5">{{ inc.detail }}</p>
+                <p v-if="inc.targetRoute" class="text-xs text-[#0F62BC] mt-1 flex items-center gap-1">
+                  <UIcon name="i-lucide-arrow-right" class="size-3" />
+                  Voir le détail
+                </p>
               </div>
             </div>
           </UCard>

@@ -1,10 +1,10 @@
 /**
  * Adapter Moleculer — Auth
  * Routes gateway prévues (issue #5) :
- *   POST /api/v1/auth/login    → auth.login
- *   POST /api/v1/auth/refresh  → auth.refresh
- *   POST /api/v1/auth/logout   → auth.logout
- *   GET  /api/v1/auth/me       → auth.me
+ *   POST /api/auth/login    → auth.login
+ *   POST /api/auth/refresh  → auth.refresh
+ *   POST /api/auth/logout   → auth.logout
+ *   GET  /api/auth/me       → auth.me
  */
 import { useApiClient } from '~/lib/api/client'
 import type { AuthAdapter } from '~/lib/adapters/types'
@@ -15,15 +15,15 @@ export function createMoleculerAuthAdapter(): AuthAdapter {
 
   return {
     login(credentials: LoginCredentials) {
-      return request('/v1/auth/login', { method: 'POST', body: credentials })
+      return request('/auth/login', { method: 'POST', body: credentials })
     },
 
     logout(refreshToken: string) {
-      return request('/v1/auth/logout', { method: 'POST', body: { refreshToken } })
+      return request('/auth/logout', { method: 'POST', body: { refreshToken } })
     },
 
     me(accessToken: string) {
-      return request('/v1/auth/me', { accessToken })
+      return request('/auth/me', { accessToken })
     }
   }
 }

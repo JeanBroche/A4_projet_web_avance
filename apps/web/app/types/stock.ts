@@ -75,3 +75,31 @@ export interface CreateReturnItemInput {
   reason: ReturnReason
   of?: string
 }
+
+/** Score de risque de rupture (0 = faible, 100 = critique). */
+export interface RuptureForecast {
+  reference: string
+  name: string
+  available: number
+  minQty: number
+  unit: StockUnit
+  score: number
+  estimatedDaysUntilRupture: number | null
+}
+
+export interface SupplierDelay {
+  id: string
+  materialReference: string
+  materialName: string
+  supplier: string
+  delayDays: number
+  reportedAt: Date
+  comment?: string
+}
+
+export interface SupplierDelayInput {
+  materialReference: string
+  supplier: string
+  delayDays: number
+  comment?: string
+}

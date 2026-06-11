@@ -3,6 +3,7 @@ import type {
   ActivityType,
   Batch,
   BatchStatus,
+  ClientStats,
   CreateBatchInput,
   CreateManufacturingOrderInput,
   CreateOrderInput,
@@ -12,13 +13,21 @@ import type {
   KpiDashboard,
   LoginCredentials,
   LoginResult,
+  LotTraceTimeline,
   ManufacturingOrder,
   Order,
+  OrderHistoryEntry,
   OrderPriority,
   OrderStatus,
   OrderValidationStatus,
   ReportAnomalyInput,
+  ReportBomAnomalyInput,
+  ReportingDashboardOptions,
+  RuptureForecast,
+  SupplierDelay,
+  SupplierDelayInput,
   UpdateBomOrderInput,
+  AppNotification,
   ReturnItem,
   Shipment,
   DeliveryStatus,
@@ -49,6 +58,9 @@ export interface StockAdapter {
   createReservation(input: CreateReservationInput): Promise<StockReservation[]>
   releaseReservation(id: number): Promise<StockReservation>
   cancelReservation(id: number): Promise<StockReservation>
+  getRuptureForecast(): Promise<RuptureForecast[]>
+  reportSupplierDelay(input: SupplierDelayInput): Promise<SupplierDelay>
+  listSupplierDelays(): Promise<SupplierDelay[]>
 }
 
 export interface ProductionAdapter {
@@ -61,6 +73,7 @@ export interface ProductionAdapter {
   updateBatchStatus(id: number, status: BatchStatus): Promise<Batch>
   reportAnomaly(input: ReportAnomalyInput): Promise<Batch>
   clearAnomaly(batchId: number): Promise<Batch>
+  reportBomAnomaly(input: ReportBomAnomalyInput): Promise<ManufacturingOrder>
 }
 
 export interface AppendActivityInput {
@@ -81,6 +94,8 @@ export interface OrderAdapter {
   changePriority(id: number, priority: OrderPriority): Promise<Order>
   reportAnomaly(id: number): Promise<Order>
   clearAnomaly(id: number): Promise<Order>
+  getClientStats(client: string): Promise<ClientStats>
+  getOrderHistory(orderId: number): Promise<OrderHistoryEntry[]>
 }
 
 export interface ShipmentAdapter {
@@ -92,10 +107,15 @@ export interface ShipmentAdapter {
 export interface AuditAdapter {
   listActivities(): Promise<Activity[]>
   append(input: AppendActivityInput): Promise<Activity>
+  traceLot(lotNumber: string): Promise<LotTraceTimeline>
 }
 
 export interface ReportingAdapter {
-  getDashboard(): Promise<KpiDashboard>
+  getDashboard(options?: ReportingDashboardOptions): Promise<KpiDashboard>
+}
+
+export interface NotificationAdapter {
+  list(): Promise<AppNotification[]>
 }
 
 export interface Adapters {
@@ -106,4 +126,5 @@ export interface Adapters {
   shipment: ShipmentAdapter
   audit: AuditAdapter
   reporting: ReportingAdapter
+  notification: NotificationAdapter
 }

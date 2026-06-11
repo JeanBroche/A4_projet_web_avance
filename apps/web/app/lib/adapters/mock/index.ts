@@ -6,6 +6,7 @@ import { createMockOrderAdapter } from './order.mock'
 import { createMockShipmentAdapter } from './shipment.mock'
 import { createMockAuditAdapter } from './audit.mock'
 import { createMockReportingAdapter } from './reporting.mock'
+import { createMockNotificationAdapter } from './notification.mock'
 
 export function createMockAdapters(): Adapters {
   return {
@@ -15,6 +16,7 @@ export function createMockAdapters(): Adapters {
     order: createMockOrderAdapter(),
     shipment: createMockShipmentAdapter(),
     audit: createMockAuditAdapter(),
-    reporting: createMockReportingAdapter()
+    reporting: createMockReportingAdapter(),
+    notification: createMockNotificationAdapter()
   }
 }

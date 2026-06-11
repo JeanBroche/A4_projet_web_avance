@@ -6,6 +6,7 @@ import { createMoleculerOrderAdapter } from './order.moleculer'
 import { createMoleculerShipmentAdapter } from './shipment.moleculer'
 import { createMoleculerAuditAdapter } from './audit.moleculer'
 import { createMoleculerReportingAdapter } from './reporting.moleculer'
+import { createMoleculerNotificationAdapter } from './notification.moleculer'
 
 export function createMoleculerAdapters(getToken: () => string | null): Adapters {
   return {
@@ -15,6 +16,7 @@ export function createMoleculerAdapters(getToken: () => string | null): Adapters
     order: createMoleculerOrderAdapter(getToken),
     shipment: createMoleculerShipmentAdapter(getToken),
     audit: createMoleculerAuditAdapter(getToken),
-    reporting: createMoleculerReportingAdapter(getToken)
+    reporting: createMoleculerReportingAdapter(getToken),
+    notification: createMoleculerNotificationAdapter(getToken)
   }
 }

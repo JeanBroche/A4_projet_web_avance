@@ -12,7 +12,18 @@ import { createInitialReservations } from '~/fixtures/stock/reservations'
 import { createInitialReturned } from '~/fixtures/stock/returned'
 import type { StockAdapter } from '~/lib/adapters/types'
 import { ApiClientError } from '~/lib/api/envelope'
-import type { CreateReturnItemInput, CreateStockLevelInput, ReturnItem, StockLevel } from '~/types'
+import {
+  addMockSupplierDelay,
+  getMockSupplierDelays
+} from '~/lib/adapters/mock/supplier-delay-store'
+import type {
+  CreateReturnItemInput,
+  CreateStockLevelInput,
+  ReturnItem,
+  RuptureForecast,
+  StockLevel,
+  SupplierDelayInput
+} from '~/types'
 
 let partsStore: StockLevel[] = createInitialParts()
 let returnedStore: ReturnItem[] = createInitialReturned()
@@ -193,6 +204,52 @@ export function createMockStockAdapter(): StockAdapter {
       } catch (e) {
         toApiError(e)
       }
+    },
+
+    async getRuptureForecast() {
+      await simulateDelay(80)
+      const forecasts: RuptureForecast[] = partsStore.map((p) => {
+        const ratio = p.minQty > 0 ? p.available / p.minQty : p.available > 0 ? 2 : 0
+        let score = 0
+        if (p.available === 0) score = 100
+        else if (ratio < 0.5) score = 85
+        else if (ratio < 1) score = 60
+        else if (ratio < 1.5) score = 30
+        else score = 10
+        const dailyUse = Math.max(1, Math.ceil(p.minQty / 14))
+        const estimatedDaysUntilRupture =
+          p.available === 0 ? 0 : Math.max(1, Math.floor(p.available / dailyUse))
+        return {
+          reference: p.reference,
+          name: p.name,
+          available: p.available,
+          minQty: p.minQty,
+          unit: p.unit,
+          score,
+          estimatedDaysUntilRupture: p.available === 0 ? 0 : estimatedDaysUntilRupture
+        }
+      })
+      return forecasts.sort((a, b) => b.score - a.score)
+    },
+
+    async reportSupplierDelay(input: SupplierDelayInput) {
+      await simulateDelay()
+      const part = partsStore.find(p => p.reference === input.materialReference)
+      if (!part) throw new ApiClientError('NOT_FOUND', 'Référence introuvable')
+      const delay = addMockSupplierDelay(input, part.name)
+      appendMockActivity({
+        type: 'stock_low',
+        title: 'Retard fournisseur',
+        description: `${part.name} — ${input.supplier} (+${input.delayDays} j)`,
+        user: getMockActorName(),
+        meta: part.reference
+      })
+      return delay
+    },
+
+    async listSupplierDelays() {
+      await simulateDelay(60)
+      return getMockSupplierDelays()
     }
   }
 }

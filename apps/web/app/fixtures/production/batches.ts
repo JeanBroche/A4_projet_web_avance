@@ -5,6 +5,7 @@ export function createInitialBatches(): Batch[] {
     {
       id: 1,
       lotNumber: 'LOT-24-001',
+      ofNumber: 'OF-2024-0142',
       productName: 'Axe Titane A320',
       emoji: '🔩',
       qty: 50,
@@ -20,6 +21,7 @@ export function createInitialBatches(): Batch[] {
     {
       id: 2,
       lotNumber: 'LOT-24-002',
+      ofNumber: 'OF-2024-0140',
       productName: 'Joint Silicone B737',
       emoji: '💠',
       qty: 200,

@@ -75,7 +75,7 @@ pnpm exec moleculer call order.order.validate --accessToken <token> --orderId <o
 pnpm exec moleculer call order.order.listUrgent --accessToken <token> --siteCode SITE-LYO
 ```
 
-L'exposition HTTP des actions order (`/api/v1/commercial/*` via le gateway moleculer-web) est hors scope de ce livrable et sera traitee dans une issue gateway dediee.
+L'exposition HTTP des actions order (`/api/commercial/*` via le gateway moleculer-web) est hors scope de ce livrable et sera traitee dans une issue gateway dediee.
 
 ## Tests
 

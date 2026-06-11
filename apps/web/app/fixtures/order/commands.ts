@@ -51,6 +51,22 @@ export function createInitialOrders(): Order[] {
       emoji: '🚀'
     },
     {
+      id: 5,
+      orderNumber: 'CMD-2026-101',
+      client: 'Airbus Hamburg',
+      destination: 'Kreetslag 10, 21129 Hamburg, Allemagne',
+      createdAt: '2026-06-04',
+      deliveryDate: '2026-06-08',
+      itemsCount: 12,
+      weight: '980 kg',
+      carrier: 'FedEx Freight',
+      status: 'shipped',
+      validationStatus: 'validated',
+      priority: 'urgent',
+      hasAnomaly: false,
+      emoji: '🚚'
+    },
+    {
       id: 4,
       orderNumber: 'CMD-2026-092',
       client: 'Safran Nacelles',

@@ -6,6 +6,17 @@ import type { UserRole } from '~/types'
 const { open, isDesktop, toggleSidebar, closeSidebar } = useSidebarLayout()
 
 const { user, role } = useSession()
+
+const siteBadge = computed(() => {
+  const code = user.value?.siteCode
+  if (!code) return null
+  const labels: Record<string, string> = {
+    'SITE-LYO': 'Lyon',
+    'SITE-PAR': 'Paris',
+    'SITE-HQ': 'Siège'
+  }
+  return { code, label: labels[code] ?? code }
+})
 const { logout } = useAuth()
 
 const roleDisplay = computed(() => {
@@ -66,6 +77,18 @@ function getItems(state: 'collapsed' | 'expanded') {
       icon: 'i-lucide-chart-bar',
       roles: ['direction', 'admin'] as UserRole[],
       to: '/dashboard'
+    },
+    {
+      label: 'Notifications',
+      icon: 'i-lucide-bell',
+      roles: ['logistique', 'direction', 'admin'] as UserRole[],
+      to: '/notifications'
+    },
+    {
+      label: 'Mon activité',
+      icon: 'i-lucide-square-activity',
+      roles: ['operateur', 'logistique', 'commercial', 'direction', 'admin'] as UserRole[],
+      to: '/activity'
     }
   ] satisfies NavigationMenuItem[]
 
@@ -162,13 +185,22 @@ const userItems = computed<DropdownMenuItem[][]>(() => [
             />
           </NuxtLink>
 
-          <div
-            v-if="state === 'expanded'"
-            class="flex items-center gap-1.5 rounded-md bg-elevated/60 px-2 py-1.5 text-xs font-medium text-muted min-w-0"
-            :title="roleDisplay.label"
-          >
-            <UIcon :name="roleDisplay.icon" class="size-3.5 shrink-0" />
-            <span class="truncate leading-tight">{{ roleDisplay.label }}</span>
+          <div v-if="state === 'expanded'" class="flex flex-col gap-1.5 min-w-0">
+            <div
+              class="flex items-center gap-1.5 rounded-md bg-elevated/60 px-2 py-1.5 text-xs font-medium text-muted min-w-0"
+              :title="roleDisplay.label"
+            >
+              <UIcon :name="roleDisplay.icon" class="size-3.5 shrink-0" />
+              <span class="truncate leading-tight">{{ roleDisplay.label }}</span>
+            </div>
+            <div
+              v-if="siteBadge"
+              class="flex items-center gap-1.5 rounded-md bg-[#0F62BC]/10 px-2 py-1 text-[11px] font-semibold text-[#0F62BC]"
+              :title="`Site ${siteBadge.code}`"
+            >
+              <UIcon name="i-lucide-map-pin" class="size-3 shrink-0" />
+              <span class="truncate">{{ siteBadge.label }}</span>
+            </div>
           </div>
         </div>
       </template>

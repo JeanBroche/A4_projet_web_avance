@@ -17,6 +17,12 @@ export default defineNuxtRouteMiddleware((to) => {
   }
 
   if (role.value && !canAccessRoute(role.value, to.path)) {
-    return navigateTo('/activity')
+    const toast = useToast()
+    toast.add({
+      title: 'Accès refusé',
+      description: 'Vous n\'avez pas les droits pour accéder à cette page.',
+      color: 'warning'
+    })
+    return navigateTo(getDefaultRouteForRole(role.value))
   }
 })

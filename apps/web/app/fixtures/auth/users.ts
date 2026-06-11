@@ -15,7 +15,7 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
       email: 'admin@aeronexis.local',
       name: 'Admin AERONEXIS',
       role: 'admin',
-      siteCode: 'SITE-01',
+      siteCode: 'SITE-HQ',
       avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Admin'
     }
   },
@@ -27,7 +27,7 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
       email: 'operateur@aeronexis.local',
       name: 'Jean Martin',
       role: 'operateur',
-      siteCode: 'SITE-01',
+      siteCode: 'SITE-LYO',
       avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Jean'
     }
   },
@@ -39,7 +39,7 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
       email: 'logistique@aeronexis.local',
       name: 'Lucie Bernard',
       role: 'logistique',
-      siteCode: 'SITE-01',
+      siteCode: 'SITE-PAR',
       avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Lucie'
     }
   },
@@ -51,7 +51,7 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
       email: 'commercial@aeronexis.local',
       name: 'Marie Dupont',
       role: 'commercial',
-      siteCode: 'SITE-01',
+      siteCode: 'SITE-PAR',
       avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Marie'
     }
   },
@@ -63,7 +63,7 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
       email: 'direction@aeronexis.local',
       name: 'Paul Renaud',
       role: 'direction',
-      siteCode: 'SITE-01',
+      siteCode: 'SITE-HQ',
       avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Paul'
     }
   }

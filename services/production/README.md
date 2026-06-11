@@ -96,7 +96,7 @@ pnpm exec moleculer call production.batch.addAnomalies `
 pnpm exec moleculer call production.batch.history --accessToken <token> --batch_code BATCH-SEED-001
 ```
 
-L'exposition HTTP des actions production (`/api/v1/production/*`) est hors scope de ce livrable.
+L'exposition HTTP des actions production (`/api/production/*`) est hors scope de ce livrable.
 
 ## Tests
 

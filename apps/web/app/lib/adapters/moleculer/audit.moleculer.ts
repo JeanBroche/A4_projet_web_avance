@@ -1,8 +1,8 @@
 /**
  * Adapter Moleculer — Audit
  * Routes gateway prévues :
- *   GET  /api/v1/audit/changes   → audit.change.list
- *   POST /api/v1/audit/events    → audit.event.log (append)
+ *   GET  /api/audit/changes   → audit.change.list
+ *   POST /api/audit/events    → audit.event.log (append)
  */
 import { useApiClient } from '~/lib/api/client'
 import type { AuditAdapter } from '~/lib/adapters/types'
@@ -13,10 +13,13 @@ export function createMoleculerAuditAdapter(getToken: () => string | null): Audi
 
   return {
     listActivities() {
-      return request('/v1/audit/changes', { accessToken: token() })
+      return request('/audit/changes', { accessToken: token() })
     },
     append(input) {
-      return request('/v1/audit/events', { method: 'POST', body: input, accessToken: token() })
+      return request('/audit/events', { method: 'POST', body: input, accessToken: token() })
+    },
+    traceLot(lotNumber) {
+      return request(`/audit/lots/${encodeURIComponent(lotNumber)}/trace`, { accessToken: token() })
     }
   }
 }

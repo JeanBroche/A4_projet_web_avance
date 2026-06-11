@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { createReservationSchema, firstZodError } from '~/lib/validation/schemas'
+import { createBomOrderSchema, createReservationSchema, firstZodError, reportAnomalySchema } from '~/lib/validation/schemas'
 import type { BomItem, BomStatus, ManufacturingOrder, Priority } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
@@ -18,7 +18,8 @@ interface ReserveLine {
   reservedQty: number
 }
 
-const { bomOrders, status, error, isMutating, refreshBom, createBomOrder, updateBomOrder, updateBomOrderStatus } = useProduction()
+const route = useRoute()
+const { bomOrders, status, error, isMutating, refreshBom, createBomOrder, updateBomOrder, updateBomOrderStatus, reportBomAnomaly } = useProduction()
 const {
   levels,
   error: stockError,
@@ -33,10 +34,18 @@ const {
   releaseReservation,
   cancelReservation
 } = useStock()
-const { canManageBomOrders, canReserveMaterials, pageSubtitle } = useRoleCapabilities()
+const { canManageBatches, canManageBomOrders, canReserveMaterials, pageSubtitle } = useRoleCapabilities()
+
+const bomAnomalyDescription = ref('')
+const bomAnomalyError = ref<string | null>(null)
 
 onMounted(async () => {
   await Promise.all([refreshBom(), refreshStock()])
+  const ofQuery = route.query.of
+  if (typeof ofQuery === 'string') {
+    const order = bomOrders.value.find(o => o.ofNumber === ofQuery)
+    if (order) openModal(order)
+  }
 })
 
 const orders = bomOrders
@@ -122,7 +131,16 @@ function removeBomRow(idx: number) {
 }
 
 async function confirmCreate() {
-  if (!newOf.value.name || !newOf.value.ofNumber) return
+  const payload = {
+    name: newOf.value.name,
+    ofNumber: newOf.value.ofNumber,
+    qty: newOf.value.qty,
+    status: newOf.value.status,
+    priority: newOf.value.priority,
+    emoji: newOf.value.emoji
+  }
+  const parsed = createBomOrderSchema.safeParse(payload)
+  if (!parsed.success) return
   await createBomOrder({
     name: newOf.value.name,
     ofNumber: newOf.value.ofNumber,
@@ -373,6 +391,19 @@ async function updateStatus(newStatus: Status) {
   if (!selected.value) return
   await updateBomOrderStatus(selected.value.id, newStatus)
   selected.value = orders.value.find(o => o.id === selected.value!.id) ?? null
+}
+
+async function submitBomAnomaly() {
+  if (!selected.value) return
+  bomAnomalyError.value = null
+  const parsed = reportAnomalySchema.safeParse({ description: bomAnomalyDescription.value })
+  if (!parsed.success) {
+    bomAnomalyError.value = firstZodError(parsed.error)
+    return
+  }
+  await reportBomAnomaly(selected.value.id, parsed.data.description)
+  selected.value = orders.value.find(o => o.id === selected.value!.id) ?? null
+  bomAnomalyDescription.value = ''
 }
 </script>
 
@@ -649,6 +680,30 @@ async function updateStatus(newStatus: Status) {
               <UBadge :color="bomStatus(item)==='ok' ? 'success' : bomStatus(item)==='low' ? 'warning' : 'error'" variant="subtle" class="text-[11px] hidden sm:inline-flex">
                 {{ bomStatus(item)==='ok' ? 'OK' : bomStatus(item)==='low' ? 'Insuffisant' : 'Rupture' }}
               </UBadge>
+            </div>
+          </div>
+
+          <div v-if="canManageBatches && selected" class="mt-5 p-3 rounded-xl border border-orange-100 bg-orange-50/30">
+            <h3 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              <UIcon name="i-lucide-alert-triangle" class="text-orange-500" />
+              Signaler un incident nomenclature
+            </h3>
+            <UAlert v-if="bomAnomalyError" color="error" variant="soft" :title="bomAnomalyError" class="mb-2" role="alert" />
+            <div class="flex flex-col sm:flex-row gap-2">
+              <UInput
+                v-model="bomAnomalyDescription"
+                placeholder="Décrire l'incident sur la nomenclature..."
+                class="flex-1"
+              />
+              <UButton
+                icon="i-lucide-alert-triangle"
+                color="warning"
+                variant="soft"
+                :loading="isMutating"
+                @click="submitBomAnomaly"
+              >
+                Signaler
+              </UButton>
             </div>
           </div>
 

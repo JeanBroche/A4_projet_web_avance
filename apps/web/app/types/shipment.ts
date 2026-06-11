@@ -3,6 +3,7 @@ export type DeliveryStatus = 'loading' | 'in_transit' | 'delivered' | 'delayed'
 export interface Shipment {
   id: number
   shipmentNumber: string
+  orderNumber?: string
   client: string
   address: string
   carrier: string
@@ -19,4 +20,5 @@ export interface CreateShipmentInput {
   carrier: string
   estimatedDelivery: string
   emoji: string
+  orderNumber?: string
 }

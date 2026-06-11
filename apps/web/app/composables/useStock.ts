@@ -1,3 +1,4 @@
+import { syncNotificationsAfterMutation } from '~/lib/notifications-sync'
 import { toFailureResult } from '~/lib/api/envelope'
 import type {
   AsyncStatus,
@@ -5,8 +6,11 @@ import type {
   CreateReturnItemInput,
   CreateStockLevelInput,
   ReturnItem,
+  RuptureForecast,
   StockLevel,
-  StockReservation
+  StockReservation,
+  SupplierDelay,
+  SupplierDelayInput
 } from '~/types'
 
 export function useStock() {
@@ -18,6 +22,24 @@ export function useStock() {
   const status = ref<AsyncStatus>('idle')
   const error = ref<string | null>(null)
   const isMutating = ref(false)
+  const ruptureForecast = ref<RuptureForecast[]>([])
+  const supplierDelays = ref<SupplierDelay[]>([])
+
+  async function refreshRuptureForecast() {
+    try {
+      ruptureForecast.value = await adapters.stock.getRuptureForecast()
+    } catch {
+      ruptureForecast.value = []
+    }
+  }
+
+  async function refreshSupplierDelays() {
+    try {
+      supplierDelays.value = await adapters.stock.listSupplierDelays()
+    } catch {
+      supplierDelays.value = []
+    }
+  }
 
   async function refresh() {
     status.value = 'pending'
@@ -95,6 +117,7 @@ export function useStock() {
     try {
       await adapters.stock.createLevel(input)
       await refreshLevels()
+      await syncNotificationsAfterMutation()
     } finally {
       isMutating.value = false
     }
@@ -105,6 +128,7 @@ export function useStock() {
     try {
       await adapters.stock.updateLevel(id, qty)
       await refreshLevels()
+      await syncNotificationsAfterMutation()
     } finally {
       isMutating.value = false
     }
@@ -156,6 +180,7 @@ export function useStock() {
     try {
       await adapters.stock.createReservation(input)
       await Promise.all([refreshLevels(), refreshReservations()])
+      await syncNotificationsAfterMutation()
     } catch (e) {
       error.value = toFailureResult(e).message
       throw e
@@ -170,6 +195,7 @@ export function useStock() {
     try {
       await adapters.stock.releaseReservation(id)
       await Promise.all([refreshLevels(), refreshReservations()])
+      await syncNotificationsAfterMutation()
     } catch (e) {
       error.value = toFailureResult(e).message
       throw e
@@ -184,6 +210,23 @@ export function useStock() {
     try {
       await adapters.stock.cancelReservation(id)
       await Promise.all([refreshLevels(), refreshReservations()])
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      error.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function reportSupplierDelay(input: SupplierDelayInput) {
+    isMutating.value = true
+    error.value = null
+    try {
+      const delay = await adapters.stock.reportSupplierDelay(input)
+      await Promise.all([refreshSupplierDelays(), refreshRuptureForecast()])
+      await syncNotificationsAfterMutation()
+      return delay
     } catch (e) {
       error.value = toFailureResult(e).message
       throw e
@@ -215,6 +258,11 @@ export function useStock() {
     deleteReturned,
     createReservation,
     releaseReservation,
-    cancelReservation
+    cancelReservation,
+    ruptureForecast,
+    supplierDelays,
+    refreshRuptureForecast,
+    refreshSupplierDelays,
+    reportSupplierDelay
   }
 }

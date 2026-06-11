@@ -67,7 +67,7 @@ pnpm exec moleculer call stock.reservation.create `
   --lines '[{"materialId":"<id>","qty":3}]'
 ```
 
-L'exposition HTTP des actions stock (`/api/v1/stock/*` via le gateway moleculer-web) est hors scope de ce livrable et sera traitee dans une issue gateway dediee.
+L'exposition HTTP des actions stock (`/api/stock/*` via le gateway moleculer-web) est hors scope de ce livrable et sera traitee dans une issue gateway dediee.
 
 ## Tests
 

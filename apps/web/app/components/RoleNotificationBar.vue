@@ -1,8 +1,12 @@
 <script setup lang="ts">
 const { canViewNotifications } = useRoleCapabilities()
-const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
+const { notifications, unreadCount, markAsRead, markAllAsRead, refresh } = useNotifications()
 
 const open = ref(false)
+
+onMounted(() => {
+  if (canViewNotifications.value) refresh()
+})
 
 const severityIcon: Record<string, string> = {
   error: 'i-lucide-alert-octagon',
@@ -18,6 +22,8 @@ const severityIcon: Record<string, string> = {
       <button
         type="button"
         class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        :aria-expanded="open"
+        aria-controls="notification-panel"
         @click="open = !open"
       >
         <div class="flex items-center gap-2 min-w-0">
@@ -32,8 +38,9 @@ const severityIcon: Record<string, string> = {
         <UIcon :name="open ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="size-4 text-gray-400 shrink-0" />
       </button>
 
-      <div v-if="open" class="border-t border-default/50 px-4 py-3 space-y-2">
-        <div class="flex justify-end">
+      <div v-if="open" id="notification-panel" class="border-t border-default/50 px-4 py-3 space-y-2">
+        <div class="flex justify-between items-center gap-2">
+          <NuxtLink to="/notifications" class="text-xs text-[#0F62BC] hover:underline">Voir tout</NuxtLink>
           <UButton v-if="unreadCount > 0" size="xs" variant="ghost" color="neutral" @click="markAllAsRead">
             Tout marquer comme lu
           </UButton>

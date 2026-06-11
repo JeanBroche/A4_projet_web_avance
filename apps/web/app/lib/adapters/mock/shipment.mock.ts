@@ -24,6 +24,7 @@ export function createMockShipmentAdapter(): ShipmentAdapter {
       const shipment: Shipment = {
         id: nextShipmentId++,
         shipmentNumber: `EXP-2026-${nextShipmentNum++}`,
+        orderNumber: input.orderNumber,
         client: input.client,
         address: input.address,
         carrier: input.carrier,

@@ -6,6 +6,7 @@ export const loginSchema = z.object({
 })
 
 export const createBatchSchema = z.object({
+  ofNumber: z.string().trim().min(1, 'OF parent requis'),
   productName: z.string().trim().min(1, 'Désignation requise'),
   qty: z.coerce.number().int().min(1, 'Quantité minimale : 1'),
   priority: z.enum(['low', 'normal', 'high', 'critical']),
@@ -50,6 +51,41 @@ export const createOrderSchema = z.object({
   weightValue: z.coerce.number().min(1, 'Poids minimal : 1 kg'),
   carrier: z.string().min(1),
   emoji: z.string().min(1)
+})
+
+export const createReturnedSchema = z.object({
+  name: z.string().trim().min(1, 'Désignation requise'),
+  reference: z.string().trim().min(1, 'Référence requise'),
+  qty: z.coerce.number().int().min(1, 'Quantité minimale : 1'),
+  state: z.enum(['neuf', 'usagé', 'défectueux']),
+  reason: z.enum(['défaut_fabrication', 'erreur_commande', 'non_conforme', 'excédent']),
+  of: z.string().optional()
+})
+
+export const createShipmentSchema = z.object({
+  client: z.string().trim().min(1, 'Client requis'),
+  address: z.string().trim().min(1, 'Adresse requise'),
+  carrier: z.string().trim().min(1, 'Transporteur requis'),
+  estimatedDelivery: z.string().trim().min(1, 'Date de livraison requise'),
+  emoji: z.string().min(1),
+  orderNumber: z.string().optional()
+})
+
+export const createBomOrderSchema = z.object({
+  name: z.string().trim().min(1, 'Désignation requise'),
+  ofNumber: z.string().trim().min(1, 'Numéro OF requis'),
+  qty: z.coerce.number().int().min(1, 'Quantité minimale : 1'),
+  status: z.enum(['pending', 'in_progress', 'done']),
+  priority: z.enum(['low', 'normal', 'high', 'critical']),
+  emoji: z.string().min(1)
+})
+
+export const updateQtySchema = z.object({
+  qty: z.coerce.number().int().min(0, 'Quantité invalide')
+})
+
+export const reportAnomalySchema = z.object({
+  description: z.string().trim().min(3, 'Description trop courte (min. 3 caractères)')
 })
 
 export type LoginForm = z.infer<typeof loginSchema>

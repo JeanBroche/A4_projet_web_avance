@@ -29,3 +29,18 @@ export interface CreateOrderInput {
   emoji: string
   priority?: OrderPriority
 }
+
+export interface ClientStats {
+  client: string
+  orderCount: number
+  deliveredCount: number
+  urgentCount: number
+  averageLeadDays: number
+  totalRevenueEstimate: number
+}
+
+export interface OrderHistoryEntry {
+  at: Date
+  label: string
+  description: string
+}

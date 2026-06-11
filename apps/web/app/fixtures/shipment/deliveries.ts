@@ -5,6 +5,7 @@ export function createInitialShipments(): Shipment[] {
     {
       id: 1,
       shipmentNumber: 'EXP-2026-401',
+      orderNumber: 'CMD-2026-101',
       client: 'Airbus Hamburg',
       address: 'Kreetslag 10, 21129 Hamburg, Allemagne',
       carrier: 'FedEx Freight',

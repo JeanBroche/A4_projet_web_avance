@@ -25,6 +25,7 @@ export interface ManufacturingOrder {
 export interface Batch {
   id: number
   lotNumber: string
+  ofNumber: string
   productName: string
   emoji: string
   qty: number
@@ -51,10 +52,16 @@ export interface UpdateBomOrderInput {
 }
 
 export interface CreateBatchInput {
+  ofNumber: string
   productName: string
   qty: number
   priority: Priority
   emoji: string
+}
+
+export interface ReportBomAnomalyInput {
+  bomOrderId: number
+  description: string
 }
 
 export interface ReportAnomalyInput {

@@ -1,12 +1,34 @@
 <script setup lang="ts">
+import { createShipmentSchema, firstZodError } from '~/lib/validation/schemas'
 import type { DeliveryStatus, Shipment } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
 
+const route = useRoute()
 const { shipments, status, error, isMutating, refresh, create, updateStatus: updateShipmentStatus } = useShipments()
 const { canPlanShipments, pageSubtitle } = useRoleCapabilities()
 
-onMounted(() => refresh())
+const createFormError = ref<string | null>(null)
+
+onMounted(async () => {
+  await refresh()
+  const id = route.query.id
+  if (id) {
+    const shipment = shipments.value.find(s => s.id === Number(id))
+    if (shipment) openModal(shipment)
+  }
+  if (route.query.create === '1') {
+    openCreateModal()
+    createForm.value = {
+      client: String(route.query.client ?? ''),
+      address: String(route.query.address ?? ''),
+      carrier: String(route.query.carrier ?? 'FedEx Freight'),
+      estimatedDelivery: String(route.query.delivery ?? createForm.value.estimatedDelivery),
+      emoji: '🚚',
+      orderNumber: String(route.query.orderNumber ?? '')
+    }
+  }
+})
 
 const statusConfig = {
   loading:    { label: 'En chargement', icon: 'i-lucide-boxes',           class: 'text-gray-600 bg-gray-100' },
@@ -37,7 +59,8 @@ const createForm = ref({
   address: '',
   carrier: 'FedEx Freight',
   estimatedDelivery: '',
-  emoji: '🚚'
+  emoji: '🚚',
+  orderNumber: ''
 })
 
 const filteredShipments = computed(() =>
@@ -61,19 +84,22 @@ function openCreateModal() {
     address: '',
     carrier: 'FedEx Freight',
     estimatedDelivery: tomorrow.toISOString().split('T')[0]!,
-    emoji: '🚚'
+    emoji: '🚚',
+    orderNumber: ''
   }
   isCreateModalOpen.value = true
 }
 
 async function submitCreateShipment() {
-  if (!createForm.value.client.trim() || !createForm.value.address.trim()) return
+  createFormError.value = null
+  const parsed = createShipmentSchema.safeParse(createForm.value)
+  if (!parsed.success) {
+    createFormError.value = firstZodError(parsed.error)
+    return
+  }
   await create({
-    client: createForm.value.client,
-    address: createForm.value.address,
-    carrier: createForm.value.carrier,
-    estimatedDelivery: createForm.value.estimatedDelivery,
-    emoji: createForm.value.emoji
+    ...parsed.data,
+    orderNumber: parsed.data.orderNumber || undefined
   })
   isCreateModalOpen.value = false
 }
@@ -135,6 +161,7 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
               <div>
                 <h3 class="font-bold text-gray-800 text-sm sm:text-base">{{ shipment.shipmentNumber }}</h3>
                 <p class="text-xs text-gray-400 font-medium truncate max-w-[160px]">{{ shipment.client }}</p>
+                <p v-if="shipment.orderNumber" class="text-[10px] font-mono text-indigo-500">{{ shipment.orderNumber }}</p>
               </div>
             </div>
 
@@ -173,7 +200,7 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
 
     <UModal v-model:open="isModalOpen" :ui="modalUi('lg')">
       <template #content>
-        <div v-if="selected" :class="MODAL_BODY">
+        <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-labelledby="shipment-detail-title">
 
           <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-5">
             <div class="flex gap-3">
@@ -181,8 +208,9 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
                 {{ selected.emoji }}
               </div>
               <div>
-                <h2 class="text-lg font-bold text-gray-800">{{ selected.shipmentNumber }}</h2>
+                <h2 id="shipment-detail-title" class="text-lg font-bold text-gray-800">{{ selected.shipmentNumber }}</h2>
                 <p class="text-sm font-semibold text-[#0F62BC]">{{ selected.client }}</p>
+                <p v-if="selected.orderNumber" class="text-xs font-mono text-indigo-500 mt-0.5">Commande {{ selected.orderNumber }}</p>
               </div>
             </div>
             <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="isModalOpen = false" />
@@ -269,16 +297,21 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
 
     <UModal v-model:open="isCreateModalOpen" :ui="modalUi('md')">
       <template #content>
-        <div :class="MODAL_BODY">
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="shipment-create-title">
           <div class="flex justify-between items-start mb-5">
             <div>
-              <h2 class="text-lg font-bold text-gray-800">Planifier un transport</h2>
+              <h2 id="shipment-create-title" class="text-lg font-bold text-gray-800">Planifier un transport</h2>
               <p class="text-xs text-gray-400 mt-0.5">L'identifiant séquentiel (EXP-2026-XXX) est calculé automatiquement.</p>
             </div>
             <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="isCreateModalOpen = false" />
           </div>
 
           <div class="space-y-4 mb-6">
+            <div>
+              <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">N° commande liée (optionnel)</label>
+              <UInput v-model="createForm.orderNumber" placeholder="Ex: CMD-2026-101" class="font-mono" icon="i-lucide-file-text" />
+            </div>
+
             <div>
               <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Société / Client final</label>
               <UInput v-model="createForm.client" placeholder="Ex: Boeing Operations" icon="i-lucide-building-2" />
@@ -305,6 +338,8 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
               </div>
             </div>
           </div>
+
+          <p v-if="createFormError" class="text-red-500 text-sm mb-3" role="alert">{{ createFormError }}</p>
 
           <div :class="MODAL_FOOTER">
             <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isCreateModalOpen = false">Annuler</UButton>

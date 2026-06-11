@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
+import { createReturnedSchema, firstZodError } from '~/lib/validation/schemas'
 import type { ReturnItem, ReturnReason, ReturnState } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
@@ -9,6 +10,9 @@ const UButton = resolveComponent('UButton')
 const UBadge  = resolveComponent('UBadge')
 
 const { returned, status, error, isMutating, refreshReturned, createReturned, updateReturned, deleteReturned } = useStock()
+const { canManageStock } = useRoleCapabilities()
+
+const createFormError = ref<string | null>(null)
 
 onMounted(() => refreshReturned())
 
@@ -172,14 +176,15 @@ function openCreate() {
 }
 
 async function confirmCreate() {
-  if (!newItem.value.name || !newItem.value.reference) return
+  createFormError.value = null
+  const parsed = createReturnedSchema.safeParse(newItem.value)
+  if (!parsed.success) {
+    createFormError.value = firstZodError(parsed.error)
+    return
+  }
   await createReturned({
-    name: newItem.value.name,
-    reference: newItem.value.reference,
-    qty: newItem.value.qty,
-    state: newItem.value.state,
-    reason: newItem.value.reason,
-    of: newItem.value.of || undefined
+    ...parsed.data,
+    of: parsed.data.of || undefined
   })
   isCreateModalOpen.value = false
 }
@@ -194,7 +199,7 @@ async function confirmCreate() {
           <h1 class="text-xl sm:text-2xl font-bold text-[#0F62BC]">Produits retournés</h1>
           <p class="text-xs sm:text-sm text-gray-400 mt-0.5">Suivi des retours en attente de traitement</p>
         </div>
-        <UButton icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium flex-shrink-0" @click="openCreate">
+        <UButton v-if="canManageStock" icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium flex-shrink-0" @click="openCreate">
           <span class="hidden sm:inline">Déclarer un retour</span>
           <span class="sm:hidden">Ajouter</span>
         </UButton>
@@ -292,8 +297,8 @@ async function confirmCreate() {
                 </div>
               </div>
               <div class="flex gap-2">
-                <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="xs" class="flex-1 justify-center" @click="openEdit(item)">Modifier</UButton>
-                <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="xs" class="flex-1 justify-center" @click="askDelete(item)">Supprimer</UButton>
+                <UButton v-if="canManageStock" icon="i-lucide-pencil" variant="outline" color="neutral" size="xs" class="flex-1 justify-center" @click="openEdit(item)">Modifier</UButton>
+                <UButton v-if="canManageStock" icon="i-lucide-trash-2" variant="outline" color="error" size="xs" class="flex-1 justify-center" @click="askDelete(item)">Supprimer</UButton>
               </div>
             </div>
           </Transition>
@@ -324,8 +329,8 @@ async function confirmCreate() {
                 </div>
               </div>
               <div class="flex gap-2 flex-shrink-0">
-                <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="sm" @click="openEdit(row.original)">Modifier</UButton>
-                <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="sm" @click="askDelete(row.original)">Supprimer</UButton>
+                <UButton v-if="canManageStock" icon="i-lucide-pencil" variant="outline" color="neutral" size="sm" @click="openEdit(row.original)">Modifier</UButton>
+                <UButton v-if="canManageStock" icon="i-lucide-trash-2" variant="outline" color="error" size="sm" @click="askDelete(row.original)">Supprimer</UButton>
               </div>
             </div>
           </template>

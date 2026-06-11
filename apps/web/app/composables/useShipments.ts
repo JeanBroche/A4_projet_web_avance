@@ -1,3 +1,4 @@
+import { syncNotificationsAfterMutation } from '~/lib/notifications-sync'
 import { toFailureResult } from '~/lib/api/envelope'
 import type { AsyncStatus, CreateShipmentInput, DeliveryStatus, Shipment } from '~/types'
 
@@ -27,6 +28,7 @@ export function useShipments() {
     try {
       await adapters.shipment.create(input)
       await refresh()
+      await syncNotificationsAfterMutation()
     } finally {
       isMutating.value = false
     }
@@ -37,6 +39,7 @@ export function useShipments() {
     try {
       await adapters.shipment.updateStatus(id, shipmentStatus)
       await refresh()
+      await syncNotificationsAfterMutation()
     } finally {
       isMutating.value = false
     }

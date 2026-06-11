@@ -9,10 +9,11 @@ type PreparedOrder = Order
 const {
   orders, status, error, isMutating, refresh, create,
   updateStatus: updateOrderStatus, validate, reject, changePriority,
-  reportAnomaly, clearAnomaly
+  reportAnomaly, clearAnomaly,
+  clientStats, orderHistory, loadClientStats, loadOrderHistory
 } = useOrders()
 
-const { canManageOrders, pageSubtitle } = useRoleCapabilities()
+const { canManageOrders, canPlanShipments, pageSubtitle } = useRoleCapabilities()
 
 onMounted(() => refresh())
 
@@ -26,6 +27,16 @@ const commercialStats = computed(() => {
     clients: clients.size,
     delivered: list.filter(o => o.status === 'delivered').length
   }
+})
+
+const statusBreakdown = computed(() => {
+  const list = orders.value
+  const total = Math.max(list.length, 1)
+  return [
+    { label: 'Préparées', value: Math.round((list.filter(o => o.status === 'prepared').length / total) * 100), color: 'primary' as const },
+    { label: 'Expédiées', value: Math.round((list.filter(o => o.status === 'shipped').length / total) * 100), color: 'warning' as const },
+    { label: 'Livrées', value: Math.round((list.filter(o => o.status === 'delivered').length / total) * 100), color: 'success' as const }
+  ]
 })
 
 function formatDeliveryDate(iso: string) {
@@ -53,7 +64,7 @@ const validationConfig = {
 
 const priorityOptions = [
   { label: 'Normale', value: 'normal' as OrderPriority },
-  { label: 'Urgente', value: 'urgent' as OrderPriority }
+  { label: 'Spéciale (urgente)', value: 'urgent' as OrderPriority }
 ]
 
 const carrierOptions = ['DHL Aviation', 'FedEx Priority', 'Geodis', 'UPS Cargo']
@@ -85,9 +96,33 @@ const filteredOrders = computed(() =>
 )
 
 // Actions
-function openModal(order: PreparedOrder) {
+async function openModal(order: PreparedOrder) {
   selected.value = orders.value.find(item => item.id === order.id) || null
   isModalOpen.value = true
+  if (selected.value) {
+    await Promise.all([
+      loadClientStats(selected.value.client),
+      loadOrderHistory(selected.value.id)
+    ])
+  }
+}
+
+function formatHistoryDate(d: Date) {
+  return d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function planShipment(order: Order) {
+  navigateTo({
+    path: '/delivery',
+    query: {
+      create: '1',
+      client: order.client,
+      address: order.destination,
+      carrier: order.carrier,
+      orderNumber: order.orderNumber,
+      delivery: order.deliveryDate
+    }
+  })
 }
 
 function openCreateModal() {
@@ -167,8 +202,8 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
 
       <div :class="PAGE_HEADER">
         <div>
-          <h1 :class="PAGE_TITLE">Expéditions & Commandes</h1>
-          <p :class="PAGE_SUBTITLE">{{ pageSubtitle || 'Suivi des commandes clients et dates de livraison' }}</p>
+          <h1 :class="PAGE_TITLE">Commandes clients</h1>
+          <p :class="PAGE_SUBTITLE">{{ pageSubtitle || 'Suivi des commandes — les commandes spéciales correspondent aux priorités urgentes' }}</p>
         </div>
       </div>
 
@@ -182,7 +217,7 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
           <p class="text-xl font-semibold text-amber-600">{{ commercialStats.pendingValidation }}</p>
         </div>
         <div class="bg-white/60 border border-gray-100 rounded-xl p-3">
-          <p class="text-xs text-gray-400 mb-1">Urgentes</p>
+          <p class="text-xs text-gray-400 mb-1">Spéciales (urgentes)</p>
           <p class="text-xl font-semibold text-red-600">{{ commercialStats.urgent }}</p>
         </div>
         <div class="bg-white/60 border border-gray-100 rounded-xl p-3">
@@ -194,6 +229,19 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
           <p class="text-xl font-semibold text-green-600">{{ commercialStats.delivered }}</p>
         </div>
       </div>
+
+      <UCard v-if="status !== 'pending' && commercialStats.total > 0" class="border-none shadow-sm mb-5">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Répartition par statut logistique</p>
+        <div class="space-y-3">
+          <div v-for="row in statusBreakdown" :key="row.label">
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-gray-500">{{ row.label }}</span>
+              <span class="font-semibold text-gray-700">{{ row.value }}%</span>
+            </div>
+            <UProgress :model-value="row.value" :max="100" :color="row.color" size="sm" />
+          </div>
+        </div>
+      </UCard>
 
       <div :class="TOOLBAR">
         <UInput v-model="search" icon="i-lucide-search" placeholder="Rechercher une commande..." class="w-full sm:flex-1" />
@@ -236,7 +284,7 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
                     v-if="order.priority === 'urgent'"
                     class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-red-600 bg-red-50"
                   >
-                    Urgente
+                    Spéciale
                   </span>
                 </div>
               </div>
@@ -320,7 +368,7 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
               v-if="selected.priority === 'urgent'"
               class="text-xs font-semibold px-2 py-0.5 rounded-full text-red-600 bg-red-50"
             >
-              Priorité urgente
+              Commande spéciale (urgente)
             </span>
           </div>
 
@@ -401,8 +449,51 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
             </UDropdownMenu>
           </div>
 
+          <div v-if="clientStats" class="mb-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-[#0F62BC] mb-3">Statistiques client — {{ clientStats.client }}</h4>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <div>
+                <p class="text-xs text-gray-400">Commandes</p>
+                <p class="font-bold text-gray-800">{{ clientStats.orderCount }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Livrées</p>
+                <p class="font-bold text-green-600">{{ clientStats.deliveredCount }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Spéciales</p>
+                <p class="font-bold text-red-600">{{ clientStats.urgentCount }}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Délai moyen</p>
+                <p class="font-bold text-gray-800">{{ clientStats.averageLeadDays }} j</p>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="orderHistory.length > 0" class="mb-6">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Historique commande</h4>
+            <ol class="space-y-2 border-s-2 border-gray-100 ps-4">
+              <li v-for="(entry, idx) in orderHistory" :key="idx" class="text-sm">
+                <p class="font-medium text-gray-800">{{ entry.label }}</p>
+                <p class="text-xs text-gray-500">{{ entry.description }}</p>
+                <p class="text-[11px] text-gray-400">{{ formatHistoryDate(entry.at) }}</p>
+              </li>
+            </ol>
+          </div>
+
           <div class="flex flex-wrap justify-between items-center gap-2 pt-4 border-t border-gray-100">
             <div class="flex flex-wrap gap-2">
+              <UButton
+                v-if="canPlanShipments && selected.validationStatus === 'validated'"
+                icon="i-lucide-truck"
+                color="primary"
+                variant="soft"
+                size="sm"
+                @click="planShipment(selected!)"
+              >
+                Planifier expédition
+              </UButton>
               <template v-if="canManageOrders && selected.validationStatus === 'pending'">
                 <UButton
                   icon="i-lucide-check-circle"

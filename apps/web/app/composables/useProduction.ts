@@ -1,3 +1,4 @@
+import { syncNotificationsAfterMutation } from '~/lib/notifications-sync'
 import { toFailureResult } from '~/lib/api/envelope'
 import type {
   AsyncStatus,
@@ -79,6 +80,7 @@ export function useProduction() {
     try {
       await adapters.production.createBatch(input)
       await refreshBatches()
+      await syncNotificationsAfterMutation()
     } finally {
       isMutating.value = false
     }
@@ -89,6 +91,7 @@ export function useProduction() {
     try {
       await adapters.production.updateBatchStatus(id, batchStatus)
       await refreshBatches()
+      await syncNotificationsAfterMutation()
     } finally {
       isMutating.value = false
     }
@@ -99,6 +102,7 @@ export function useProduction() {
     try {
       await adapters.production.reportAnomaly({ batchId, description })
       await refreshBatches()
+      await syncNotificationsAfterMutation()
     } finally {
       isMutating.value = false
     }
@@ -109,6 +113,17 @@ export function useProduction() {
     try {
       await adapters.production.clearAnomaly(batchId)
       await refreshBatches()
+      await syncNotificationsAfterMutation()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function reportBomAnomaly(bomOrderId: number, description: string) {
+    isMutating.value = true
+    try {
+      await adapters.production.reportBomAnomaly({ bomOrderId, description })
+      await refreshBom()
     } finally {
       isMutating.value = false
     }
@@ -128,6 +143,7 @@ export function useProduction() {
     createBatch,
     updateBatchStatus,
     reportAnomaly,
-    clearAnomaly
+    clearAnomaly,
+    reportBomAnomaly
   }
 }

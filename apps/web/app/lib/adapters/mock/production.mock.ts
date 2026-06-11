@@ -5,7 +5,7 @@ import { createInitialBatches } from '~/fixtures/production/batches'
 import { createInitialBomOrders } from '~/fixtures/production/bom'
 import type { ProductionAdapter } from '~/lib/adapters/types'
 import { getMockStockLevels } from '~/lib/adapters/mock/stock.mock'
-import type { Batch, BatchStatus, BomItem, CreateBatchInput, CreateManufacturingOrderInput, ManufacturingOrder } from '~/types'
+import type { Batch, BatchStatus, BomItem, CreateBatchInput, CreateManufacturingOrderInput, ManufacturingOrder, ReportBomAnomalyInput } from '~/types'
 import { ApiClientError } from '~/lib/api/envelope'
 
 const bomStore: ManufacturingOrder[] = createInitialBomOrders()
@@ -110,9 +110,13 @@ export function createMockProductionAdapter(): ProductionAdapter {
 
     async createBatch(input: CreateBatchInput) {
       await simulateDelay()
+      const ofOrder = bomStore.find(o => o.ofNumber === input.ofNumber)
+      if (!ofOrder) throw new ApiClientError('NOT_FOUND', `OF introuvable : ${input.ofNumber}`)
+      const bom = syncBomStock(ofOrder.bom.map(item => ({ ...item })))
       const batch: Batch = {
         id: nextBatchId++,
         lotNumber: `LOT-24-${String(nextLotNum++).padStart(3, '0')}`,
+        ofNumber: input.ofNumber,
         productName: input.productName,
         emoji: input.emoji,
         qty: input.qty,
@@ -120,13 +124,13 @@ export function createMockProductionAdapter(): ProductionAdapter {
         priority: input.priority,
         hasAnomaly: false,
         createdAt: new Date().toISOString().slice(0, 10),
-        bom: []
+        bom
       }
       batchStore.unshift(batch)
       appendMockActivity({
         type: 'of_started',
         title: 'Lot ordonnancé',
-        description: `Création du lot ${batch.lotNumber} — ${batch.productName}.`,
+        description: `Création du lot ${batch.lotNumber} pour ${input.ofNumber} — ${batch.productName}.`,
         user: getMockActorName(),
         meta: batch.lotNumber
       })
@@ -171,6 +175,22 @@ export function createMockProductionAdapter(): ProductionAdapter {
       if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Lot introuvable')
       batchStore[idx] = { ...batchStore[idx]!, hasAnomaly: false }
       return batchStore[idx]!
+    },
+
+    async reportBomAnomaly(input: ReportBomAnomalyInput) {
+      await simulateDelay()
+      const idx = bomStore.findIndex(o => o.id === input.bomOrderId)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'OF introuvable')
+      bomStore[idx] = { ...bomStore[idx]!, hasBomAnomaly: true }
+      const order = bomStore[idx]!
+      appendMockActivity({
+        type: 'anomaly',
+        title: 'Incident nomenclature',
+        description: input.description,
+        user: getMockActorName(),
+        meta: order.ofNumber
+      })
+      return order
     }
   }
 }
