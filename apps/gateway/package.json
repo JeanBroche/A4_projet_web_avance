@@ -9,6 +9,7 @@
     "build": "node -e \"process.exit(0)\""
   },
   "dependencies": {
+    "@platformatic/kafka": "^2.3.0",
     "moleculer": "^0.15.0"
   }
 }

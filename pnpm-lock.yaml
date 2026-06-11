@@ -19,16 +19,19 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       tsx:
         specifier: ^4.20.3
         version: 4.22.4
 
   apps/gateway:
     dependencies:
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
 
   apps/web:
     dependencies:
@@ -66,6 +69,9 @@ importers:
 
   infra/mongo:
     dependencies:
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -124,7 +130,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
     devDependencies:
       '@types/node':
         specifier: ^22.15.0
@@ -159,7 +165,7 @@ importers:
         version: 9.0.3
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -203,6 +209,9 @@ importers:
       '@aeronexis/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -217,7 +226,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       mongodb:
         specifier: ^6.17.0
         version: 6.21.0
@@ -233,7 +242,7 @@ importers:
         version: 22.19.19
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       tsx:
         specifier: ^4.20.3
         version: 4.22.4
@@ -258,6 +267,9 @@ importers:
       '@aeronexis/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
@@ -281,7 +293,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       pg:
         specifier: ^8.16.0
         version: 8.21.0
@@ -303,7 +315,7 @@ importers:
         version: 8.20.0
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       prisma:
         specifier: ^7.8.0
         version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
@@ -325,6 +337,9 @@ importers:
       '@aeronexis/services-shared':
         specifier: workspace:*
         version: link:../../packages/services-shared
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -339,7 +354,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -352,7 +367,7 @@ importers:
         version: 22.19.19
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       tsx:
         specifier: ^4.20.3
         version: 4.22.4
@@ -377,6 +392,9 @@ importers:
       '@aeronexis/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
@@ -397,7 +415,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       pg:
         specifier: ^8.16.0
         version: 8.21.0
@@ -416,7 +434,7 @@ importers:
         version: 8.20.0
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       prisma:
         specifier: ^7.8.0
         version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
@@ -444,6 +462,9 @@ importers:
       '@aeronexis/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
@@ -467,7 +488,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       pg:
         specifier: ^8.16.0
         version: 8.21.0
@@ -483,7 +504,7 @@ importers:
         version: 8.20.0
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       prisma:
         specifier: ^7.8.0
         version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
@@ -508,6 +529,9 @@ importers:
       '@aeronexis/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -522,7 +546,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -535,7 +559,7 @@ importers:
         version: 22.19.19
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       tsx:
         specifier: ^4.20.3
         version: 4.22.4
@@ -560,6 +584,9 @@ importers:
       '@aeronexis/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
@@ -580,7 +607,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       pg:
         specifier: ^8.16.0
         version: 8.21.0
@@ -599,7 +626,7 @@ importers:
         version: 8.20.0
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       prisma:
         specifier: ^7.8.0
         version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
@@ -627,6 +654,9 @@ importers:
       '@aeronexis/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@platformatic/kafka':
+        specifier: ^2.3.0
+        version: 2.3.0
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
@@ -647,7 +677,7 @@ importers:
         version: 2.2.4
       moleculer:
         specifier: ^0.15.0
-        version: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       pg:
         specifier: ^8.16.0
         version: 8.21.0
@@ -666,7 +696,7 @@ importers:
         version: 8.20.0
       moleculer-cli:
         specifier: ^0.8.2
-        version: 0.8.2(debug@4.4.3)(ioredis@5.11.0)
+        version: 0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       prisma:
         specifier: ^7.8.0
         version: 7.8.0(@types/react@19.2.16)(magicast@0.5.3)(typescript@5.9.3)
@@ -1382,6 +1412,9 @@ packages:
   '@mongodb-js/saslprep@1.4.11':
     resolution: {integrity: sha512-o9rAHc0IpIjuPSxRutWpE1F62x7n+4mVS4rCNHkzhIUMQcc18bb6xEq5wd2NdN0WjepIyXIppRshYI2kQDOZVA==}
 
+  '@napi-rs/wasm-runtime@0.2.12':
+    resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
+
   '@napi-rs/wasm-runtime@1.1.4':
     resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
     peerDependencies:
@@ -1390,6 +1423,97 @@ packages:
 
   '@nodable/entities@2.1.1':
     resolution: {integrity: sha512-Pig3HxDIoMgjdEH8OCf/dkcTmLFjJRjWuq8jSnklu284/TKOPibSRERmOykiwmyXTtv61mP+44f3GMx0tLAyjg==}
+
+  '@node-rs/crc32-android-arm-eabi@1.10.6':
+    resolution: {integrity: sha512-vZAMuJXm3TpWPOkkhxdrofWDv+Q+I2oO7ucLRbXyAPmXFNDhHtBxbO1rk9Qzz+M3eep8ieS4/+jCL1Q0zacNMQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [android]
+
+  '@node-rs/crc32-android-arm64@1.10.6':
+    resolution: {integrity: sha512-Vl/JbjCinCw/H9gEpZveWCMjxjcEChDcDBM8S4hKay5yyoRCUHJPuKr4sjVDBeOm+1nwU3oOm6Ca8dyblwp4/w==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [android]
+
+  '@node-rs/crc32-darwin-arm64@1.10.6':
+    resolution: {integrity: sha512-kARYANp5GnmsQiViA5Qu74weYQ3phOHSYQf0G+U5wB3NB5JmBHnZcOc46Ig21tTypWtdv7u63TaltJQE41noyg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@node-rs/crc32-darwin-x64@1.10.6':
+    resolution: {integrity: sha512-Q99bevJVMfLTISpkpKBlXgtPUItrvTWKFyiqoKH5IvscZmLV++NH4V13Pa17GTBmv9n18OwzgQY4/SRq6PQNVA==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@node-rs/crc32-freebsd-x64@1.10.6':
+    resolution: {integrity: sha512-66hpawbNjrgnS9EDMErta/lpaqOMrL6a6ee+nlI2viduVOmRZWm9Rg9XdGTK/+c4bQLdtC6jOd+Kp4EyGRYkAg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@node-rs/crc32-linux-arm-gnueabihf@1.10.6':
+    resolution: {integrity: sha512-E8Z0WChH7X6ankbVm8J/Yym19Cq3otx6l4NFPS6JW/cWdjv7iw+Sps2huSug+TBprjbcEA+s4TvEwfDI1KScjg==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [linux]
+
+  '@node-rs/crc32-linux-arm64-gnu@1.10.6':
+    resolution: {integrity: sha512-LmWcfDbqAvypX0bQjQVPmQGazh4dLiVklkgHxpV4P0TcQ1DT86H/SWpMBMs/ncF8DGuCQ05cNyMv1iddUDugoQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@node-rs/crc32-linux-arm64-musl@1.10.6':
+    resolution: {integrity: sha512-k8ra/bmg0hwRrIEE8JL1p32WfaN9gDlUUpQRWsbxd1WhjqvXea7kKO6K4DwVxyxlPhBS9Gkb5Urq7Y4mXANzaw==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@node-rs/crc32-linux-x64-gnu@1.10.6':
+    resolution: {integrity: sha512-IfjtqcuFK7JrSZ9mlAFhb83xgium30PguvRjIMI45C3FJwu18bnLk1oR619IYb/zetQT82MObgmqfKOtgemEKw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@node-rs/crc32-linux-x64-musl@1.10.6':
+    resolution: {integrity: sha512-LbFYsA5M9pNunOweSt6uhxenYQF94v3bHDAQRPTQ3rnjn+mK6IC7YTAYoBjvoJP8lVzcvk9hRj8wp4Jyh6Y80g==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@node-rs/crc32-wasm32-wasi@1.10.6':
+    resolution: {integrity: sha512-KaejdLgHMPsRaxnM+OG9L9XdWL2TabNx80HLdsCOoX9BVhEkfh39OeahBo8lBmidylKbLGMQoGfIKDjq0YMStw==}
+    engines: {node: '>=14.0.0'}
+    cpu: [wasm32]
+
+  '@node-rs/crc32-win32-arm64-msvc@1.10.6':
+    resolution: {integrity: sha512-x50AXiSxn5Ccn+dCjLf1T7ZpdBiV1Sp5aC+H2ijhJO4alwznvXgWbopPRVhbp2nj0i+Gb6kkDUEyU+508KAdGQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@node-rs/crc32-win32-ia32-msvc@1.10.6':
+    resolution: {integrity: sha512-DpDxQLaErJF9l36aghe1Mx+cOnYLKYo6qVPqPL9ukJ5rAGLtCdU0C+Zoi3gs9ySm8zmbFgazq/LvmsZYU42aBw==}
+    engines: {node: '>= 10'}
+    cpu: [ia32]
+    os: [win32]
+
+  '@node-rs/crc32-win32-x64-msvc@1.10.6':
+    resolution: {integrity: sha512-5B1vXosIIBw1m2Rcnw62IIfH7W9s9f7H7Ma0rRuhT8HR4Xh8QCgw6NJSI2S2MCngsGktYnAhyUvs81b7efTyQw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  '@node-rs/crc32@1.10.6':
+    resolution: {integrity: sha512-+llXfqt+UzgoDzT9of5vPQPGqTAVCohU74I9zIBkNo5TH6s2P31DFJOGsJQKN207f0GHnYv5pV3wh3BCY/un/A==}
+    engines: {node: '>= 10'}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -2048,6 +2172,18 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@platformatic/dynamic-buffer@0.3.1':
+    resolution: {integrity: sha512-xQD5JSkQc4D15suOk7FezGDmh6Vb5e4phDoFZ/ASpa3Ft+3fOVwFOENmHtC1561zm/xHnKwI91NbMF8inpbk0Q==}
+    engines: {node: '>= 22.19.0'}
+
+  '@platformatic/kafka@2.3.0':
+    resolution: {integrity: sha512-Oy4IK4chi0sS/NuS6k6Sn/uZv63SCLnvkZfkxGfOnVFxGokFbl3fPRSCCUF+guIrDJOA8nPkIcuGR0XMfcSADA==}
+    engines: {node: '>= 22.22.0 || >= 24.6.0'}
+
+  '@platformatic/wasm-utils@0.2.1':
+    resolution: {integrity: sha512-5rNl4h5n+hZG4LjiItQ7bVfHBqTypjldP46NXrOYW64cZr87ahngK1s9nEtCpByWg7WWjRLSxyCytgJK5gNdwQ==}
+    engines: {node: '>= 22.19.0'}
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
@@ -3339,6 +3475,10 @@ packages:
   available-typed-arrays@1.0.7:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
+
+  avsc@5.7.9:
+    resolution: {integrity: sha512-yOA4wFeI7ET3v32Di/sUybQ+ttP20JHSW3mxLuNGeO0uD6PPcvLrIQXSvy/rhJOWU5JrYh7U4OHplWMmtAtjMg==}
+    engines: {node: '>=0.11'}
 
   aws-ssl-profiles@1.1.2:
     resolution: {integrity: sha512-NZKeq9AfyQvEeNlN0zSYAaWrmBffJh3IELMZfRpJVWgrpEbtEpnjvzqBPf+mxoI287JohRDoa+/nsfqqiZmF6g==}
@@ -5605,6 +5745,9 @@ packages:
   mlly@1.8.2:
     resolution: {integrity: sha512-d+ObxMQFmbt10sretNDytwt85VrbkhhUA/JBGm1MPaWJ65Cl4wOgLaB1NYvJSZ0Ef03MMEU/0xpPMXUIQ29UfA==}
 
+  mnemonist@0.40.4:
+    resolution: {integrity: sha512-ZAv+KNavneRVzu4tUeOgzkScI3W5BGwZ3rkxIpKtzzVgfTtWQFN1CgX0U72cyvyh3iTuHL3SiSmrQxTlryEIcw==}
+
   mocked-exports@0.1.1:
     resolution: {integrity: sha512-aF7yRQr/Q0O2/4pIXm6PZ5G+jAd7QS4Yu8m+WEeEHGnbo+7mE36CbLSDQiXYV8bVL3NfmdeqPJct0tUlnjVSnA==}
 
@@ -5869,6 +6012,9 @@ packages:
 
   object-deep-merge@2.0.1:
     resolution: {integrity: sha512-aKttDKcU3pyZqKcCkDhsMn70WmZFG2JGDQLP9EcLyTSIFQRCPWLAmBZRLJnrVUrhPG1jETEEbfdgbNtJf1LyMg==}
+
+  obliterator@2.0.5:
+    resolution: {integrity: sha512-42CPE9AhahZRsMNslczq0ctAEtqk8Eka26QofnqC346BZdHDySk3LWka23LI7ULIw11NmltpiLagIq8gBozxTw==}
 
   obug@2.1.1:
     resolution: {integrity: sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==}
@@ -6417,6 +6563,10 @@ packages:
 
   proto-list@1.2.4:
     resolution: {integrity: sha512-vtK/94akxsTMhe0/cbfpR+syPuszcuwhqVjJq26CuNDgFGj682oRBXOP5MJpv2r7JtE8MsiepGIqvvOTBwn2vA==}
+
+  protobufjs@8.6.3:
+    resolution: {integrity: sha512-alQyzT0j401LGBtwsqu6uprjR6pfNH1UJf9N6GBFMjIcd+HzTe0/HrjAbFCqun+zvnfLarrxAtMM2xvZ+kFZ5A==}
+    engines: {node: '>=12.0.0'}
 
   pump@3.0.4:
     resolution: {integrity: sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA==}
@@ -8328,6 +8478,13 @@ snapshots:
     dependencies:
       sparse-bitfield: 3.0.3
 
+  '@napi-rs/wasm-runtime@0.2.12':
+    dependencies:
+      '@emnapi/core': 1.10.0
+      '@emnapi/runtime': 1.10.0
+      '@tybys/wasm-util': 0.10.2
+    optional: true
+
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
@@ -8336,6 +8493,68 @@ snapshots:
     optional: true
 
   '@nodable/entities@2.1.1': {}
+
+  '@node-rs/crc32-android-arm-eabi@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-android-arm64@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-darwin-arm64@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-darwin-x64@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-freebsd-x64@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-linux-arm-gnueabihf@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-linux-arm64-gnu@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-linux-arm64-musl@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-linux-x64-gnu@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-linux-x64-musl@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-wasm32-wasi@1.10.6':
+    dependencies:
+      '@napi-rs/wasm-runtime': 0.2.12
+    optional: true
+
+  '@node-rs/crc32-win32-arm64-msvc@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-win32-ia32-msvc@1.10.6':
+    optional: true
+
+  '@node-rs/crc32-win32-x64-msvc@1.10.6':
+    optional: true
+
+  '@node-rs/crc32@1.10.6':
+    optionalDependencies:
+      '@node-rs/crc32-android-arm-eabi': 1.10.6
+      '@node-rs/crc32-android-arm64': 1.10.6
+      '@node-rs/crc32-darwin-arm64': 1.10.6
+      '@node-rs/crc32-darwin-x64': 1.10.6
+      '@node-rs/crc32-freebsd-x64': 1.10.6
+      '@node-rs/crc32-linux-arm-gnueabihf': 1.10.6
+      '@node-rs/crc32-linux-arm64-gnu': 1.10.6
+      '@node-rs/crc32-linux-arm64-musl': 1.10.6
+      '@node-rs/crc32-linux-x64-gnu': 1.10.6
+      '@node-rs/crc32-linux-x64-musl': 1.10.6
+      '@node-rs/crc32-wasm32-wasi': 1.10.6
+      '@node-rs/crc32-win32-arm64-msvc': 1.10.6
+      '@node-rs/crc32-win32-ia32-msvc': 1.10.6
+      '@node-rs/crc32-win32-x64-msvc': 1.10.6
+    optional: true
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -9160,6 +9379,28 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@platformatic/dynamic-buffer@0.3.1': {}
+
+  '@platformatic/kafka@2.3.0':
+    dependencies:
+      '@platformatic/dynamic-buffer': 0.3.1
+      '@platformatic/wasm-utils': 0.2.1
+      ajv: 8.20.0
+      avsc: 5.7.9
+      debug: 4.4.3
+      fastq: 1.20.1
+      mnemonist: 0.40.4
+      scule: 1.3.0
+    optionalDependencies:
+      '@node-rs/crc32': 1.10.6
+      protobufjs: 8.6.3
+    transitivePeerDependencies:
+      - supports-color
+
+  '@platformatic/wasm-utils@0.2.1':
+    dependencies:
+      '@platformatic/dynamic-buffer': 0.3.1
 
   '@polka/url@1.0.0-next.29': {}
 
@@ -10397,6 +10638,8 @@ snapshots:
   available-typed-arrays@1.0.7:
     dependencies:
       possible-typed-array-names: 1.1.0
+
+  avsc@5.7.9: {}
 
   aws-ssl-profiles@1.1.2: {}
 
@@ -12592,9 +12835,13 @@ snapshots:
       pkg-types: 1.3.1
       ufo: 1.6.4
 
+  mnemonist@0.40.4:
+    dependencies:
+      obliterator: 2.0.5
+
   mocked-exports@0.1.1: {}
 
-  moleculer-cli@0.8.2(debug@4.4.3)(ioredis@5.11.0):
+  moleculer-cli@0.8.2(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0):
     dependencies:
       async: 3.2.6
       consolidate: 0.16.0(handlebars@4.7.9)(lodash@4.18.1)
@@ -12608,7 +12855,7 @@ snapshots:
       metalsmith: 2.7.0
       minimatch: 3.1.5
       mkdirp: 1.0.4
-      moleculer: 0.15.0(debug@4.4.3)(ioredis@5.11.0)
+      moleculer: 0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0)
       moleculer-repl: 0.7.4
       multimatch: 4.0.0
       rimraf: 3.0.2
@@ -12700,7 +12947,7 @@ snapshots:
       tiny-human-time: 1.2.0
       yargs-parser: 21.1.1
 
-  moleculer@0.15.0(debug@4.4.3)(ioredis@5.11.0):
+  moleculer@0.15.0(@platformatic/kafka@2.3.0)(debug@4.4.3)(ioredis@5.11.0):
     dependencies:
       args: 5.0.3
       eventemitter2: 6.4.9
@@ -12712,6 +12959,7 @@ snapshots:
       lru-cache: 11.5.1
       recursive-watch: 1.1.4
     optionalDependencies:
+      '@platformatic/kafka': 2.3.0
       debug: 4.4.3
       ioredis: 5.11.0
 
@@ -13086,6 +13334,8 @@ snapshots:
   object-assign@4.1.1: {}
 
   object-deep-merge@2.0.1: {}
+
+  obliterator@2.0.5: {}
 
   obug@2.1.1: {}
 
@@ -13678,6 +13928,11 @@ snapshots:
       prosemirror-transform: 1.12.0
 
   proto-list@1.2.4: {}
+
+  protobufjs@8.6.3:
+    dependencies:
+      long: 5.3.2
+    optional: true
 
   pump@3.0.4:
     dependencies:
