@@ -56,7 +56,7 @@ pnpm dev
 | `auth.ping` | Smoke test |
 | `auth.login` | Email + password → tokens |
 | `auth.refresh` | Rotation du refresh token |
-| `auth.logout` | Revocation du refresh token |
+| `auth.logout` | Revocation du refresh token + blacklist de l'access token (`jti` Redis, TTL restant) |
 | `auth.me` | Profil courant via access token |
 | `auth.user.list` | Liste utilisateurs (admin) |
 | `auth.user.create` | Creation utilisateur (admin) |

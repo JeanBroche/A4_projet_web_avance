@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "crypto";
 
-import { createError } from "@aeronexis/services-shared";
+import { accessTokenRemainingTtlSeconds, createError, verifyAccessToken } from "@aeronexis/services-shared";
 import {
   getRedisClient,
   getSessionStore,
@@ -82,6 +82,25 @@ export async function rotateRefreshToken(_prisma: AuthPrisma, refreshToken: stri
 
 export async function revokeRefreshToken(_prisma: AuthPrisma, refreshToken: string) {
   return getStore().revokeRefreshToken(refreshToken);
+}
+
+export async function revokeAccessToken(accessToken: string) {
+  try {
+    const payload = verifyAccessToken(accessToken);
+    if (!payload.jti) {
+      return false;
+    }
+
+    const ttlSeconds = accessTokenRemainingTtlSeconds(accessToken);
+    if (ttlSeconds <= 0) {
+      return false;
+    }
+
+    await blacklistAccessToken(payload.jti, ttlSeconds);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function blacklistAccessToken(jti: string, ttlSeconds: number) {
