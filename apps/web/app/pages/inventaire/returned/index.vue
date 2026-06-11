@@ -1,26 +1,18 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
+import type { ReturnItem, ReturnReason, ReturnState } from '~/types'
 
-definePageMeta({ layout: 'default' })
+definePageMeta({ layout: 'sidebar' })
 
 const UButton = resolveComponent('UButton')
 const UBadge  = resolveComponent('UBadge')
 
-type ReturnState = 'neuf' | 'usagé' | 'défectueux'
-type ReturnReason = 'défaut_fabrication' | 'erreur_commande' | 'non_conforme' | 'excédent'
+const { returned, status, error, isMutating, refreshReturned, createReturned, updateReturned, deleteReturned } = useStock()
 
-interface ReturnItem {
-  id: number
-  emoji: string
-  name: string
-  reference: string
-  qty: number
-  state: ReturnState
-  reason: ReturnReason
-  date: string
-  of?: string
-}
+onMounted(() => refreshReturned())
+
+const items = returned
 
 const stateConfig: Record<ReturnState, { label: string; color: 'success' | 'warning' | 'error' }> = {
   neuf:        { label: 'Neuf',        color: 'success' },
@@ -34,15 +26,6 @@ const reasonConfig: Record<ReturnReason, { label: string; icon: string }> = {
   non_conforme:       { label: 'Non conforme',       icon: 'i-lucide-alert-triangle' },
   excédent:           { label: 'Excédent',           icon: 'i-lucide-boxes'          },
 }
-
-const items = ref<ReturnItem[]>([
-  { id: 1,  emoji: '⚙️', name: 'Roulement 6205-ZZ',      reference: 'RLM-6205-ZZ', qty: 4,  state: 'défectueux', reason: 'défaut_fabrication', date: '10/12/2024', of: 'OF-2024-0139' },
-  { id: 2,  emoji: '🔩', name: 'Vis M6 x 20',            reference: 'VIS-M6-020',  qty: 50, state: 'neuf',       reason: 'excédent',           date: '09/12/2024', of: 'OF-2024-0141' },
-  { id: 3,  emoji: '🪛', name: 'Axe acier Ø12',          reference: 'AXE-012-500', qty: 2,  state: 'usagé',      reason: 'non_conforme',       date: '08/12/2024', of: 'OF-2024-0138' },
-  { id: 4,  emoji: '🧲', name: 'Joint torique NBR 20×2', reference: 'JNT-NBR-202', qty: 8,  state: 'défectueux', reason: 'défaut_fabrication', date: '07/12/2024', of: 'OF-2024-0140' },
-  { id: 5,  emoji: '🔧', name: 'Boulon M8 x 40',         reference: 'BLN-M8-040',  qty: 12, state: 'neuf',       reason: 'erreur_commande',    date: '06/12/2024'                    },
-  { id: 6,  emoji: '📐', name: 'Profilé alu 40×40',      reference: 'PRF-AL-4040', qty: 3,  state: 'usagé',      reason: 'non_conforme',       date: '05/12/2024', of: 'OF-2024-0135' },
-])
 
 const search     = ref('')
 const filter     = ref<'all' | ReturnState>('all')
@@ -163,13 +146,9 @@ function openEdit(item: ReturnItem) {
   isEditModalOpen.value = true
 }
 
-function confirmEdit() {
+async function confirmEdit() {
   if (!editTarget.value) return
-  const idx = items.value.findIndex(i => i.id === editTarget.value!.id)
-  if (idx !== -1) {
-    items.value[idx]!.qty   = editQty.value
-    items.value[idx]!.state = editState.value
-  }
+  await updateReturned(editTarget.value.id, editQty.value, editState.value)
   isEditModalOpen.value = false
 }
 
@@ -178,11 +157,11 @@ function askDelete(item: ReturnItem) {
   isDeleteModalOpen.value = true
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!deleteTarget.value) return
   const id = deleteTarget.value.id
   if (expandedId.value === id) expandedId.value = null
-  items.value = items.value.filter(i => i.id !== id)
+  await deleteReturned(id)
   isDeleteModalOpen.value = false
   deleteTarget.value = null
 }
@@ -192,27 +171,22 @@ function openCreate() {
   isCreateModalOpen.value = true
 }
 
-function confirmCreate() {
+async function confirmCreate() {
   if (!newItem.value.name || !newItem.value.reference) return
-  const emojis: Record<string, string> = { défectueux: '⚠️', usagé: '🔄', neuf: '✅' }
-  items.value.unshift({
-    id:        Date.now(),
-    emoji:     emojis[newItem.value.state] ?? '📦',
-    name:      newItem.value.name,
+  await createReturned({
+    name: newItem.value.name,
     reference: newItem.value.reference,
-    qty:       newItem.value.qty,
-    state:     newItem.value.state,
-    reason:    newItem.value.reason,
-    date:      new Date().toLocaleDateString('fr-FR'),
-    of:        newItem.value.of || undefined,
+    qty: newItem.value.qty,
+    state: newItem.value.state,
+    reason: newItem.value.reason,
+    of: newItem.value.of || undefined
   })
   isCreateModalOpen.value = false
 }
 </script>
 
 <template>
-  <div class="relative min-h-screen overflow-hidden px-4 py-5 sm:px-6 sm:py-8">
-    <div class="max-w-4xl mx-auto">
+  <div class="mx-auto w-full max-w-4xl">
 
       <!-- Header -->
       <div class="flex items-start justify-between mb-5 gap-2">
@@ -226,8 +200,15 @@ function confirmCreate() {
         </UButton>
       </div>
 
+      <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
+      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refreshReturned">Réessayer</UButton>
+
+      <div v-if="status === 'pending'" class="space-y-3 mb-5">
+        <USkeleton v-for="i in 4" :key="i" class="h-16 w-full" />
+      </div>
+
       <!-- Stats -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
+      <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
         <div class="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl p-3 sm:p-4">
           <p class="text-xs text-gray-400 mb-1">Total retours</p>
           <p class="text-xl sm:text-2xl font-semibold text-[#0F62BC]">{{ stats.total }}</p>
@@ -247,7 +228,7 @@ function confirmCreate() {
       </div>
 
       <!-- Toolbar -->
-      <div class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center">
+      <div v-if="status !== 'pending'" class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center">
         <UInput v-model="search" icon="i-lucide-search" placeholder="Référence, nom, numéro OF…" class="w-full sm:flex-1" />
         <div class="flex gap-1 w-full sm:w-auto">
           <UButton
@@ -265,7 +246,7 @@ function confirmCreate() {
       </div>
 
       <!-- MOBILE -->
-      <div class="flex sm:hidden flex-col gap-2">
+      <div v-if="status !== 'pending'" class="flex sm:hidden flex-col gap-2">
         <div
           v-for="item in filteredItems" :key="item.id"
           class="bg-white/70 border rounded-xl overflow-hidden transition-colors duration-150"
@@ -321,7 +302,7 @@ function confirmCreate() {
       </div>
 
       <!-- DESKTOP -->
-      <div class="hidden sm:block bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-hidden">
+      <div v-if="status !== 'pending'" class="hidden sm:block bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-x-auto">
         <UTable v-model:expanded="expanded" :data="filteredItems" :columns="columns" class="w-full">
           <template #expanded="{ row }">
             <div class="px-6 py-4 bg-gray-50/60 border-t border-gray-100 flex items-center justify-between gap-6 flex-wrap">
@@ -352,12 +333,10 @@ function confirmCreate() {
         <div v-if="filteredItems.length === 0" class="text-center py-12 text-gray-400 text-sm">Aucun retour trouvé.</div>
       </div>
 
-    </div>
-
     <!-- ═══ Modal : Déclarer un retour ═══ -->
-    <UModal v-model:open="isCreateModalOpen" :ui="{ content: 'max-w-lg' }">
+    <UModal v-model:open="isCreateModalOpen" :ui="modalUi('lg')">
       <template #content>
-        <div class="p-5 sm:p-6">
+        <div :class="MODAL_BODY">
           <div class="flex items-center gap-3 mb-5">
             <div class="w-10 h-10 rounded-xl bg-[#0F62BC]/8 flex items-center justify-center flex-shrink-0">
               <UIcon name="i-lucide-package-x" class="text-[#0F62BC] text-lg" />
@@ -369,7 +348,7 @@ function confirmCreate() {
           </div>
 
           <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <UFormField label="Désignation *" name="name" class="col-span-2">
                 <UInput v-model="newItem.name" placeholder="Ex : Roulement 6205-ZZ" class="w-full" />
               </UFormField>
@@ -383,11 +362,11 @@ function confirmCreate() {
               </UFormField>
 
               <UFormField label="État" name="state">
-                <USelect v-model="newItem.state" :options="stateOptions" class="w-full" />
+                <USelect v-model="newItem.state" :items="stateOptions" value-key="value" class="w-full" />
               </UFormField>
 
               <UFormField label="Raison du retour" name="reason">
-                <USelect v-model="newItem.reason" :options="reasonOptions" class="w-full" />
+                <USelect v-model="newItem.reason" :items="reasonOptions" value-key="value" class="w-full" />
               </UFormField>
 
               <UFormField label="Numéro OF (optionnel)" name="of" class="col-span-2">
@@ -396,12 +375,13 @@ function confirmCreate() {
             </div>
           </div>
 
-          <div class="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
-            <UButton variant="ghost" color="neutral" @click="isCreateModalOpen = false">Annuler</UButton>
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isCreateModalOpen = false">Annuler</UButton>
             <UButton
               icon="i-lucide-plus"
-              class="bg-[#F57C00] hover:bg-[#e06d00] text-white"
+              class="bg-[#F57C00] hover:bg-[#e06d00] text-white w-full sm:w-auto"
               :disabled="!newItem.name || !newItem.reference"
+              :loading="isMutating"
               @click="confirmCreate"
             >
               Déclarer le retour
@@ -412,9 +392,9 @@ function confirmCreate() {
     </UModal>
 
     <!-- ═══ Modal : Modifier ═══ -->
-    <UModal v-model:open="isEditModalOpen">
+    <UModal v-model:open="isEditModalOpen" :ui="modalUi('sm')">
       <template #content>
-        <div class="p-5 sm:p-6">
+        <div :class="MODAL_BODY">
           <h3 class="text-lg font-semibold text-[#0F62BC] mb-1">Modifier le retour</h3>
           <p v-if="editTarget" class="text-sm font-mono text-gray-400 mb-4">{{ editTarget.reference }} — {{ editTarget.name }}</p>
           <div class="space-y-4">
@@ -422,21 +402,21 @@ function confirmCreate() {
               <UInput v-model.number="editQty" type="number" min="0" class="w-full" />
             </UFormField>
             <UFormField label="État" name="state">
-              <USelect v-model="editState" :options="stateOptions" class="w-full" />
+              <USelect v-model="editState" :items="stateOptions" value-key="value" class="w-full" />
             </UFormField>
           </div>
           <div class="flex justify-end gap-2 mt-5">
             <UButton variant="ghost" color="neutral" @click="isEditModalOpen = false">Annuler</UButton>
-            <UButton class="bg-[#F57C00] hover:bg-[#e06d00] text-white" @click="confirmEdit">Confirmer</UButton>
+            <UButton class="bg-[#F57C00] hover:bg-[#e06d00] text-white" :loading="isMutating" @click="confirmEdit">Confirmer</UButton>
           </div>
         </div>
       </template>
     </UModal>
 
     <!-- ═══ Modal : Supprimer ═══ -->
-    <UModal v-model:open="isDeleteModalOpen">
+    <UModal v-model:open="isDeleteModalOpen" :ui="modalUi('sm')">
       <template #content>
-        <div class="p-5 sm:p-6">
+        <div :class="MODAL_BODY">
           <div class="flex items-center gap-3 mb-4">
             <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
               <UIcon name="i-lucide-trash-2" class="text-red-500 text-lg" />

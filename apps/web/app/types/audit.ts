@@ -1,0 +1,23 @@
+export type ActivityType =
+  | 'of_started'
+  | 'of_completed'
+  | 'of_paused'
+  | 'anomaly'
+  | 'stock_low'
+  | 'stock_updated'
+  | 'stock_reserved'
+  | 'stock_released'
+  | 'bom_validated'
+  | 'login'
+
+export interface Activity {
+  id: number
+  type: ActivityType
+  title: string
+  description: string
+  /** Identifiant utilisateur (filtrage historique par compte). */
+  userId?: string
+  user: string
+  date: Date
+  meta?: string
+}

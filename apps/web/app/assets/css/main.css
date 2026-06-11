@@ -2,17 +2,66 @@
 @import "@nuxt/ui";
 
 @theme static {
-  --font-sans: 'Public Sans', sans-serif;
+  --font-sans: 'Public Sans', system-ui, sans-serif;
 
-  --color-green-50: #EFFDF5;
-  --color-green-100: #D9FBE8;
-  --color-green-200: #B3F5D1;
-  --color-green-300: #75EDAE;
-  --color-green-400: #00DC82;
-  --color-green-500: #00C16A;
-  --color-green-600: #00A155;
-  --color-green-700: #007F45;
-  --color-green-800: #016538;
-  --color-green-900: #0A5331;
-  --color-green-950: #052E16;
+  /* Tokens de marque AERONEXIS Dynamics */
+  --color-aeronexis-primary: #0F62BC;
+  --color-aeronexis-secondary: #156FD4;
+  --color-aeronexis-accent: #F57C00;
+  --color-aeronexis-metal-dark: #7A8798;
+  --color-aeronexis-metal-light: #9AA4B2;
+  --color-aeronexis-metal-pale: #D8DDE3;
+  --color-aeronexis-background: #FFFFFF;
+
+  /* Bleu principal — primary */
+  --color-primary-50: #E7F0FA;
+  --color-primary-100: #C3DBF2;
+  --color-primary-200: #9BC4E9;
+  --color-primary-300: #72ACE0;
+  --color-primary-400: #3F8FD4;
+  --color-primary-500: #0F62BC;
+  --color-primary-600: #0D549F;
+  --color-primary-700: #0B4582;
+  --color-primary-800: #093765;
+  --color-primary-900: #072848;
+  --color-primary-950: #041A2E;
+
+  /* Bleu secondaire — secondary */
+  --color-secondary-50: #E8F2FC;
+  --color-secondary-100: #C5DFF7;
+  --color-secondary-200: #9ECAF2;
+  --color-secondary-300: #77B5EC;
+  --color-secondary-400: #4699E5;
+  --color-secondary-500: #156FD4;
+  --color-secondary-600: #125FB5;
+  --color-secondary-700: #0F4E96;
+  --color-secondary-800: #0C3E77;
+  --color-secondary-900: #092E58;
+  --color-secondary-950: #061F3A;
+
+  /* Orange accent — warning */
+  --color-warning-50: #FEF4E8;
+  --color-warning-100: #FDE4C4;
+  --color-warning-200: #FBD29C;
+  --color-warning-300: #F9BF73;
+  --color-warning-400: #F7A84A;
+  --color-warning-500: #F57C00;
+  --color-warning-600: #D06900;
+  --color-warning-700: #AB5600;
+  --color-warning-800: #864300;
+  --color-warning-900: #613000;
+  --color-warning-950: #3D1E00;
+
+  /* Gris métallique — neutral */
+  --color-neutral-50: #F8F9FA;
+  --color-neutral-100: #F0F2F4;
+  --color-neutral-200: #D8DDE3;
+  --color-neutral-300: #C5CBD3;
+  --color-neutral-400: #AFB7C2;
+  --color-neutral-500: #9AA4B2;
+  --color-neutral-600: #7A8798;
+  --color-neutral-700: #636E7D;
+  --color-neutral-800: #4D5561;
+  --color-neutral-900: #373D46;
+  --color-neutral-950: #21252B;
 }

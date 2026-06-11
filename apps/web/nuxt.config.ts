@@ -13,12 +13,13 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: '/api'
+      apiBase: '/api',
+      apiAdapter: process.env.NUXT_PUBLIC_API_ADAPTER || 'mock'
     }
   },
 
   routeRules: {
-    '/': { prerender: true }
+    '/login': { redirect: '/' }
   },
 
   compatibilityDate: '2025-01-15',

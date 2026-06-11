@@ -1,61 +1,12 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'default' })
+import type { DeliveryStatus, Shipment } from '~/types'
 
-// Types pour les Expéditions
-type DeliveryStatus = 'loading' | 'in_transit' | 'delivered' | 'delayed'
+definePageMeta({ layout: 'sidebar' })
 
-interface Shipment {
-  id: number
-  shipmentNumber: string
-  client: string
-  address: string
-  carrier: string
-  status: DeliveryStatus
-  departureDate: string 
-  estimatedDelivery: string
-  delayDays: number 
-  emoji: string
-}
+const { shipments, status, error, isMutating, refresh, create, updateStatus: updateShipmentStatus } = useShipments()
+const { canPlanShipments, pageSubtitle } = useRoleCapabilities()
 
-// Données fictives complétées
-const shipments = ref<Shipment[]>([
-  {
-    id: 1,
-    shipmentNumber: 'EXP-2026-401',
-    client: 'Airbus Hamburg',
-    address: 'Kreetslag 10, 21129 Hamburg, Allemagne',
-    carrier: 'FedEx Freight',
-    status: 'delayed',
-    departureDate: '2026-06-04',
-    estimatedDelivery: '2026-06-08',
-    delayDays: 2, 
-    emoji: '🚚'
-  },
-  {
-    id: 2,
-    shipmentNumber: 'EXP-2026-402',
-    client: 'Safran Moteurs',
-    address: 'Rond-point René Ravaud, 77550 Moissy-Cramayel, France',
-    carrier: 'DHL Aviation',
-    status: 'in_transit',
-    departureDate: '2026-06-08',
-    estimatedDelivery: '2026-06-11',
-    delayDays: 0,
-    emoji: '✈️'
-  },
-  {
-    id: 3,
-    shipmentNumber: 'EXP-2026-403',
-    client: 'Eurocopter España',
-    address: 'Parque Aeronáutico, 02006 Albacete, Espagne',
-    carrier: 'Geodis Road',
-    status: 'loading',
-    departureDate: '2026-06-11',
-    estimatedDelivery: '2026-06-12',
-    delayDays: 0,
-    emoji: '📦'
-  }
-])
+onMounted(() => refresh())
 
 const statusConfig = {
   loading:    { label: 'En chargement', icon: 'i-lucide-boxes',           class: 'text-gray-600 bg-gray-100' },
@@ -115,62 +66,58 @@ function openCreateModal() {
   isCreateModalOpen.value = true
 }
 
-function submitCreateShipment() {
+async function submitCreateShipment() {
   if (!createForm.value.client.trim() || !createForm.value.address.trim()) return
-
-  const currentYear = new Date().getFullYear()
-  const nextId = shipments.value.length > 0 ? Math.max(...shipments.value.map(s => s.id)) + 1 : 1
-  const generatedShipmentNumber = `EXP-${currentYear}-${String(nextId).padStart(3, '0')}`
-
-  const newShipment: Shipment = {
-    id: nextId,
-    shipmentNumber: generatedShipmentNumber,
+  await create({
     client: createForm.value.client,
     address: createForm.value.address,
     carrier: createForm.value.carrier,
-    status: 'loading',
-    departureDate: new Date().toISOString().split('T')[0]!,
     estimatedDelivery: createForm.value.estimatedDelivery,
-    delayDays: 0,
     emoji: createForm.value.emoji
-  }
-
-  shipments.value.unshift(newShipment)
+  })
   isCreateModalOpen.value = false
 }
 
-function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
-  shipment.status = newStatus
-  if (newStatus !== 'delayed') {
-    shipment.delayDays = 0
+async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
+  await updateShipmentStatus(shipment.id, newStatus)
+  if (selected.value?.id === shipment.id) {
+    selected.value = shipments.value.find(s => s.id === shipment.id) ?? null
   }
 }
 </script>
 
 <template>
-  <div class="relative min-h-screen px-4 py-5 sm:px-6 sm:py-8 bg-gray-50/50">
-    <div class="max-w-6xl mx-auto">
+  <div class="mx-auto w-full max-w-6xl">
 
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+      <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
+      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refresh">Réessayer</UButton>
+
+      <div v-if="status === 'pending'" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <USkeleton v-for="i in 3" :key="i" class="h-40 w-full" />
+      </div>
+
+      <div :class="PAGE_HEADER">
         <div>
-          <h1 class="text-2xl font-bold text-[#0F62BC]">Suivi des Expéditions</h1>
-          <p class="text-sm text-gray-400 mt-0.5">Suivi des flux de transport sortants et gestion des dérives de planning</p>
-        </div>
-        
-        <div class="flex items-center gap-3 w-full sm:w-auto">
-          <UInput v-model="search" icon="i-lucide-search" placeholder="N° expédition, client..." class="flex-1 sm:w-64" />
-          <UButton
-            icon="i-lucide-truck"
-            size="sm"
-            class="bg-[#F57C00] hover:bg-[#e06d00] text-white shrink-0"
-            @click="openCreateModal"
-          >
-            Nouvelle Expédition
-          </UButton>
+          <h1 :class="PAGE_TITLE">Suivi des Expéditions</h1>
+          <p :class="PAGE_SUBTITLE">{{ pageSubtitle || 'Planification des expéditions internes et clients' }}</p>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div :class="TOOLBAR">
+        <UInput v-model="search" icon="i-lucide-search" placeholder="N° expédition, client..." class="w-full sm:flex-1" />
+        <UButton
+          v-if="canPlanShipments"
+          icon="i-lucide-truck"
+          size="sm"
+          class="bg-[#F57C00] hover:bg-[#e06d00] text-white w-full sm:w-auto shrink-0"
+          @click="openCreateModal"
+        >
+          <span class="sm:hidden">Nouvelle</span>
+          <span class="hidden sm:inline">Nouvelle Expédition</span>
+        </UButton>
+      </div>
+
+      <div v-if="status !== 'pending' && filteredShipments.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <UCard
           v-for="shipment in filteredShipments"
           :key="shipment.id"
@@ -213,21 +160,22 @@ function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
               <UIcon name="i-lucide-clock-alert" class="animate-pulse" />
               <span>+{{ shipment.delayDays || 1 }}j de retard</span>
             </div>
-            <div class="text-[11px] text-green-600 font-medium flex items-center gap-1">
+            <div v-else class="text-[11px] text-green-600 font-medium flex items-center gap-1">
               <UIcon name="i-lucide-shield-check" />
               <span>À l'heure</span>
             </div>
           </div>
         </UCard>
       </div>
+      <div v-if="status !== 'pending' && filteredShipments.length === 0" class="text-center py-16 text-gray-400 text-sm">
+        Aucune expédition trouvée.
+      </div>
 
-    </div>
-
-    <UModal v-model:open="isModalOpen" :ui="{ content: 'max-w-lg' }">
+    <UModal v-model:open="isModalOpen" :ui="modalUi('lg')">
       <template #content>
-        <div v-if="selected" class="p-6">
-          
-          <div class="flex justify-between items-start mb-5">
+        <div v-if="selected" :class="MODAL_BODY">
+
+          <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-5">
             <div class="flex gap-3">
               <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl">
                 {{ selected.emoji }}
@@ -253,7 +201,7 @@ function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
           <div class="bg-gray-50 rounded-xl p-4 space-y-4 mb-5 text-sm">
             <div>
               <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Planning de transport</h4>
-              <div class="grid grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-gray-100">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-gray-100">
                 <div>
                   <span class="text-xs text-gray-400 block mb-0.5">Date de départ effective</span>
                   <span class="font-semibold text-gray-800 flex items-center gap-1.5">
@@ -293,7 +241,7 @@ function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
 
           <div class="border border-gray-100 rounded-xl p-4 mb-6">
             <p class="text-xs font-bold uppercase text-gray-400 mb-3">Mettre à jour le statut manuellement</p>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <UButton
                 v-for="option in statusOptions"
                 :key="option.value"
@@ -301,7 +249,7 @@ function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
                 size="sm"
                 :variant="selected.status === option.value ? 'solid' : 'outline'"
                 :color="option.value === 'delayed' && selected.status === 'delayed' ? 'error' : selected.status === option.value ? 'primary' : 'neutral'"
-                class="justify-start text-xs"
+                class="justify-start text-xs w-full"
                 @click="updateStatus(selected!, option.value as DeliveryStatus)"
               >
                 {{ option.label }}
@@ -311,7 +259,7 @@ function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
 
           <div class="flex justify-end pt-3 border-t border-gray-100">
             <UButton class="bg-[#0F62BC] text-white hover:bg-[#156FD4]" @click="isModalOpen = false">
-              Fermer et Sauvegarder
+              Fermer
             </UButton>
           </div>
 
@@ -319,9 +267,9 @@ function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
       </template>
     </UModal>
 
-    <UModal v-model:open="isCreateModalOpen" :ui="{ content: 'max-w-md' }">
+    <UModal v-model:open="isCreateModalOpen" :ui="modalUi('md')">
       <template #content>
-        <div class="p-6">
+        <div :class="MODAL_BODY">
           <div class="flex justify-between items-start mb-5">
             <div>
               <h2 class="text-lg font-bold text-gray-800">Planifier un transport</h2>
@@ -346,24 +294,25 @@ function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
               <UInput v-model="createForm.estimatedDelivery" type="date" icon="i-lucide-calendar" />
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Transporteur</label>
-                <USelectMenu v-model="createForm.carrier" :options="carrierOptions" />
+                <USelectMenu v-model="createForm.carrier" :items="carrierOptions" />
               </div>
               <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Vecteur</label>
-                <USelectMenu v-model="createForm.emoji" :options="['🚚', '✈️', '📦', '🚢', '🚂']" />
+                <USelectMenu v-model="createForm.emoji" :items="['🚚', '✈️', '📦', '🚢', '🚂']" />
               </div>
             </div>
           </div>
 
-          <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
-            <UButton variant="ghost" color="neutral" @click="isCreateModalOpen = false">Annuler</UButton>
-            <UButton 
-              class="bg-[#F57C00] hover:bg-[#e06d00] text-white" 
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isCreateModalOpen = false">Annuler</UButton>
+            <UButton
+              class="bg-[#F57C00] hover:bg-[#e06d00] text-white w-full sm:w-auto"
               icon="i-lucide-check"
               :disabled="!createForm.client.trim() || !createForm.address.trim()"
+              :loading="isMutating"
               @click="submitCreateShipment"
             >
               Créer l'expédition

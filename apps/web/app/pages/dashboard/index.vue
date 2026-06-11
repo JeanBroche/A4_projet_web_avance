@@ -1,37 +1,21 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'default' })
+definePageMeta({ layout: 'sidebar' })
 
-// Types pour le tableau de bord
-interface MarginData {
-  id: number
-  ofNumber: string
-  client: string
-  product: string
-  costPrice: number  // Coût de revient
-  sellingPrice: number // Prix de vente
-  marginPercent: number
-}
+const { dashboard, status, error, refresh } = useReporting()
+const { pageSubtitle } = useRoleCapabilities()
 
-// Données fictives orientées Aero/Marges
-const marginOrders = ref<MarginData[]>([
-  { id: 1, ofNumber: 'OF-2026-0142', client: 'Airbus', product: 'Bras articulé A320', costPrice: 4200, sellingPrice: 6500, marginPercent: 35.3 },
-  { id: 2, ofNumber: 'OF-2026-0143', client: 'Boeing', product: 'Support moteur B737', costPrice: 8900, sellingPrice: 12000, marginPercent: 25.8 },
-  { id: 3, ofNumber: 'OF-2026-0139', client: 'ATR', product: 'Verrouillage train ATR', costPrice: 1500, sellingPrice: 3100, marginPercent: 51.6 },
-  { id: 4, ofNumber: 'OF-2026-0145', client: 'Lockheed', product: 'Panneau cockpit C130', costPrice: 14200, sellingPrice: 16000, marginPercent: 11.2 }, // Marge faible
-])
+onMounted(() => refresh())
 
-// Statistiques des tuiles d'alerte
-const kpis = computed(() => {
-  const totalRevenue = marginOrders.value.reduce((acc, o) => acc + o.sellingPrice, 0)
-  const totalCost = marginOrders.value.reduce((acc, o) => acc + o.costPrice, 0)
-  const avgMargin = ((totalRevenue - totalCost) / totalRevenue) * 100
-
-  return {
-    globalMargin: avgMargin.toFixed(1),
-    delayedOrders: 3, // Exemple de commandes en retard
-    bomAnomalies: 2,  // Nombre d'anomalies BOM bloquantes
-    totalValue: totalRevenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-  }
+const marginOrders = computed(() => dashboard.value?.marginOrders ?? [])
+const criticalIncidents = computed(() => dashboard.value?.criticalIncidents ?? [])
+const kpis = computed(() => dashboard.value ?? {
+  globalMargin: '0',
+  delayedOrders: 0,
+  bomAnomalies: 0,
+  totalValue: '0 €',
+  yieldRate: 0,
+  marginOrders: [],
+  criticalIncidents: []
 })
 
 // Détermination de la couleur de la jauge de marge
@@ -43,17 +27,23 @@ function getMarginColor(percent: number) {
 </script>
 
 <template>
-  <div class="relative min-h-screen px-4 py-5 sm:px-6 sm:py-8 bg-gray-50/50">
-    <div class="max-w-6xl mx-auto">
+  <div class="mx-auto w-full max-w-6xl">
+      <div class="mb-5 sm:mb-6">
+        <div>
+          <h1 :class="PAGE_TITLE">Performance & Alertes</h1>
+          <p :class="PAGE_SUBTITLE">{{ pageSubtitle || 'KPI production, stocks, marges et incidents critiques' }}</p>
+        </div>
+      </div>
 
-      <!-- Header -->
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold text-[#0F62BC]">Performance & Alertes</h1>
-        <p class="text-sm text-gray-400 mt-0.5">Analyse des marges financières, retards de livraison et criticité des nomenclatures</p>
+      <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
+      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refresh">Réessayer</UButton>
+
+      <div v-if="status === 'pending'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <USkeleton v-for="i in 4" :key="i" class="h-24 w-full" />
       </div>
 
       <!-- Tuiles KPI (Dashboard Grid) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         
         <!-- Jauge Marge Globale -->
         <UCard class="border-none shadow-sm">
@@ -105,11 +95,50 @@ function getMarginColor(percent: number) {
 
       </div>
 
-      <!-- Section Graphique Réel & Analyse des Marges -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Liste analytique des marges par OF -->
-        <div class="lg:col-span-2 space-y-4">
+      <!-- Taux de rendement -->
+      <div v-if="status !== 'pending'" class="mb-6">
+        <UCard class="border-none shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Taux de rendement production</p>
+              <p class="text-2xl font-bold text-[#0F62BC]">{{ kpis.yieldRate }}%</p>
+              <p class="text-xs text-gray-400 mt-1">Lots terminés / lots totaux</p>
+            </div>
+            <UProgress :model-value="kpis.yieldRate" :max="100" color="primary" class="w-full sm:w-64" />
+          </div>
+        </UCard>
+      </div>
+
+      <!-- Incidents critiques -->
+      <div v-if="status !== 'pending' && criticalIncidents.length > 0" class="mb-6">
+        <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2 mb-3">
+          <UIcon name="i-lucide-shield-alert" class="text-red-500" />
+          Incidents critiques & rapport consolidé
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <UCard
+            v-for="inc in criticalIncidents"
+            :key="inc.id"
+            class="border-none shadow-sm"
+            :ui="{ body: 'py-3 px-4' }"
+          >
+            <div class="flex items-start gap-3">
+              <UIcon
+                :name="inc.severity === 'error' ? 'i-lucide-alert-octagon' : 'i-lucide-alert-triangle'"
+                :class="inc.severity === 'error' ? 'text-red-500' : 'text-orange-500'"
+                class="size-4 mt-0.5 shrink-0"
+              />
+              <div>
+                <p class="text-sm font-semibold text-gray-800">{{ inc.label }}</p>
+                <p class="text-xs text-gray-500 mt-0.5">{{ inc.detail }}</p>
+              </div>
+            </div>
+          </UCard>
+        </div>
+      </div>
+
+      <!-- Analyse des marges par OF -->
+      <div v-if="status !== 'pending'" class="space-y-4">
           <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
             <UIcon name="i-lucide-layers" class="text-[#0F62BC]" />
             Détail des marges par Ordre de Fabrication
@@ -136,7 +165,7 @@ function getMarginColor(percent: number) {
                   ]">{{ order.marginPercent }}%</span>
                 </div>
                 <!-- Composant Nuxt UI UProgress pour simuler un mini-graph linéaire -->
-                <UProgress :value="order.marginPercent" :max="100" :color="getMarginColor(order.marginPercent)" size="sm" />
+                <UProgress :model-value="order.marginPercent" :max="100" :color="getMarginColor(order.marginPercent)" size="sm" />
               </div>
 
               <!-- Prix de vente final -->
@@ -146,74 +175,7 @@ function getMarginColor(percent: number) {
               </div>
             </div>
           </UCard>
-        </div>
-
-        <!-- Deuxième Graphique "En Vrai" : Répartition de la charge de travail et goulets d'étranglement -->
-        <div class="space-y-4">
-          <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center gap-2">
-            <UIcon name="i-lucide-pie-chart" class="text-[#0F62BC]" />
-            Santé de la Supply Chain
-          </h2>
-
-          <UCard class="border-none shadow-sm h-full">
-            <p class="text-xs font-semibold text-gray-500 mb-4">Répartition des risques composants</p>
-            
-            <!-- Graphique à barres verticales simulé nativement pour une légèreté maximale -->
-            <div class="flex items-end justify-between h-40 pt-4 px-2 border-b border-gray-100">
-              
-              <!-- Barre 1 : Matière Première -->
-              <div class="flex flex-col items-center gap-2 w-12 group">
-                <div class="bg-[#0F62BC] w-full rounded-t-md transition-all duration-300 group-hover:opacity-80" style="height: 75%" title="75% conforme" />
-                <span class="text-[10px] font-medium text-gray-400 truncate w-full text-center">Acier/Alu</span>
-              </div>
-
-              <!-- Barre 2 : Fixations (Alerte moyenne) -->
-              <div class="flex flex-col items-center gap-2 w-12 group">
-                <div class="bg-[#F57C00] w-full rounded-t-md transition-all duration-300 group-hover:opacity-80" style="height: 40%" title="40% en stock bas" />
-                <span class="text-[10px] font-medium text-gray-400 truncate w-full text-center">Visserie</span>
-              </div>
-
-              <!-- Barre 3 : Joints / Composants critiques (Alerte forte) -->
-              <div class="flex flex-col items-center gap-2 w-12 group">
-                <div class="bg-red-500 w-full rounded-t-md transition-all duration-300 group-hover:opacity-80" style="height: 15%" title="15% rupture imminente" />
-                <span class="text-[10px] font-medium text-gray-400 truncate w-full text-center">Étanchéité</span>
-              </div>
-
-              <!-- Barre 4 : Électronique -->
-              <div class="flex flex-col items-center gap-2 w-12 group">
-                <div class="bg-green-500 w-full rounded-t-md transition-all duration-300 group-hover:opacity-80" style="height: 90%" title="90% OK" />
-                <span class="text-[10px] font-medium text-gray-400 truncate w-full text-center">Avionique</span>
-              </div>
-
-            </div>
-
-            <!-- Légende du graphique -->
-            <div class="grid grid-cols-2 gap-2 mt-4 text-[11px] text-gray-500">
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-[#0F62BC]" /> Stock Sécurisé
-              </div>
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-green-500" /> Flux Tendu OK
-              </div>
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-[#F57C00]" /> Appro. Limite
-              </div>
-              <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-red-500" /> Rupture (BOM)
-              </div>
-            </div>
-
-            <!-- Bouton d'action contextuel -->
-            <div class="mt-5 pt-4 border-t border-gray-100">
-              <UButton icon="i-lucide-file-text" size="xs" color="neutral" variant="subtle" block class="text-xs">
-                Exporter le rapport financier (PDF)
-              </UButton>
-            </div>
-          </UCard>
-        </div>
-
       </div>
 
-    </div>
   </div>
 </template>

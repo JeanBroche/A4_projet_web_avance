@@ -1,25 +1,26 @@
-export type UserRole = 'guest' | 'production' | 'logistique' | 'commercial' | 'direction' | 'admin'
+import { getRoleLabel } from '~/lib/roles'
+import type { UserRole } from '~/types'
 
-export interface SessionUser {
-  id: string | null
-  name: string | null
-  role: UserRole
-}
-
-/**
- * Stub de session en attendant l'authentification (issue #11).
- */
 export function useSession() {
-  const user = ref<SessionUser>({
-    id: null,
-    name: null,
-    role: 'guest'
-  })
+  const { session } = useSessionState()
 
-  const isAuthenticated = computed(() => user.value.id !== null)
+  const user = computed(() => session.value.user)
+  const isAuthenticated = computed(() => session.value.user !== null)
+  const role = computed(() => session.value.user?.role ?? null)
+  const roleLabel = computed(() => (role.value ? getRoleLabel(role.value) : null))
+  const accessToken = computed(() => session.value.accessToken)
+
+  function hasRole(...roles: UserRole[]): boolean {
+    if (!role.value) return false
+    return roles.includes(role.value) || role.value === 'admin'
+  }
 
   return {
-    user: readonly(user),
-    isAuthenticated
+    user,
+    isAuthenticated,
+    role,
+    roleLabel,
+    accessToken,
+    hasRole
   }
 }

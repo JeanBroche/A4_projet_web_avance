@@ -1,26 +1,22 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
+import { createStockLevelSchema, firstZodError } from '~/lib/validation/schemas'
+import type { StockLevel, StockUnit } from '~/types'
 
-definePageMeta({ layout: 'default' })
+definePageMeta({ layout: 'sidebar' })
 
 const UButton = resolveComponent('UButton')
 const UBadge  = resolveComponent('UBadge')
 
-type Unit = 'pcs' | 'mm' | 'cm' | 'm' | 'kg' | 'g' | 'ml' | 'l'
+const { levels, status, error, isMutating, refreshLevels, createLevel, updateLevel, deleteLevel } = useStock()
+const { canManageStock, pageSubtitle } = useRoleCapabilities()
 
-interface Part {
-  id: number
-  emoji: string
-  name: string
-  reference: string
-  category: string
-  description: string
-  dimensions: string
-  qty: number
-  unit: Unit
-  minQty: number
-}
+onMounted(() => refreshLevels())
+
+const parts = levels
+type Unit = StockUnit
+type Part = StockLevel
 
 const unitLabels: Record<Unit, string> = {
   pcs: 'pcs', mm: 'mm', cm: 'cm', m: 'm', kg: 'kg', g: 'g', ml: 'ml', l: 'L'
@@ -37,19 +33,6 @@ const unitOptions = [
   { label: 'Litres (L)',   value: 'l'   },
 ]
 
-const parts = ref<Part[]>([
-  { id: 1,  emoji: '🔩', name: 'Vis M6 x 20',           reference: 'VIS-M6-020',  category: 'Visserie',      description: 'Vis à tête hexagonale en acier inoxydable 316L, traitement anti-corrosion.',           dimensions: 'M6 × 20 mm',          qty: 450, unit: 'pcs', minQty: 100 },
-  { id: 2,  emoji: '🔩', name: 'Boulon M8 x 40',         reference: 'BLN-M8-040',  category: 'Visserie',      description: 'Boulon haute résistance classe 8.8, tête hexagonale, filetage complet.',               dimensions: 'M8 × 40 mm',          qty: 80,  unit: 'pcs', minQty: 100 },
-  { id: 3,  emoji: '⚙️', name: 'Roulement 6205-ZZ',      reference: 'RLM-6205-ZZ', category: 'Roulements',    description: 'Roulement à billes double blindage, acier chromé, graisse haute température.',           dimensions: 'Ø25 × Ø52 × 15 mm',  qty: 24,  unit: 'pcs', minQty: 10  },
-  { id: 4,  emoji: '🪛', name: 'Axe acier Ø12',          reference: 'AXE-012-500', category: 'Axes & Arbres', description: 'Axe en acier rectifié h6, tolérance serrée, acier C45 traité.',                       dimensions: 'Ø12 × 500 mm',        qty: 6,   unit: 'pcs', minQty: 10  },
-  { id: 5,  emoji: '🔧', name: 'Écrou frein M6',         reference: 'ECR-M6-FR',   category: 'Visserie',      description: 'Écrou nylstop inox A2, auto-freinant, résistant aux vibrations.',                    dimensions: 'M6',                  qty: 320, unit: 'pcs', minQty: 200 },
-  { id: 6,  emoji: '🧲', name: 'Joint torique NBR 20×2', reference: 'JNT-NBR-202', category: 'Joints',        description: 'Joint torique en caoutchouc NBR, résistant aux huiles et carburants, -30°C/+120°C.', dimensions: 'Ø20 × 2 mm',         qty: 0,   unit: 'pcs', minQty: 50  },
-  { id: 7,  emoji: '📐', name: 'Profilé alu 40×40',      reference: 'PRF-AL-4040', category: 'Profilés',      description: 'Profilé aluminium anodisé 6060-T5, rainure 8 mm, usage structural.',                 dimensions: '40 × 40 mm — 3 m',    qty: 12,  unit: 'm',   minQty: 20  },
-  { id: 8,  emoji: '🔗', name: 'Câble acier Ø4',         reference: 'CAB-AC-004',  category: 'Câbles',        description: 'Câble toronné 7×7 en acier galvanisé, rupture 1200 kg.',                            dimensions: 'Ø4 mm',               qty: 85,  unit: 'm',   minQty: 50  },
-  { id: 9,  emoji: '🧪', name: 'Graisse Molykote BR2',   reference: 'GRS-MK-BR2',  category: 'Lubrifiants',   description: 'Graisse au bisulfure de molybdène, hautes pressions, -40°C/+180°C.',                  dimensions: '—',                   qty: 3,   unit: 'kg',  minQty: 5   },
-  { id: 10, emoji: '🪝', name: 'Chape Ø8 inox',          reference: 'CHP-INX-008', category: 'Fixations',     description: 'Chape droite inox A4, corps forgé, axe démontable, WLL 500 kg.',                    dimensions: 'Ø8 mm',               qty: 18,  unit: 'pcs', minQty: 10  },
-])
-
 const search     = ref('')
 const filter     = ref<'all' | 'low' | 'out'>('all')
 const expanded   = ref({})
@@ -59,6 +42,7 @@ const expandedId = ref<number | null>(null)
 const isCreateModalOpen  = ref(false)
 const isEditModalOpen    = ref(false)
 const isDeleteModalOpen  = ref(false)
+const createFormError    = ref<string | null>(null)
 const editTarget         = ref<Part | null>(null)
 const deleteTarget       = ref<Part | null>(null)
 const editQty            = ref(0)
@@ -70,34 +54,25 @@ const newPart = ref({
 
 function openCreate() {
   newPart.value = { name: '', reference: '', category: '', description: '', dimensions: '', qty: 1, unit: 'pcs', minQty: 10 }
+  createFormError.value = null
   isCreateModalOpen.value = true
 }
 
-function confirmCreate() {
-  if (!newPart.value.name || !newPart.value.reference) return
-  const emojiMap: Record<string, string> = {
-    Visserie: '🔩', Roulements: '⚙️', 'Axes & Arbres': '🪛', Joints: '🧲',
-    Profilés: '📐', Câbles: '🔗', Lubrifiants: '🧪', Fixations: '🪝',
+async function confirmCreate() {
+  createFormError.value = null
+  const parsed = createStockLevelSchema.safeParse(newPart.value)
+  if (!parsed.success) {
+    createFormError.value = firstZodError(parsed.error)
+    return
   }
-  parts.value.unshift({
-    id:          Date.now(),
-    emoji:       emojiMap[newPart.value.category] ?? '📦',
-    name:        newPart.value.name,
-    reference:   newPart.value.reference,
-    category:    newPart.value.category,
-    description: newPart.value.description,
-    dimensions:  newPart.value.dimensions || '—',
-    qty:         newPart.value.qty,
-    unit:        newPart.value.unit,
-    minQty:      newPart.value.minQty,
-  })
+  await createLevel(parsed.data)
   isCreateModalOpen.value = false
 }
 
 // ── Statuts ───────────────────────────────────────────────────────────────────
 function getStatus(p: Part): 'ok' | 'low' | 'out' {
-  if (p.qty === 0)       return 'out'
-  if (p.qty < p.minQty) return 'low'
+  if (p.available === 0) return 'out'
+  if (p.available < p.minQty) return 'low'
   return 'ok'
 }
 
@@ -177,7 +152,11 @@ const columns: TableColumn<Part>[] = [
     cell: ({ row }) => {
       const s = getStatus(row.original)
       const color = s === 'out' ? 'text-red-500' : s === 'low' ? 'text-orange-500' : 'text-[#0F62BC]'
-      return h('span', { class: `text-sm font-semibold ${color}` }, `${row.original.qty} ${unitLabels[row.original.unit]}`)
+      const p = row.original
+      const label = p.reserved > 0
+        ? `${p.available} dispo (${p.reserved} rés.)`
+        : `${p.available}`
+      return h('span', { class: `text-sm font-semibold ${color}` }, `${label} ${unitLabels[p.unit]}`)
     },
   },
   {
@@ -200,10 +179,9 @@ function openEdit(p: Part) {
   isEditModalOpen.value = true
 }
 
-function confirmEdit() {
+async function confirmEdit() {
   if (!editTarget.value) return
-  const idx = parts.value.findIndex(p => p.id === editTarget.value!.id)
-  if (idx !== -1) parts.value[idx]!.qty = editQty.value
+  await updateLevel(editTarget.value.id, editQty.value)
   isEditModalOpen.value = false
 }
 
@@ -212,34 +190,40 @@ function askDelete(p: Part) {
   isDeleteModalOpen.value = true
 }
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!deleteTarget.value) return
   const id = deleteTarget.value.id
   if (expandedId.value === id) expandedId.value = null
-  parts.value = parts.value.filter(p => p.id !== id)
+  await deleteLevel(id)
   isDeleteModalOpen.value = false
   deleteTarget.value = null
 }
 </script>
 
 <template>
-  <div class="relative min-h-screen overflow-hidden px-4 py-5 sm:px-6 sm:py-8">
-    <div class="max-w-5xl mx-auto">
+  <div class="mx-auto w-full max-w-5xl">
 
       <!-- Header -->
       <div class="flex items-start justify-between mb-5 gap-2">
         <div>
           <h1 class="text-xl sm:text-2xl font-bold text-[#0F62BC]">Stock pièces & matières</h1>
-          <p class="text-xs sm:text-sm text-gray-400 mt-0.5">Composants, visserie, matières premières</p>
+          <p class="text-xs sm:text-sm text-gray-400 mt-0.5">{{ pageSubtitle || 'Composants, visserie, matières premières' }}</p>
         </div>
-        <UButton icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium flex-shrink-0" @click="openCreate">
+        <UButton v-if="canManageStock" icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium flex-shrink-0" @click="openCreate">
           <span class="hidden sm:inline">Ajouter une pièce</span>
           <span class="sm:hidden">Ajouter</span>
         </UButton>
       </div>
 
+      <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
+      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refreshLevels">Réessayer</UButton>
+
+      <div v-if="status === 'pending'" class="space-y-3 mb-5">
+        <USkeleton v-for="i in 4" :key="i" class="h-16 w-full" />
+      </div>
+
       <!-- Stats -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
+      <div v-else class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-5">
         <div class="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-xl p-3 sm:p-4">
           <p class="text-xs text-gray-400 mb-1">Références</p>
           <p class="text-xl sm:text-2xl font-semibold text-[#0F62BC]">{{ stats.total }}</p>
@@ -259,7 +243,7 @@ function confirmDelete() {
       </div>
 
       <!-- Toolbar -->
-      <div class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center">
+      <div v-if="status !== 'pending'" class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center">
         <UInput v-model="search" icon="i-lucide-search" placeholder="Référence, désignation, catégorie…" class="w-full sm:flex-1" />
         <div class="flex gap-1 w-full sm:w-auto">
           <UButton
@@ -277,7 +261,7 @@ function confirmDelete() {
       </div>
 
       <!-- MOBILE -->
-      <div class="flex sm:hidden flex-col gap-2">
+      <div v-if="status !== 'pending'" class="flex sm:hidden flex-col gap-2">
         <div
           v-for="p in filteredParts" :key="p.id"
           class="bg-white/70 border rounded-xl overflow-hidden transition-colors duration-150"
@@ -324,8 +308,10 @@ function confirmDelete() {
                 </div>
               </div>
               <div class="flex gap-2">
-                <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="xs" class="flex-1 justify-center" @click="openEdit(p)">Modifier</UButton>
-                <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="xs" class="flex-1 justify-center" @click="askDelete(p)">Supprimer</UButton>
+                <template v-if="canManageStock">
+                  <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="xs" class="flex-1 justify-center" @click="openEdit(p)">Modifier</UButton>
+                  <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="xs" class="flex-1 justify-center" @click="askDelete(p)">Supprimer</UButton>
+                </template>
               </div>
             </div>
           </Transition>
@@ -334,7 +320,7 @@ function confirmDelete() {
       </div>
 
       <!-- DESKTOP -->
-      <div class="hidden sm:block bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-hidden">
+      <div v-if="status !== 'pending'" class="hidden sm:block bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-x-auto">
         <UTable v-model:expanded="expanded" :data="filteredParts" :columns="columns" class="w-full">
           <template #expanded="{ row }">
             <div class="px-6 py-4 bg-gray-50/60 border-t border-gray-100">
@@ -361,8 +347,10 @@ function confirmDelete() {
                   </div>
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0">
-                  <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="sm" @click="openEdit(row.original)">Modifier</UButton>
-                  <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="sm" @click="askDelete(row.original)">Supprimer</UButton>
+                  <template v-if="canManageStock">
+                    <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="sm" @click="openEdit(row.original)">Modifier</UButton>
+                    <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="sm" @click="askDelete(row.original)">Supprimer</UButton>
+                  </template>
                 </div>
               </div>
             </div>
@@ -371,23 +359,21 @@ function confirmDelete() {
         <div v-if="filteredParts.length === 0" class="text-center py-12 text-gray-400 text-sm">Aucune pièce trouvée.</div>
       </div>
 
-    </div>
-
     <!-- ═══ Modal : Ajouter une pièce ═══ -->
-    <UModal v-model:open="isCreateModalOpen" :ui="{ content: 'max-w-lg' }">
+    <UModal v-model:open="isCreateModalOpen" :ui="modalUi('lg')">
       <template #content>
-        <div class="p-5 sm:p-6">
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="spare-create-title">
           <div class="flex items-center gap-3 mb-5">
             <div class="w-10 h-10 rounded-xl bg-[#0F62BC]/8 flex items-center justify-center flex-shrink-0">
               <UIcon name="i-lucide-package-plus" class="text-[#0F62BC] text-lg" />
             </div>
             <div>
-              <h3 class="text-base font-semibold text-gray-800">Ajouter une pièce</h3>
+              <h3 id="spare-create-title" class="text-base font-semibold text-gray-800">Ajouter une pièce</h3>
               <p class="text-xs text-gray-400 mt-0.5">Enregistrer une nouvelle référence au stock</p>
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <UFormField label="Désignation *" name="name" class="col-span-2">
               <UInput v-model="newPart.name" placeholder="Ex : Roulement 6205-ZZ" class="w-full" />
             </UFormField>
@@ -405,7 +391,7 @@ function confirmDelete() {
             </UFormField>
 
             <UFormField label="Unité" name="unit">
-              <USelect v-model="newPart.unit" :options="unitOptions" class="w-full" />
+              <USelect v-model="newPart.unit" :items="unitOptions" value-key="value" class="w-full" />
             </UFormField>
 
             <UFormField label="Seuil minimum" name="minQty">
@@ -421,12 +407,15 @@ function confirmDelete() {
             </UFormField>
           </div>
 
-          <div class="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
-            <UButton variant="ghost" color="neutral" @click="isCreateModalOpen = false">Annuler</UButton>
+          <p v-if="createFormError" class="text-red-500 text-sm mt-3">{{ createFormError }}</p>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isCreateModalOpen = false">Annuler</UButton>
             <UButton
               icon="i-lucide-plus"
-              class="bg-[#F57C00] hover:bg-[#e06d00] text-white"
-              :disabled="!newPart.name || !newPart.reference"
+              class="bg-[#F57C00] hover:bg-[#e06d00] text-white w-full sm:w-auto"
+              :loading="isMutating"
+              aria-label="Ajouter la pièce au stock"
               @click="confirmCreate"
             >
               Ajouter la pièce
@@ -437,10 +426,10 @@ function confirmDelete() {
     </UModal>
 
     <!-- ═══ Modal : Modifier quantité ═══ -->
-    <UModal v-model:open="isEditModalOpen">
+    <UModal v-model:open="isEditModalOpen" :ui="modalUi('sm')">
       <template #content>
-        <div class="p-5 sm:p-6">
-          <h3 class="text-lg font-semibold text-[#0F62BC] mb-1">Modifier la quantité</h3>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="spare-edit-title">
+          <h3 id="spare-edit-title" class="text-lg font-semibold text-[#0F62BC] mb-1">Modifier la quantité</h3>
           <p v-if="editTarget" class="text-sm text-gray-400 mb-4">
             {{ editTarget.name }} — <span class="font-mono">{{ editTarget.reference }}</span>
           </p>
@@ -449,29 +438,29 @@ function confirmDelete() {
           </UFormField>
           <div class="flex justify-end gap-2 mt-5">
             <UButton variant="ghost" color="neutral" @click="isEditModalOpen = false">Annuler</UButton>
-            <UButton class="bg-[#F57C00] hover:bg-[#e06d00] text-white" @click="confirmEdit">Confirmer</UButton>
+            <UButton class="bg-[#F57C00] hover:bg-[#e06d00] text-white" :loading="isMutating" @click="confirmEdit">Confirmer</UButton>
           </div>
         </div>
       </template>
     </UModal>
 
     <!-- ═══ Modal : Supprimer ═══ -->
-    <UModal v-model:open="isDeleteModalOpen">
+    <UModal v-model:open="isDeleteModalOpen" :ui="modalUi('sm')">
       <template #content>
-        <div class="p-5 sm:p-6">
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="spare-delete-title">
           <div class="flex items-center gap-3 mb-4">
             <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
               <UIcon name="i-lucide-trash-2" class="text-red-500 text-lg" />
             </div>
             <div>
-              <h3 class="text-base font-semibold text-gray-800">Supprimer la pièce</h3>
+              <h3 id="spare-delete-title" class="text-base font-semibold text-gray-800">Supprimer la pièce</h3>
               <p v-if="deleteTarget" class="text-sm text-gray-400 font-mono mt-0.5">{{ deleteTarget.reference }}</p>
             </div>
           </div>
           <p class="text-sm text-gray-600 mb-5">Cette action est irréversible. La pièce <span class="font-medium text-gray-800">{{ deleteTarget?.name }}</span> sera définitivement supprimée du stock.</p>
           <div class="flex justify-end gap-2">
             <UButton variant="ghost" color="neutral" @click="isDeleteModalOpen = false">Annuler</UButton>
-            <UButton icon="i-lucide-trash-2" color="error" @click="confirmDelete">Supprimer</UButton>
+            <UButton icon="i-lucide-trash-2" color="error" aria-label="Confirmer la suppression" @click="confirmDelete">Supprimer</UButton>
           </div>
         </div>
       </template>
