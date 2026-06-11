@@ -7,7 +7,7 @@ Expose les microservices Moleculer en **REST** sur le port **4000** (`/api/*`), 
 ## Prérequis
 
 - Infra locale : `pnpm docker:up` (Kafka, Redis, PostgreSQL…)
-- Microservices démarrés : `pnpm dev:backend`
+- Microservices + gateway : `pnpm backend` (ou `pnpm dev:backend`)
 - Fichier `.env` à la racine (voir `.env.example`)
 
 ## Lancer la gateway

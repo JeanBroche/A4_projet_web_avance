@@ -18,6 +18,8 @@
     "dev:audit": "pnpm --filter @aeronexis/audit dev",
     "dev:notification": "pnpm --filter @aeronexis/notification dev",
     "dev:backend": "node --import tsx scripts/dev-backend.ts",
+    "backend": "pnpm dev:backend",
+    "typecheck:scripts": "tsc --project scripts/tsconfig.json",
     "dev:backend:parallel": "pnpm --parallel --filter @aeronexis/auth --filter @aeronexis/stock --filter @aeronexis/order --filter @aeronexis/production --filter @aeronexis/shipment --filter @aeronexis/reporting --filter @aeronexis/audit --filter @aeronexis/notification --filter @aeronexis/gateway dev",
     "dev:web": "pnpm --filter web dev",
     "lint": "pnpm -r run lint",
@@ -44,9 +46,11 @@
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@types/node": "^22.15.0",
     "dotenv": "^17.4.2",
     "kafkajs": "^2.2.4",
     "moleculer": "^0.15.0",
-    "tsx": "^4.20.3"
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }
