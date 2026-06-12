@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import { createStockLevelSchema, firstZodError } from '~/lib/validation/schemas'
-import type { MaterialLot, PurchaseOrder, PurchaseOrderStatus, StockLevel, StockMovement, StockUnit, SupplierDelay } from '~/types'
+import type { MaterialLot, PurchaseOrder, PurchaseOrderStatus, RuptureForecast, StockLevel, StockMovement, StockReservation, StockUnit, SupplierDelay } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
 
@@ -12,13 +12,14 @@ const UBadge  = resolveComponent('UBadge')
 const {
   levels, reservations, alerts, status, error, isMutating,
   refresh, reportSupplierDelay,
-  ruptureForecast,
+  ruptureForecast, refreshRuptureForecast,
   supplierDelays,
   fetchMovementsFor,
   consolidatedLevels, refreshConsolidated,
   fetchLotsFor, createLot,
   transferStock,
   purchaseOrders, refreshPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
+  releaseReservation,
   createLevel, updateLevel, deleteLevel
 } = useStock()
 const { canManageStock, canViewConsolidatedStock, pageSubtitle } = useRoleCapabilities()
@@ -27,19 +28,53 @@ const activeReservations = computed(() =>
   reservations.value.filter(r => r.status === 'ACTIVE')
 )
 
-const reservationsByOf = computed(() => {
-  const map = new Map<string, typeof activeReservations.value>()
+type ReservationOfGroup = {
+  ofId: string
+  items: StockReservation[]
+  createdAt: Date
+  materialCount: number
+}
+
+const reservationsByOf = computed<ReservationOfGroup[]>(() => {
+  const map = new Map<string, StockReservation[]>()
   for (const res of activeReservations.value) {
     const list = map.get(res.ofId) ?? []
     list.push(res)
     map.set(res.ofId, list)
   }
   return [...map.entries()]
-    .map(([ofId, items]) => ({ ofId, items }))
-    .sort((a, b) => a.ofId.localeCompare(b.ofId))
+    .map(([ofId, items]) => ({
+      ofId,
+      items: [...items].sort((a, b) => a.materialId.localeCompare(b.materialId)),
+      createdAt: new Date(Math.min(...items.map(i => i.createdAt.getTime()))),
+      materialCount: items.length
+    }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 })
 
 const openReservationOfIds = ref<Set<string>>(new Set())
+const reservationFilter = ref('')
+const releasingReservationId = ref<number | null>(null)
+
+const filteredReservationsByOf = computed(() => {
+  const q = reservationFilter.value.trim().toLowerCase()
+  if (!q) return reservationsByOf.value
+  return reservationsByOf.value
+    .map(group => ({
+      ...group,
+      items: group.items.filter(res =>
+        res.ofId.toLowerCase().includes(q)
+        || res.materialId.toLowerCase().includes(q)
+        || res.materialName.toLowerCase().includes(q)
+      )
+    }))
+    .filter(group => group.items.length > 0)
+})
+
+const allReservationsExpanded = computed(() =>
+  filteredReservationsByOf.value.length > 0
+  && filteredReservationsByOf.value.every(g => openReservationOfIds.value.has(g.ofId))
+)
 
 function toggleReservationOf(ofId: string) {
   const next = new Set(openReservationOfIds.value)
@@ -51,6 +86,59 @@ function toggleReservationOf(ofId: string) {
 function isReservationOfOpen(ofId: string) {
   return openReservationOfIds.value.has(ofId)
 }
+
+function expandAllReservations() {
+  openReservationOfIds.value = new Set(filteredReservationsByOf.value.map(g => g.ofId))
+}
+
+function collapseAllReservations() {
+  openReservationOfIds.value = new Set()
+}
+
+function toggleAllReservations() {
+  if (allReservationsExpanded.value) collapseAllReservations()
+  else expandAllReservations()
+}
+
+function reservationStockPart(res: StockReservation) {
+  return parts.value.find(p => p.reference === res.materialId)
+}
+
+function reservationStockStatus(res: StockReservation): 'ok' | 'tight' | 'unknown' {
+  const part = reservationStockPart(res)
+  if (!part) return 'unknown'
+  if (part.available >= res.quantity) return 'ok'
+  return 'tight'
+}
+
+const reservationStockStatusConfig = {
+  ok: { label: 'Stock OK', color: 'success' as const },
+  tight: { label: 'Stock serré', color: 'warning' as const },
+  unknown: { label: '—', color: 'neutral' as const }
+}
+
+function formatReservationAge(d: Date) {
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000)
+  if (days === 0) return 'Aujourd\'hui'
+  if (days === 1) return 'Hier'
+  if (days < 7) return `Il y a ${days} j`
+  return formatDate(d)
+}
+
+async function onReleaseReservation(id: number) {
+  releasingReservationId.value = id
+  try {
+    await releaseReservation(id)
+  } finally {
+    releasingReservationId.value = null
+  }
+}
+
+watch(reservationsByOf, (groups) => {
+  if (groups.length > 0 && openReservationOfIds.value.size === 0) {
+    openReservationOfIds.value = new Set(groups.slice(0, Math.min(2, groups.length)).map(g => g.ofId))
+  }
+}, { immediate: true })
 
 const viewMode = ref<'site' | 'consolidated'>('site')
 
@@ -69,8 +157,33 @@ onMounted(async () => {
 })
 
 const topRuptureRisks = computed(() =>
-  ruptureForecast.value.filter(f => f.score >= 30).slice(0, 5)
+  ruptureForecast.value
+    .filter(f => f.score >= 30 || f.status === 'rupture' || f.status === 'critical')
+    .slice(0, 5)
 )
+
+const ruptureStatusConfig = {
+  rupture: { label: 'Rupture', color: 'error' as const },
+  critical: { label: 'Critique', color: 'error' as const },
+  warning: { label: 'À surveiller', color: 'warning' as const },
+  ok: { label: 'OK', color: 'success' as const }
+}
+
+function ruptureDetailLabel(item: RuptureForecast) {
+  if (item.status === 'rupture' || item.available <= 0) {
+    return 'Rupture actuelle — réapprovisionnement requis'
+  }
+  if (item.consumptionPerDay > 0 && item.estimatedDaysUntilRupture !== null) {
+    return `~${item.estimatedDaysUntilRupture} j restants à ${item.consumptionPerDay} ${unitLabels[item.unit]}/j`
+  }
+  if (item.available < item.minQty) {
+    return `Sous le seuil (${item.available} / ${item.minQty} ${unitLabels[item.unit]} min.) — pas de conso récente`
+  }
+  if (item.activeReservationQty > 0) {
+    return `${item.activeReservationQty} ${unitLabels[item.unit]} engagés en réservations OF`
+  }
+  return 'Risque faible sur les 30 prochains jours'
+}
 
 const isDelayModalOpen = ref(false)
 const delayFormError = ref<string | null>(null)
@@ -661,35 +774,59 @@ async function confirmTransfer() {
 
       <UCard v-if="status !== 'pending' && topRuptureRisks.length > 0" class="border-none shadow-sm mb-5">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-            <UIcon name="i-lucide-gauge" class="text-[#F57C00]" />
-            Prévision de rupture (30 j)
-          </h2>
-          <UButton size="xs" variant="ghost" icon="i-lucide-refresh-cw" @click="refresh" />
+          <div>
+            <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <UIcon name="i-lucide-gauge" class="text-[#F57C00]" />
+              Prévision de rupture (30 j)
+            </h2>
+            <p class="text-xs text-gray-400 mt-0.5">
+              Basée sur les sorties stock et les réservations OF actives
+            </p>
+          </div>
+          <UButton size="xs" variant="ghost" icon="i-lucide-refresh-cw" @click="refreshRuptureForecast" />
         </div>
-        <div class="space-y-3">
+        <div class="space-y-4">
           <div v-for="item in topRuptureRisks" :key="item.reference">
-            <div class="flex justify-between text-xs mb-1">
-              <span class="font-medium text-gray-700 truncate">{{ item.name }}</span>
-              <span class="font-mono text-gray-400 ml-2">{{ item.reference }}</span>
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-1.5">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <UBadge color="neutral" variant="subtle" size="xs" class="font-mono shrink-0">
+                    {{ item.reference }}
+                  </UBadge>
+                  <UBadge :color="ruptureStatusConfig[item.status].color" variant="soft" size="xs">
+                    {{ ruptureStatusConfig[item.status].label }}
+                  </UBadge>
+                </div>
+                <p class="text-sm font-medium text-gray-800 mt-1 truncate">{{ item.name }}</p>
+              </div>
+              <div class="text-right shrink-0">
+                <p class="text-lg font-bold tabular-nums" :class="item.score >= 80 ? 'text-red-600' : item.score >= 50 ? 'text-orange-500' : 'text-gray-700'">
+                  {{ item.score }}
+                </p>
+                <p class="text-[10px] text-gray-400 uppercase tracking-wide">risque</p>
+              </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 mb-1">
               <UProgress :model-value="item.score" :max="100" :color="ruptureColor(item.score)" size="sm" class="flex-1" />
-              <span class="text-xs font-bold w-8 text-right">{{ item.score }}</span>
               <UButton
                 v-if="canManageStock"
                 size="xs"
                 variant="outline"
                 icon="i-lucide-shopping-cart"
                 color="primary"
+                class="shrink-0"
                 @click="openPoCreate(item.reference)"
               >
                 Commander
               </UButton>
             </div>
+            <p class="text-[11px] text-gray-500">
+              {{ ruptureDetailLabel(item) }}
+            </p>
             <p class="text-[11px] text-gray-400 mt-0.5">
-              {{ item.available }} {{ item.unit }} dispo
-              <span v-if="item.estimatedDaysUntilRupture !== null"> — ~{{ item.estimatedDaysUntilRupture }} j restants</span>
+              {{ item.available }} {{ unitLabels[item.unit] }} dispo
+              <span v-if="item.reserved > 0"> · {{ item.reserved }} réservé</span>
+              <span v-if="item.minQty > 0"> · seuil {{ item.minQty }} {{ unitLabels[item.unit] }}</span>
             </p>
           </div>
         </div>
@@ -758,37 +895,77 @@ async function confirmTransfer() {
         </ul>
       </UCard>
 
-      <div v-if="status !== 'pending' && activeReservations.length > 0" class="mb-5">
-        <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-          <UIcon name="i-lucide-bookmark" class="text-indigo-500" />
-          Réservations actives ({{ activeReservations.length }})
-        </h2>
-        <div class="space-y-2">
+      <UCard v-if="status !== 'pending' && activeReservations.length > 0" class="border-none shadow-sm mb-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-3">
+          <div>
+            <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <UIcon name="i-lucide-bookmark" class="text-indigo-500" />
+              Réservations actives
+            </h2>
+            <p class="text-xs text-gray-400 mt-0.5">
+              {{ reservationsByOf.length }} OF · {{ activeReservations.length }} ligne{{ activeReservations.length > 1 ? 's' : '' }}
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <UInput
+              v-model="reservationFilter"
+              icon="i-lucide-search"
+              placeholder="OF, référence…"
+              size="xs"
+              class="w-full sm:w-44"
+            />
+            <UButton
+              size="xs"
+              variant="ghost"
+              :icon="allReservationsExpanded ? 'i-lucide-chevrons-up' : 'i-lucide-chevrons-down'"
+              @click="toggleAllReservations"
+            >
+              {{ allReservationsExpanded ? 'Tout replier' : 'Tout déplier' }}
+            </UButton>
+          </div>
+        </div>
+
+        <p v-if="filteredReservationsByOf.length === 0" class="text-sm text-gray-400 text-center py-4">
+          Aucune réservation ne correspond à votre recherche.
+        </p>
+
+        <div v-else class="space-y-2">
           <div
-            v-for="group in reservationsByOf"
+            v-for="group in filteredReservationsByOf"
             :key="group.ofId"
-            class="bg-white/70 border rounded-xl overflow-hidden transition-colors duration-150"
-            :class="isReservationOfOpen(group.ofId) ? 'border-indigo-200' : 'border-gray-100 shadow-sm'"
+            class="border rounded-xl overflow-hidden transition-colors duration-150"
+            :class="isReservationOfOpen(group.ofId) ? 'border-indigo-200 bg-indigo-50/20' : 'border-gray-100 bg-white/60'"
           >
             <button
               type="button"
-              class="w-full flex items-center gap-3 px-3 py-3 text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-indigo-50/30 transition-colors"
               @click="toggleReservationOf(group.ofId)"
             >
-              <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                <UIcon name="i-lucide-clipboard-list" class="text-indigo-500 text-base" />
+              <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <UIcon name="i-lucide-clipboard-list" class="text-indigo-600 text-base" />
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-800 truncate">
-                  OF <span class="font-mono text-indigo-600">{{ group.ofId }}</span>
-                </p>
-                <p class="text-xs text-gray-400">
-                  {{ group.items.length }} matière{{ group.items.length > 1 ? 's' : '' }} réservée{{ group.items.length > 1 ? 's' : '' }}
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="text-sm font-medium text-gray-800 truncate">
+                    <span class="font-mono text-indigo-700">{{ group.ofId }}</span>
+                  </p>
+                  <UBadge color="primary" variant="subtle" size="xs">
+                    {{ group.materialCount }} matière{{ group.materialCount > 1 ? 's' : '' }}
+                  </UBadge>
+                </div>
+                <p class="text-xs text-gray-400 mt-0.5">
+                  Réservé {{ formatReservationAge(group.createdAt) }}
                 </p>
               </div>
-              <UBadge color="primary" variant="subtle" size="xs" class="shrink-0">
-                {{ group.items.reduce((sum, r) => sum + r.quantity, 0) }} unités
-              </UBadge>
+              <NuxtLink
+                :to="`/bom?of=${encodeURIComponent(group.ofId)}`"
+                class="hidden sm:inline-flex"
+                @click.stop
+              >
+                <UButton size="xs" variant="outline" color="primary" icon="i-lucide-external-link">
+                  OF
+                </UButton>
+              </NuxtLink>
               <UIcon
                 name="i-lucide-chevron-down"
                 class="flex-shrink-0 text-gray-400 text-base transition-transform duration-200"
@@ -799,37 +976,76 @@ async function confirmTransfer() {
             <Transition
               enter-active-class="transition-all duration-200 ease-out"
               enter-from-class="opacity-0 max-h-0"
-              enter-to-class="opacity-100 max-h-96"
+              enter-to-class="opacity-100 max-h-[32rem]"
               leave-active-class="transition-all duration-150 ease-in"
-              leave-from-class="opacity-100 max-h-96"
+              leave-from-class="opacity-100 max-h-[32rem]"
               leave-to-class="opacity-0 max-h-0"
             >
-              <ul v-if="isReservationOfOpen(group.ofId)" class="border-t border-gray-100 divide-y divide-gray-50">
+              <ul v-if="isReservationOfOpen(group.ofId)" class="border-t border-indigo-100/80 divide-y divide-gray-100">
                 <li
                   v-for="res in group.items"
                   :key="res.id"
-                  class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 px-3 py-2.5 text-sm bg-gray-50/40"
+                  class="px-3 py-2.5 bg-white/80"
                 >
-                  <div class="min-w-0">
-                    <span class="font-medium text-gray-800">{{ res.materialName }}</span>
-                    <span class="text-xs font-mono text-gray-400 ml-2">{{ res.materialId }}</span>
-                  </div>
-                  <div class="flex items-center gap-2 text-xs text-gray-500 shrink-0">
-                    <span class="font-semibold tabular-nums text-gray-700">{{ res.quantity }} {{ res.unit }}</span>
-                    <NuxtLink
-                      :to="`/bom?of=${encodeURIComponent(group.ofId)}`"
-                      class="text-indigo-600 hover:text-indigo-800 font-medium"
-                      @click.stop
-                    >
-                      Voir OF
-                    </NuxtLink>
+                  <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <UBadge color="neutral" variant="subtle" size="xs" class="font-mono">
+                          {{ res.materialId }}
+                        </UBadge>
+                        <UBadge
+                          :color="reservationStockStatusConfig[reservationStockStatus(res)].color"
+                          variant="soft"
+                          size="xs"
+                        >
+                          {{ reservationStockStatusConfig[reservationStockStatus(res)].label }}
+                        </UBadge>
+                      </div>
+                      <p class="text-sm font-medium text-gray-800 mt-1 truncate">{{ res.materialName }}</p>
+                      <p v-if="reservationStockPart(res)" class="text-xs text-gray-400 mt-0.5">
+                        {{ reservationStockPart(res)!.available }} {{ res.unit }} dispo
+                        <span class="mx-1">·</span>
+                        {{ reservationStockPart(res)!.reserved }} réservé au total
+                      </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
+                      <div class="text-right">
+                        <p class="text-sm font-semibold tabular-nums text-indigo-700">
+                          {{ res.quantity }} {{ unitLabels[res.unit] }}
+                        </p>
+                        <p class="text-[11px] text-gray-400">{{ formatDateTime(res.createdAt) }}</p>
+                      </div>
+                      <UButton
+                        v-if="reservationStockPart(res)"
+                        size="xs"
+                        variant="ghost"
+                        icon="i-lucide-history"
+                        @click.stop="openHistory(reservationStockPart(res)!)"
+                      >
+                        <span class="hidden sm:inline">Historique</span>
+                      </UButton>
+                      <NuxtLink :to="`/bom?of=${encodeURIComponent(group.ofId)}`" @click.stop>
+                        <UButton size="xs" variant="outline" color="primary" icon="i-lucide-external-link" />
+                      </NuxtLink>
+                      <UButton
+                        v-if="canManageStock"
+                        size="xs"
+                        variant="outline"
+                        color="success"
+                        icon="i-lucide-check-circle"
+                        :loading="releasingReservationId === res.id"
+                        @click.stop="onReleaseReservation(res.id)"
+                      >
+                        Libérer
+                      </UButton>
+                    </div>
                   </div>
                 </li>
               </ul>
             </Transition>
           </div>
         </div>
-      </div>
+      </UCard>
 
       <!-- Vue consolidée multi-sites -->
       <div v-if="status !== 'pending' && viewMode === 'consolidated'" class="bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-hidden">

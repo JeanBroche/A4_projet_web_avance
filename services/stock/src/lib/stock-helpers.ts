@@ -137,3 +137,79 @@ export async function loadActiveMaterial(client: DbClient, materialId: string) {
   }
   return material;
 }
+
+export type RuptureForecastStatus = "rupture" | "critical" | "warning" | "ok";
+
+export type RuptureForecastInput = {
+  available: number;
+  minimum: number;
+  totalOutInWindow: number;
+  windowDays: number;
+  activeReservationQty: number;
+};
+
+export type RuptureForecastComputed = {
+  consumptionPerDay: number;
+  estimatedDaysToRupture: number | null;
+  score: number;
+  status: RuptureForecastStatus;
+};
+
+/** Score de risque de rupture sur une fenêtre glissante (consommation OUT + pression réservations). */
+export function computeRuptureForecast(input: RuptureForecastInput): RuptureForecastComputed {
+  const { available, minimum, totalOutInWindow, windowDays, activeReservationQty } = input;
+  const historicalDaily = totalOutInWindow / windowDays;
+  const reservationDaily = activeReservationQty > 0 ? activeReservationQty / 7 : 0;
+  const consumptionPerDay = Math.round(Math.max(historicalDaily, reservationDaily) * 100) / 100;
+
+  if (available <= 0) {
+    return {
+      consumptionPerDay,
+      estimatedDaysToRupture: 0,
+      score: 100,
+      status: "rupture"
+    };
+  }
+
+  if (consumptionPerDay <= 0) {
+    if (available < minimum) {
+      const ratio = available / Math.max(minimum, 1);
+      const score = Math.min(100, Math.round(40 + (1 - ratio) * 60));
+      return {
+        consumptionPerDay: 0,
+        estimatedDaysToRupture: null,
+        score,
+        status: score >= 70 ? "critical" : "warning"
+      };
+    }
+    return {
+      consumptionPerDay: 0,
+      estimatedDaysToRupture: null,
+      score: 0,
+      status: "ok"
+    };
+  }
+
+  const daysToRupture = available / consumptionPerDay;
+  const windowRatio = 1 - daysToRupture / windowDays;
+  let score = Math.min(100, Math.max(0, Math.round(windowRatio * 100)));
+
+  if (available < minimum) {
+    const thresholdBoost = Math.round((1 - available / Math.max(minimum, 1)) * 25);
+    score = Math.min(100, score + thresholdBoost);
+  }
+
+  let status: RuptureForecastStatus = "ok";
+  if (score >= 80 || daysToRupture <= 3) {
+    status = "critical";
+  } else if (score >= 50 || daysToRupture <= windowDays / 2) {
+    status = "warning";
+  }
+
+  return {
+    consumptionPerDay,
+    estimatedDaysToRupture: Math.round(daysToRupture * 10) / 10,
+    score,
+    status
+  };
+}

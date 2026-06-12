@@ -41,6 +41,7 @@ import type {
   AppNotification,
   Shipment,
   DeliveryStatus,
+  UpdateShipmentInput,
   CreateReservationInput,
   StockLevel,
   StockReservation,
@@ -142,7 +143,8 @@ export interface OrderAdapter {
 export interface ShipmentAdapter {
   list(): Promise<Shipment[]>
   create(input: CreateShipmentInput): Promise<Shipment>
-  updateStatus(id: number, status: DeliveryStatus): Promise<Shipment>
+  update(id: number, input: UpdateShipmentInput, backendId?: string): Promise<Shipment>
+  updateStatus(id: number, status: DeliveryStatus, backendId?: string): Promise<Shipment>
 }
 
 export interface AuditAdapter {

@@ -81,6 +81,17 @@ export const createShipmentSchema = z.object({
   orderNumber: z.string().optional()
 })
 
+export const updateShipmentSchema = z.object({
+  client: z.string().trim().min(1, 'Client requis'),
+  address: z.string().trim().min(1, 'Adresse requise'),
+  carrier: z.string().trim().min(1, 'Transporteur requis'),
+  departureDate: z.string().trim().min(1, 'Date de départ requise'),
+  estimatedDelivery: z.string().trim().min(1, 'Date de livraison requise'),
+  emoji: z.string().min(1),
+  orderNumber: z.string().optional(),
+  status: z.enum(['planned', 'loading', 'in_transit', 'delivered', 'delayed'])
+})
+
 export const createBomOrderSchema = z.object({
   name: z.string().trim().min(1, 'Désignation requise'),
   ofNumber: z.string().trim().min(1, 'Numéro OF requis'),

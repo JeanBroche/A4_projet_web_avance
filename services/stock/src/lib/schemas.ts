@@ -7,6 +7,8 @@ const accessTokenSchema = z
 const siteCodeSchema = z.string().min(1);
 const materialIdSchema = z.string().min(1);
 const cuidLikeSchema = z.string().min(1);
+const optionalLimit = z.coerce.number().int().positive().max(500).optional();
+const optionalOffset = z.coerce.number().int().nonnegative().optional();
 
 const reservationQtySchema = z
   .number()
@@ -49,8 +51,8 @@ export const reservationListSchema = accessTokenSchema.extend({
   siteCode: siteCodeSchema.optional(),
   siteId: siteCodeSchema.optional(),
   status: z.enum(["ACTIVE", "RELEASED", "CANCELLED"]).optional(),
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: optionalLimit,
+  offset: optionalOffset
 });
 
 export const movementCreateSchema = accessTokenSchema.extend({
@@ -67,8 +69,8 @@ export const movementListSchema = accessTokenSchema.extend({
   siteCode: siteCodeSchema.optional(),
   materialId: materialIdSchema.optional(),
   type: z.enum(["IN", "OUT", "ADJUST"]).optional(),
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: optionalLimit,
+  offset: optionalOffset
 });
 
 export const alertListSchema = accessTokenSchema.extend({
@@ -85,7 +87,7 @@ export const thresholdUpsertSchema = accessTokenSchema.extend({
 export const forecastRuptureSchema = accessTokenSchema.extend({
   siteId: siteCodeSchema.optional(),
   siteCode: siteCodeSchema.optional(),
-  windowDays: z.number().int().positive().max(365).optional()
+  windowDays: z.coerce.number().int().positive().max(365).optional()
 });
 
 export const supplierDelayListSchema = accessTokenSchema.extend({
@@ -105,8 +107,8 @@ export const materialListSchema = accessTokenSchema.extend({
   siteId: siteCodeSchema.optional(),
   siteCode: siteCodeSchema.optional(),
   code: z.string().min(1).optional(),
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: optionalLimit,
+  offset: optionalOffset
 });
 
 export const materialGetSchema = accessTokenSchema
@@ -157,8 +159,8 @@ export const lotListSchema = accessTokenSchema.extend({
   siteCode: siteCodeSchema.optional(),
   materialId: materialIdSchema.optional(),
   status: z.enum(["ACTIVE", "EXHAUSTED", "QUARANTINE", "EXPIRED"]).optional(),
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: optionalLimit,
+  offset: optionalOffset
 });
 
 export const lotUpdateSchema = accessTokenSchema.extend({
@@ -185,8 +187,8 @@ export const purchaseOrderListSchema = accessTokenSchema.extend({
   materialId: materialIdSchema.optional(),
   status: z.enum(["DRAFT", "ORDERED", "PARTIAL", "RECEIVED", "CANCELLED"]).optional(),
   supplier: z.string().min(1).optional(),
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: optionalLimit,
+  offset: optionalOffset
 });
 
 export const purchaseOrderUpdateSchema = accessTokenSchema.extend({

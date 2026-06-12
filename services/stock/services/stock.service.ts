@@ -46,6 +46,7 @@ import type { StockReservation } from "../src/generated/prisma/client.js";
 import { withMaterialLocks } from "../src/lib/locks.js";
 import {
   computeAvailable,
+  computeRuptureForecast,
   consolidateByCode,
   evaluateThreshold,
   loadActiveMaterial,
@@ -272,7 +273,10 @@ const StockService: ServiceSchema = {
           where,
           orderBy: { createdAt: "desc" },
           take: params.limit ?? 100,
-          skip: params.offset ?? 0
+          skip: params.offset ?? 0,
+          include: {
+            material: { select: { code: true, description: true } }
+          }
         });
       }
     },
@@ -546,42 +550,61 @@ const StockService: ServiceSchema = {
             ...(effectiveSite ? { siteCode: effectiveSite } : {})
           }
         });
-        const results = [];
-        for (const material of materials) {
-          const aggregate = await prisma.stockMovement.aggregate({
+        if (materials.length === 0) {
+          return [];
+        }
+        const materialIds = materials.map((m) => m.id);
+        const [outByMaterial, reservedByMaterial] = await Promise.all([
+          prisma.stockMovement.groupBy({
+            by: ["materialId"],
             where: {
-              materialId: material.id,
+              materialId: { in: materialIds },
               type: "OUT",
               createdAt: { gte: windowStart }
             },
             _sum: { quantity: true }
-          });
-          const totalOut = aggregate._sum.quantity ?? 0;
-          const dailyRate = totalOut / windowDays;
+          }),
+          prisma.stockReservation.groupBy({
+            by: ["materialId"],
+            where: {
+              materialId: { in: materialIds },
+              status: "ACTIVE"
+            },
+            _sum: { quantity: true }
+          })
+        ]);
+        const outMap = new Map(
+          outByMaterial.map((row) => [row.materialId, row._sum.quantity ?? 0])
+        );
+        const reservedMap = new Map(
+          reservedByMaterial.map((row) => [row.materialId, row._sum.quantity ?? 0])
+        );
+        const results = materials.map((material) => {
           const available = computeAvailable(material);
-          let score: number;
-          let estimatedDaysToRupture: number | null = null;
-          if (available <= 0) {
-            score = 100;
-          } else if (dailyRate <= 0) {
-            score = 0;
-          } else {
-            estimatedDaysToRupture = available / dailyRate;
-            const ratio = (dailyRate * windowDays) / available;
-            score = Math.min(100, Math.round(ratio * 100));
-          }
-          results.push({
+          const activeReservationQty = reservedMap.get(material.id) ?? 0;
+          const forecast = computeRuptureForecast({
+            available,
+            minimum: material.minimumStock,
+            totalOutInWindow: outMap.get(material.id) ?? 0,
+            windowDays,
+            activeReservationQty
+          });
+          return {
             materialId: material.id,
             code: material.code,
+            description: material.description,
+            unit: material.unit,
             siteCode: material.siteCode,
             available,
             minimum: material.minimumStock,
-            consumptionPerDay: Math.round(dailyRate * 100) / 100,
-            estimatedDaysToRupture:
-              estimatedDaysToRupture === null ? null : Math.round(estimatedDaysToRupture * 10) / 10,
-            score
-          });
-        }
+            reserved: material.reservedStock,
+            activeReservationQty,
+            consumptionPerDay: forecast.consumptionPerDay,
+            estimatedDaysToRupture: forecast.estimatedDaysToRupture,
+            score: forecast.score,
+            status: forecast.status
+          };
+        });
         return results.sort((a, b) => b.score - a.score);
       }
     },

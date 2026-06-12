@@ -10,25 +10,6 @@ import {
 import { isCuidLike, resolveStringIdByNumeric } from '~/lib/mappers/resolve-id'
 import { toNumericId } from '~/lib/mappers/id'
 
-const PRODUCT_CODES_KEY = 'aeronexis-product-codes'
-
-function loadProductCodes(): Set<string> {
-  if (!import.meta.client) return new Set()
-  try {
-    const raw = sessionStorage.getItem(PRODUCT_CODES_KEY)
-    return new Set(raw ? JSON.parse(raw) as string[] : [])
-  } catch {
-    return new Set()
-  }
-}
-
-function saveProductCode(code: string) {
-  if (!import.meta.client) return
-  const codes = loadProductCodes()
-  codes.add(code)
-  sessionStorage.setItem(PRODUCT_CODES_KEY, JSON.stringify([...codes]))
-}
-
 export function createMoleculerProductionAdapter(
   getSiteCode: () => string
 ): ProductionAdapter {
@@ -337,20 +318,11 @@ export function createMoleculerProductionAdapter(
     },
 
     async listProducts() {
-      const codes = [...loadProductCodes()]
-      const products = await Promise.all(
-        codes.map(async (code) => {
-          try {
-            return await request<Parameters<typeof mapProductToUi>[0]>(
-              `/production/products/${encodeURIComponent(code)}`,
-              {}
-            )
-          } catch {
-            return null
-          }
-        })
+      const result = await request<{ items: Array<Parameters<typeof mapProductToUi>[0]> }>(
+        '/production/products',
+        { params: { siteCode: siteCode() } }
       )
-      return products.filter(Boolean).map(p => mapProductToUi(p!))
+      return (result.items ?? []).map(mapProductToUi)
     },
 
     async getProduct(productCode) {
@@ -358,7 +330,6 @@ export function createMoleculerProductionAdapter(
         `/production/products/${encodeURIComponent(productCode)}`,
         {}
       )
-      saveProductCode(productCode)
       return mapProductToUi(product)
     },
 
@@ -367,7 +338,6 @@ export function createMoleculerProductionAdapter(
         method: 'POST',
         body: { ...input, siteCode: input.siteCode ?? siteCode() }
       })
-      saveProductCode(input.productCode)
       return mapProductToUi(product)
     },
 
@@ -379,7 +349,6 @@ export function createMoleculerProductionAdapter(
           body: input
         }
       )
-      saveProductCode(input.productCode)
       return mapProductToUi(product)
     },
 
@@ -387,11 +356,6 @@ export function createMoleculerProductionAdapter(
       await request(`/production/products/${encodeURIComponent(productCode)}`, {
         method: 'DELETE'
       })
-      if (import.meta.client) {
-        const codes = loadProductCodes()
-        codes.delete(productCode)
-        sessionStorage.setItem(PRODUCT_CODES_KEY, JSON.stringify([...codes]))
-      }
     }
   }
 }

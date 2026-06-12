@@ -31,6 +31,7 @@ import {
   shipmentByIdSchema,
   shipmentHistorySchema,
   shipmentPlanSchema,
+  shipmentUpdateSchema,
   shipmentUpdateStatusSchema
 } from "../src/lib/schemas.js";
 
@@ -318,53 +319,93 @@ const ShipmentService: ServiceSchema = {
     "shipment.updateStatus": {
       async handler(this: Service, ctx: Context) {
         const params = parseParams(shipmentUpdateStatusSchema, ctx.params);
+        return this.broker.call("shipment.shipment.update", params, { meta: ctx.meta });
+      }
+    },
+
+    "shipment.update": {
+      async handler(this: Service, ctx: Context) {
+        const params = parseParams(shipmentUpdateSchema, ctx.params) as {
+          id: string;
+          accessToken?: string;
+          clientCode?: string;
+          orderNumber?: string;
+          carrier?: string;
+          deliveryAddress?: string;
+          plannedShipDate?: Date;
+          plannedDeliveryDate?: Date;
+          emoji?: string;
+          status?: string;
+          notes?: string;
+        };
         const auth = await requireLogistique(ctx, params.accessToken);
 
         const shipment = await loadActiveShipment(params.id);
         assertSiteAccess(auth, shipment.siteCode);
-        assertShipmentTransition(shipment.status, params.status);
 
-        const sideEffects = shipmentStatusSideEffects(params.status);
+        const data: Record<string, unknown> = {};
+        if (params.clientCode !== undefined) data.clientCode = params.clientCode;
+        if (params.orderNumber !== undefined) data.orderNumber = params.orderNumber;
+        if (params.carrier !== undefined) data.carrier = params.carrier;
+        if (params.deliveryAddress !== undefined) data.deliveryAddress = params.deliveryAddress;
+        if (params.plannedShipDate !== undefined) data.plannedShipDate = params.plannedShipDate;
+        if (params.plannedDeliveryDate !== undefined) {
+          data.plannedDeliveryDate = params.plannedDeliveryDate;
+        }
+        if (params.emoji !== undefined) data.emoji = params.emoji;
+
+        const statusChanging =
+          params.status !== undefined && params.status !== shipment.status;
+
+        if (statusChanging && params.status) {
+          assertShipmentTransition(shipment.status, params.status as never);
+          data.status = params.status;
+          Object.assign(data, shipmentStatusSideEffects(params.status));
+          if (params.status === "IN_TRANSIT" && !shipment.shippedAt) {
+            data.shippedAt = new Date();
+          }
+          if (params.status === "DELIVERED") {
+            data.deliveredAt = new Date();
+            data.shippedAt = shipment.shippedAt || new Date();
+          }
+        }
+
+        if (Object.keys(data).length === 0) {
+          return { shipment: toShipmentSummary(shipment) };
+        }
+
         const updated = await prisma.$transaction(async (tx) => {
           const next = await tx.shipment.update({
             where: { id: shipment.id },
-            data: {
-              status: params.status,
-              ...sideEffects,
-              ...(params.status === "IN_TRANSIT" && !shipment.shippedAt
-                ? { shippedAt: new Date() }
-                : {}),
-              ...(params.status === "DELIVERED"
-                ? {
-                    deliveredAt: new Date(),
-                    shippedAt: shipment.shippedAt || new Date()
-                  }
-                : {})
-            },
+            data,
             include: { trackingEvents: { orderBy: { createdAt: "asc" } } }
           });
 
-          await tx.shipmentTrackingEvent.create({
-            data: {
-              shipmentId: shipment.id,
-              fromStatus: shipment.status,
-              toStatus: params.status,
-              notes: params.notes
-            }
-          });
+          if (statusChanging && params.status) {
+            await tx.shipmentTrackingEvent.create({
+              data: {
+                shipmentId: shipment.id,
+                fromStatus: shipment.status,
+                toStatus: params.status,
+                notes: params.notes
+              }
+            });
+          }
 
           return next;
         });
 
-        publishShipmentEvent(this, "shipment.status.changed", {
-          id: updated.id,
-          code: updated.code,
-          orderNumber: updated.orderNumber,
-          ofId: shipment.pickList?.ofId ?? null,
-          siteCode: updated.siteCode,
-          fromStatus: shipment.status,
-          toStatus: params.status
-        });
+        if (statusChanging && params.status) {
+          publishShipmentEvent(this, "shipment.status.changed", {
+            id: updated.id,
+            code: updated.code,
+            orderNumber: updated.orderNumber,
+            ofId: shipment.pickList?.ofId ?? null,
+            siteCode: updated.siteCode,
+            fromStatus: shipment.status,
+            toStatus: params.status
+          });
+        }
 
         const now = new Date();
         if (
@@ -387,7 +428,7 @@ const ShipmentService: ServiceSchema = {
         }
 
         await logShipmentAudit({
-          action: "shipment.shipment.updateStatus",
+          action: statusChanging ? "shipment.shipment.updateStatus" : "shipment.shipment.update",
           actorId: auth.sub,
           actorEmail: auth.email,
           roles: auth.roles,
@@ -397,12 +438,24 @@ const ShipmentService: ServiceSchema = {
           correlationId: (ctx.meta as { correlationId?: string }).correlationId,
           metadata: { code: updated.code, notes: params.notes },
           diff: {
-            before: { status: shipment.status },
-            after: { status: updated.status }
+            before: {
+              clientCode: shipment.clientCode,
+              orderNumber: shipment.orderNumber,
+              carrier: shipment.carrier,
+              deliveryAddress: shipment.deliveryAddress,
+              status: shipment.status
+            },
+            after: {
+              clientCode: updated.clientCode,
+              orderNumber: updated.orderNumber,
+              carrier: updated.carrier,
+              deliveryAddress: updated.deliveryAddress,
+              status: updated.status
+            }
           }
         });
 
-        this.logger.info("Shipment status updated", {
+        this.logger.info("Shipment updated", {
           correlationId: (ctx.meta as { correlationId?: string }).correlationId,
           id: updated.id,
           status: updated.status

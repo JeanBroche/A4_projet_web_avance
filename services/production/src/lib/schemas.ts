@@ -153,3 +153,10 @@ export const deleteProductSchema = accessTokenSchema.extend({
 export const getProductSchema = accessTokenSchema.extend({
   product_code: z.string().min(1)
 });
+
+export const listProductSchema = accessTokenSchema.extend({
+  siteCode: z.string().min(1).optional(),
+  siteId: z.string().min(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional()
+});

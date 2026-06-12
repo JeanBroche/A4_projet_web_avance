@@ -483,6 +483,43 @@ describe("order lifecycle", () => {
     );
   });
 
+  it("sets logistics status manually from the UI", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const created = await callAction<{ id: string }>("order.order.create", {
+      accessToken: tokens.commercial,
+      clientId,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-LOG", quantity: 1, unitPrice: 500 }]
+    });
+
+    await callAction("order.order.validate", {
+      accessToken: tokens.commercial,
+      orderId: created.id
+    });
+
+    const shipped = await callAction<{ status: string }>("order.order.setLogisticsStatus", {
+      accessToken: tokens.commercial,
+      orderId: created.id,
+      status: "shipped"
+    });
+    assert.equal(shipped.status, "SHIPPED");
+
+    const delivered = await callAction<{ status: string }>("order.order.setLogisticsStatus", {
+      accessToken: tokens.commercial,
+      orderId: created.id,
+      status: "delivered"
+    });
+    assert.equal(delivered.status, "DELIVERED");
+
+    const prepared = await callAction<{ status: string }>("order.order.setLogisticsStatus", {
+      accessToken: tokens.commercial,
+      orderId: created.id,
+      status: "prepared"
+    });
+    assert.equal(prepared.status, "VALIDATED");
+  });
+
   it("refuses finish from VALIDATED", async (t) => {
     if (skipIfNoDb(t)) return;
 

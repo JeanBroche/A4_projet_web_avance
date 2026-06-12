@@ -63,6 +63,18 @@ export const shipmentUpdateStatusSchema = accessTokenSchema.extend({
   notes: z.string().min(1).optional()
 });
 
+export const shipmentUpdateSchema = accessTokenSchema.extend({
+  id: z.string().min(1),
+  clientCode: z.string().min(1).optional(),
+  orderNumber: z.string().min(1).optional(),
+  carrier: z.string().min(1).optional(),
+  deliveryAddress: z.string().min(1).optional(),
+  plannedShipDate: z.coerce.date().optional(),
+  plannedDeliveryDate: z.coerce.date().optional(),
+  emoji: z.string().min(1).optional(),
+  status: shipmentStatusSchema.optional()
+});
+
 export const shipmentHistorySchema = accessTokenSchema.extend({
   siteCode: z.string().min(1).optional(),
   clientCode: z.string().min(1).optional(),

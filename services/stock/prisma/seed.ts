@@ -148,6 +148,7 @@ async function main() {
   const matLyoTitane = persisted[`${SEED_SITES.LYO}/${SEED_MATERIALS.TITANE}`];
   const matLyoAcier = persisted[`${SEED_SITES.LYO}/${SEED_MATERIALS.ACIER}`];
   const matLyoJoint = persisted[`${SEED_SITES.LYO}/${SEED_MATERIALS.JOINT}`];
+  const matLyoGraisse = persisted[`${SEED_SITES.LYO}/${SEED_MATERIALS.GRAISSE}`];
 
   if (matLyoAcier) {
     const movementsExist = await prisma.stockMovement.findFirst({
@@ -182,6 +183,47 @@ async function main() {
             createdAt: daysAgo(5)
           }
         ]
+      });
+    }
+  }
+
+  if (matLyoGraisse) {
+    const graisseMovementsExist = await prisma.stockMovement.findFirst({
+      where: { materialId: matLyoGraisse, reason: "Consommation VH-450" }
+    });
+    if (!graisseMovementsExist) {
+      await prisma.stockMovement.createMany({
+        data: [
+          {
+            materialId: matLyoGraisse,
+            siteCode: SEED_SITES.LYO,
+            type: "OUT",
+            quantity: 3,
+            reason: "Consommation VH-450",
+            createdAt: daysAgo(18)
+          },
+          {
+            materialId: matLyoGraisse,
+            siteCode: SEED_SITES.LYO,
+            type: "OUT",
+            quantity: 2,
+            reason: "Consommation VH-450",
+            createdAt: daysAgo(8)
+          }
+        ]
+      });
+    }
+    const graisseAlertExists = await prisma.stockAlert.findFirst({
+      where: { materialId: matLyoGraisse, resolvedAt: null }
+    });
+    if (!graisseAlertExists) {
+      await prisma.stockAlert.create({
+        data: {
+          materialId: matLyoGraisse,
+          siteCode: SEED_SITES.LYO,
+          severity: "CRITICAL",
+          message: "Rupture graisse aéronautique — réapprovisionnement urgent"
+        }
       });
     }
   }

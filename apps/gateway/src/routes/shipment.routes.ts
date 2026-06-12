@@ -8,6 +8,7 @@ export const restShipmentRoutes: RouteDefinition[] = [
   { method: "GET", path: "logistics/shipments", action: "shipment.shipment.history", layer: "REST" },
   { method: "GET", path: "logistics/shipments/:id", action: "shipment.shipment.get", layer: "REST" },
   { method: "GET", path: "logistics/shipments/:id/track", action: "shipment.shipment.track", layer: "REST" },
+  { method: "PATCH", path: "logistics/shipments/:id", action: "shipment.shipment.update", layer: "REST" },
   { method: "PATCH", path: "logistics/shipments/:id/status", action: "shipment.shipment.updateStatus", layer: "REST" }
 ];
 

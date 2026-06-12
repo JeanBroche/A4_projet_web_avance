@@ -1,6 +1,6 @@
 import { syncNotificationsAfterMutation } from '~/lib/notifications-sync'
 import { toFailureResult } from '~/lib/api/envelope'
-import type { AsyncStatus, CreateShipmentInput, DeliveryStatus, Shipment } from '~/types'
+import type { AsyncStatus, CreateShipmentInput, DeliveryStatus, Shipment, UpdateShipmentInput } from '~/types'
 
 export function useShipments() {
   const adapters = useAdapters()
@@ -34,16 +34,37 @@ export function useShipments() {
     }
   }
 
-  async function updateStatus(id: number, shipmentStatus: DeliveryStatus) {
+  async function update(id: number, input: UpdateShipmentInput, backendId?: string) {
     isMutating.value = true
+    error.value = null
     try {
-      await adapters.shipment.updateStatus(id, shipmentStatus)
+      await adapters.shipment.update(id, input, backendId)
       await refresh()
       await syncNotificationsAfterMutation()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
     } finally {
       isMutating.value = false
     }
   }
 
-  return { shipments, status, error, isMutating, refresh, create, updateStatus }
+  async function updateStatus(id: number, shipmentStatus: DeliveryStatus, backendId?: string) {
+    isMutating.value = true
+    error.value = null
+    try {
+      await adapters.shipment.updateStatus(id, shipmentStatus, backendId)
+      await refresh()
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  return { shipments, status, error, isMutating, refresh, create, update, updateStatus }
 }

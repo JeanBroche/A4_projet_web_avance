@@ -1,14 +1,26 @@
 <script setup lang="ts">
-import { createShipmentSchema, firstZodError } from '~/lib/validation/schemas'
+import { createShipmentSchema, firstZodError, updateShipmentSchema } from '~/lib/validation/schemas'
 import type { DeliveryStatus, Shipment } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
 
 const route = useRoute()
-const { shipments, status, error, isMutating, refresh, create, updateStatus: updateShipmentStatus } = useShipments()
-const { canPlanShipments, pageSubtitle } = useRoleCapabilities()
+const { shipments, status, error, isMutating, refresh, create, update: updateShipment } = useShipments()
+const { canPlanShipments, canManageStock, pageSubtitle } = useRoleCapabilities()
 
 const createFormError = ref<string | null>(null)
+const editFormError = ref<string | null>(null)
+
+const editForm = ref({
+  client: '',
+  orderNumber: '',
+  address: '',
+  carrier: 'FedEx Freight',
+  departureDate: '',
+  estimatedDelivery: '',
+  emoji: '🚚',
+  status: 'planned' as DeliveryStatus
+})
 
 onMounted(async () => {
   await refresh()
@@ -31,6 +43,7 @@ onMounted(async () => {
 })
 
 const statusConfig = {
+  planned:    { label: 'Planifié',      icon: 'i-lucide-clipboard-list',  class: 'text-slate-600 bg-slate-100' },
   loading:    { label: 'En chargement', icon: 'i-lucide-boxes',           class: 'text-gray-600 bg-gray-100' },
   in_transit: { label: 'En transit',    icon: 'i-lucide-plane-takeoff',   class: 'text-blue-600 bg-blue-50' },
   delivered:  { label: 'Livré',         icon: 'i-lucide-check-circle-2', class: 'text-green-600 bg-green-50' },
@@ -38,6 +51,7 @@ const statusConfig = {
 }
 
 const statusOptions = [
+  { label: 'Planifié', value: 'planned', icon: 'i-lucide-clipboard-list' },
   { label: 'En chargement', value: 'loading', icon: 'i-lucide-boxes' },
   { label: 'En transit', value: 'in_transit', icon: 'i-lucide-plane-takeoff' },
   { label: 'Livré', value: 'delivered', icon: 'i-lucide-check-circle-2' },
@@ -70,8 +84,23 @@ const filteredShipments = computed(() =>
   )
 )
 
+function syncEditForm(shipment: Shipment) {
+  editForm.value = {
+    client: shipment.client === '—' ? '' : shipment.client,
+    orderNumber: shipment.orderNumber ?? '',
+    address: shipment.address === '—' ? '' : shipment.address,
+    carrier: shipment.carrier,
+    departureDate: shipment.departureDate,
+    estimatedDelivery: shipment.estimatedDelivery,
+    emoji: shipment.emoji,
+    status: shipment.status
+  }
+}
+
 function openModal(shipment: Shipment) {
   selected.value = shipments.value.find(item => item.id === shipment.id) || null
+  if (selected.value) syncEditForm(selected.value)
+  editFormError.value = null
   isModalOpen.value = true
 }
 
@@ -104,10 +133,20 @@ async function submitCreateShipment() {
   isCreateModalOpen.value = false
 }
 
-async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
-  await updateShipmentStatus(shipment.id, newStatus)
-  if (selected.value?.id === shipment.id) {
-    selected.value = shipments.value.find(s => s.id === shipment.id) ?? null
+async function submitEditShipment() {
+  if (!selected.value) return
+  editFormError.value = null
+  const parsed = updateShipmentSchema.safeParse(editForm.value)
+  if (!parsed.success) {
+    editFormError.value = firstZodError(parsed.error)
+    return
+  }
+  try {
+    await updateShipment(selected.value.id, parsed.data, selected.value.backendId)
+    selected.value = shipments.value.find(s => s.id === selected.value?.id) ?? null
+    if (selected.value) syncEditForm(selected.value)
+  } catch {
+    editFormError.value = error.value ?? 'Impossible d\'enregistrer les modifications.'
   }
 }
 </script>
@@ -203,14 +242,26 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
         <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-labelledby="shipment-detail-title">
 
           <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-5">
-            <div class="flex gap-3">
-              <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl">
+            <div class="flex gap-3 flex-1 min-w-0">
+              <div v-if="!canManageStock" class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl shrink-0">
                 {{ selected.emoji }}
               </div>
-              <div>
+              <USelectMenu
+                v-else
+                v-model="editForm.emoji"
+                :items="['🚚', '✈️', '📦', '🚢', '🚂']"
+                class="w-16 shrink-0"
+              />
+              <div class="flex-1 min-w-0 space-y-2">
                 <h2 id="shipment-detail-title" class="text-lg font-bold text-gray-800">{{ selected.shipmentNumber }}</h2>
-                <p class="text-sm font-semibold text-[#0F62BC]">{{ selected.client }}</p>
-                <p v-if="selected.orderNumber" class="text-xs font-mono text-indigo-500 mt-0.5">Commande {{ selected.orderNumber }}</p>
+                <template v-if="canManageStock">
+                  <UInput v-model="editForm.client" placeholder="Client" icon="i-lucide-building-2" size="sm" />
+                  <UInput v-model="editForm.orderNumber" placeholder="N° commande" icon="i-lucide-file-text" size="sm" class="font-mono" />
+                </template>
+                <template v-else>
+                  <p class="text-sm font-semibold text-[#0F62BC]">{{ selected.client }}</p>
+                  <p v-if="selected.orderNumber" class="text-xs font-mono text-indigo-500">Commande {{ selected.orderNumber }}</p>
+                </template>
               </div>
             </div>
             <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="isModalOpen = false" />
@@ -231,15 +282,29 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
               <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Planning de transport</h4>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-gray-100">
                 <div>
-                  <span class="text-xs text-gray-400 block mb-0.5">Date de départ effective</span>
-                  <span class="font-semibold text-gray-800 flex items-center gap-1.5">
+                  <label class="text-xs text-gray-400 block mb-1">Date de départ effective</label>
+                  <UInput
+                    v-if="canManageStock"
+                    v-model="editForm.departureDate"
+                    type="date"
+                    icon="i-lucide-log-out"
+                    size="sm"
+                  />
+                  <span v-else class="font-semibold text-gray-800 flex items-center gap-1.5">
                     <UIcon name="i-lucide-log-out" class="text-blue-500 text-xs" />
                     {{ selected.departureDate }}
                   </span>
                 </div>
                 <div>
-                  <span class="text-xs text-gray-400 block mb-0.5">Livraison prévue</span>
-                  <span class="font-semibold text-gray-800 flex items-center gap-1.5">
+                  <label class="text-xs text-gray-400 block mb-1">Livraison prévue</label>
+                  <UInput
+                    v-if="canManageStock"
+                    v-model="editForm.estimatedDelivery"
+                    type="date"
+                    icon="i-lucide-calendar"
+                    size="sm"
+                  />
+                  <span v-else class="font-semibold text-gray-800 flex items-center gap-1.5">
                     <UIcon name="i-lucide-calendar" class="text-gray-400 text-xs" />
                     {{ selected.estimatedDelivery }}
                   </span>
@@ -247,47 +312,73 @@ async function updateStatus(shipment: Shipment, newStatus: DeliveryStatus) {
               </div>
             </div>
 
-            <div class="space-y-2 pt-1">
+            <div class="space-y-3 pt-1">
               <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400">Détails d'acheminement</h4>
-              <div class="flex items-start gap-2">
-                <UIcon name="i-lucide-truck" class="text-gray-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span class="text-xs text-gray-400 block">Transporteur officiel</span>
-                  <span class="font-medium text-gray-800">{{ selected.carrier }}</span>
-                </div>
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Transporteur officiel</label>
+                <USelectMenu
+                  v-if="canManageStock"
+                  v-model="editForm.carrier"
+                  :items="carrierOptions"
+                  size="sm"
+                />
+                <span v-else class="font-medium text-gray-800">{{ selected.carrier }}</span>
               </div>
-
-              <div class="flex items-start gap-2">
-                <UIcon name="i-lucide-map-pinned" class="text-[#0F62BC] mt-0.5 flex-shrink-0" />
-                <div>
-                  <span class="text-xs text-gray-400 block">Adresse de livraison</span>
-                  <span class="font-medium text-gray-800 text-xs sm:text-sm">{{ selected.address }}</span>
-                </div>
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Adresse de livraison</label>
+                <UInput
+                  v-if="canManageStock"
+                  v-model="editForm.address"
+                  icon="i-lucide-map-pinned"
+                  size="sm"
+                />
+                <span v-else class="font-medium text-gray-800 text-xs sm:text-sm">{{ selected.address }}</span>
               </div>
             </div>
           </div>
 
           <div class="border border-gray-100 rounded-xl p-4 mb-6">
-            <p class="text-xs font-bold uppercase text-gray-400 mb-3">Mettre à jour le statut manuellement</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <p class="text-xs font-bold uppercase text-gray-400 mb-3">Statut de l'expédition</p>
+            <div v-if="canManageStock" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <UButton
                 v-for="option in statusOptions"
                 :key="option.value"
                 :icon="option.icon"
                 size="sm"
-                :variant="selected.status === option.value ? 'solid' : 'outline'"
-                :color="option.value === 'delayed' && selected.status === 'delayed' ? 'error' : selected.status === option.value ? 'primary' : 'neutral'"
+                :variant="editForm.status === option.value ? 'solid' : 'outline'"
+                :color="option.value === 'delayed' && editForm.status === 'delayed' ? 'error' : editForm.status === option.value ? 'primary' : 'neutral'"
                 class="justify-start text-xs w-full"
-                @click="updateStatus(selected!, option.value as DeliveryStatus)"
+                @click="editForm.status = option.value as DeliveryStatus"
               >
                 {{ option.label }}
               </UButton>
             </div>
+            <UBadge v-else :class="statusConfig[selected.status].class" variant="subtle">
+              <UIcon :name="statusConfig[selected.status].icon" class="mr-1" />
+              {{ statusConfig[selected.status].label }}
+            </UBadge>
           </div>
 
-          <div class="flex justify-end pt-3 border-t border-gray-100">
-            <UButton class="bg-[#0F62BC] text-white hover:bg-[#156FD4]" @click="isModalOpen = false">
+          <UAlert
+            v-if="editFormError"
+            color="error"
+            variant="soft"
+            :title="editFormError"
+            class="mb-4"
+          />
+
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-3 border-t border-gray-100">
+            <UButton variant="ghost" color="neutral" @click="isModalOpen = false">
               Fermer
+            </UButton>
+            <UButton
+              v-if="canManageStock"
+              class="bg-[#0F62BC] text-white hover:bg-[#156FD4]"
+              icon="i-lucide-save"
+              :loading="isMutating"
+              @click="submitEditShipment"
+            >
+              Enregistrer
             </UButton>
           </div>
 

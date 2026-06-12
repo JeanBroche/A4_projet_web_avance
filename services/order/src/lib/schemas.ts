@@ -6,6 +6,8 @@ const accessTokenSchema = z
 
 const siteCodeSchema = z.string().min(1);
 const cuidLikeSchema = z.string().min(1);
+const optionalLimit = z.coerce.number().int().positive().max(500).optional();
+const optionalOffset = z.coerce.number().int().nonnegative().optional();
 
 const orderLineSchema = z.object({
   productCode: z.string().min(1),
@@ -53,8 +55,8 @@ export const clientListSchema = accessTokenSchema.extend({
   siteCode: siteCodeSchema.optional(),
   siteId: siteCodeSchema.optional(),
   code: z.string().min(1).optional(),
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: optionalLimit,
+  offset: optionalOffset
 });
 
 export const clientGetSchema = accessTokenSchema
@@ -89,8 +91,8 @@ export const orderHistorySchema = accessTokenSchema.extend({
   clientId: cuidLikeSchema.optional(),
   siteCode: siteCodeSchema.optional(),
   siteId: siteCodeSchema.optional(),
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: optionalLimit,
+  offset: optionalOffset
 });
 
 export const orderValidateSchema = accessTokenSchema.extend({
@@ -123,5 +125,11 @@ export const orderMarkShippedSchema = accessTokenSchema.extend({
 
 export const orderMarkDeliveredSchema = accessTokenSchema.extend({
   orderId: cuidLikeSchema,
+  notes: z.string().min(1).optional()
+});
+
+export const orderSetLogisticsStatusSchema = accessTokenSchema.extend({
+  orderId: cuidLikeSchema,
+  status: z.enum(["prepared", "shipped", "delivered"]),
   notes: z.string().min(1).optional()
 });

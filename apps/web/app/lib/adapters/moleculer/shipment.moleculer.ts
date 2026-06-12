@@ -1,7 +1,12 @@
 import { useApiClient } from '~/lib/api/client'
 import type { ShipmentAdapter } from '~/lib/adapters/types'
-import { mapShipmentToUi, mapUiShipmentStatus } from '~/lib/mappers/shipment'
+import {
+  mapShipmentToUi,
+  mapUiShipmentStatus,
+  mapUpdateShipmentToBackend
+} from '~/lib/mappers/shipment'
 import { isCuidLike, resolveStringIdByNumeric } from '~/lib/mappers/resolve-id'
+import type { DeliveryStatus, UpdateShipmentInput } from '~/types'
 
 export function createMoleculerShipmentAdapter(
   getSiteCode: () => string
@@ -48,11 +53,37 @@ export function createMoleculerShipmentAdapter(
           body: { pickListId: picklist.pickList.id, carrier: input.carrier }
         }
       )
-      return mapShipmentToUi(planned.shipment)
+      const updated = await request<{ shipment: Parameters<typeof mapShipmentToUi>[0] }>(
+        `/logistics/shipments/${encodeURIComponent(planned.shipment.id)}`,
+        {
+          method: 'PATCH',
+          body: {
+            clientCode: input.client,
+            deliveryAddress: input.address,
+            plannedDeliveryDate: input.estimatedDelivery,
+            emoji: input.emoji,
+            orderNumber: input.orderNumber || orderNumber
+          }
+        }
+      )
+      return mapShipmentToUi(updated.shipment)
     },
 
-    async updateStatus(id, status) {
-      const shipmentId = await resolveShipmentId(id)
+    async update(id, input: UpdateShipmentInput, backendId?: string) {
+      const shipmentId = backendId ?? await resolveShipmentId(id)
+      if (!shipmentId) throw new Error('NOT_FOUND')
+      const updated = await request<{ shipment: Parameters<typeof mapShipmentToUi>[0] }>(
+        `/logistics/shipments/${encodeURIComponent(shipmentId)}`,
+        {
+          method: 'PATCH',
+          body: mapUpdateShipmentToBackend(input)
+        }
+      )
+      return mapShipmentToUi(updated.shipment)
+    },
+
+    async updateStatus(id, status: DeliveryStatus, backendId?: string) {
+      const shipmentId = backendId ?? await resolveShipmentId(id)
       if (!shipmentId) throw new Error('NOT_FOUND')
       const updated = await request<{ shipment: Parameters<typeof mapShipmentToUi>[0] }>(
         `/logistics/shipments/${encodeURIComponent(shipmentId)}/status`,

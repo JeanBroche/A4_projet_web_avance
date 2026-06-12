@@ -19,6 +19,7 @@ export const restProductionRoutes: RouteDefinition[] = [
   { method: "PATCH", path: "production/batches/:batchCode/steps/:stepCode", action: "production.batch.steps.update", layer: "REST" },
   { method: "POST", path: "production/batches/:batchId/anomalies", action: "production.batch.addAnomalies", layer: "REST" },
   { method: "PATCH", path: "production/batches/:batchId/anomalies/:anomalyCode", action: "production.batch.updateAnomalies", layer: "REST" },
+  { method: "GET", path: "production/products", action: "production.product.list", layer: "REST" },
   { method: "POST", path: "production/products", action: "production.product.create", layer: "REST" },
   { method: "GET", path: "production/products/:productCode", action: "production.product.get", layer: "REST" },
   { method: "PATCH", path: "production/products/:productCode", action: "production.product.update", layer: "REST" },

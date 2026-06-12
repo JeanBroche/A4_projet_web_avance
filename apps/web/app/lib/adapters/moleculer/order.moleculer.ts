@@ -3,8 +3,7 @@ import type { OrderAdapter } from '~/lib/adapters/types'
 import {
   mapClientStatsToUi,
   mapOrderHistoryToUi,
-  mapOrderToUi,
-  mapUiStatusToBackend
+  mapOrderToUi
 } from '~/lib/mappers/order'
 import { isCuidLike, resolveStringIdByNumeric } from '~/lib/mappers/resolve-id'
 import { toNumericId } from '~/lib/mappers/id'
@@ -89,19 +88,12 @@ export function createMoleculerOrderAdapter(
     async updateStatus(id, status) {
       const orderId = await resolveOrderId(id)
       if (!orderId) throw new Error('NOT_FOUND')
-      const backendStatus = mapUiStatusToBackend(status)
-      if (backendStatus === 'SHIPPED') {
-        await request(`/commercial/orders/${encodeURIComponent(orderId)}/mark-shipped`, {
-          method: 'POST'
-        })
-      } else if (backendStatus === 'DELIVERED') {
-        await request(`/commercial/orders/${encodeURIComponent(orderId)}/mark-delivered`, {
-          method: 'POST'
-        })
-      }
       const order = await request<Parameters<typeof mapOrderToUi>[0]>(
-        `/commercial/orders/${encodeURIComponent(orderId)}`,
-        {}
+        `/commercial/orders/${encodeURIComponent(orderId)}/logistics-status`,
+        {
+          method: 'PATCH',
+          body: { status }
+        }
       )
       return mapOrderToUi(order)
     },

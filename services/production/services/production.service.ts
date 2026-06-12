@@ -60,6 +60,7 @@ import {
   updateProductSchema,
   deleteProductSchema,
   getProductSchema,
+  listProductSchema,
   addBatchAnomalySchema,
   updateBatchAnomalySchema
 } from "../src/lib/schemas.js";
@@ -844,6 +845,31 @@ const ProductionService: ServiceSchema = {
         });
 
         return updatedAnomaly;
+      }
+    },
+
+    "product.list": {
+      async handler(ctx) {
+        const params = parseParams(listProductSchema, ctx.params);
+        const auth = await requireProductionRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
+
+        const where = {
+          deletedAt: null,
+          ...(effectiveSite ? { siteCode: effectiveSite } : {})
+        };
+
+        const [rows, total] = await Promise.all([
+          prisma.productStock.findMany({
+            where,
+            orderBy: [{ siteCode: "asc" }, { productCode: "asc" }],
+            take: params.limit ?? 50,
+            skip: params.offset ?? 0
+          }),
+          prisma.productStock.count({ where })
+        ]);
+
+        return { total, limit: params.limit ?? 50, offset: params.offset ?? 0, items: rows };
       }
     },
 

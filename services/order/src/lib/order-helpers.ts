@@ -136,6 +136,52 @@ const ALLOWED_STATUS_TRANSITIONS: Record<string, readonly string[]> = {
   [ORDER_STATUSES.SHIPPED]: [ORDER_STATUSES.DELIVERED]
 };
 
+/** Statuts modifiables manuellement depuis l'UI commerciale (hors workflow production). */
+export const MANUAL_LOGISTICS_STATUSES = new Set<string>([
+  ORDER_STATUSES.VALIDATED,
+  ORDER_STATUSES.IN_PRODUCTION,
+  ORDER_STATUSES.SHIPPED,
+  ORDER_STATUSES.DELIVERED
+]);
+
+export const UI_LOGISTICS_STATUS = {
+  PREPARED: "prepared",
+  SHIPPED: "shipped",
+  DELIVERED: "delivered"
+} as const;
+
+export type UiLogisticsStatus =
+  (typeof UI_LOGISTICS_STATUS)[keyof typeof UI_LOGISTICS_STATUS];
+
+export function mapUiLogisticsToOrderStatus(status: UiLogisticsStatus): string {
+  switch (status) {
+    case UI_LOGISTICS_STATUS.PREPARED:
+      return ORDER_STATUSES.VALIDATED;
+    case UI_LOGISTICS_STATUS.SHIPPED:
+      return ORDER_STATUSES.SHIPPED;
+    case UI_LOGISTICS_STATUS.DELIVERED:
+      return ORDER_STATUSES.DELIVERED;
+    default:
+      throw createError("VALIDATION_ERROR", `Unknown logistics status: ${status}`);
+  }
+}
+
+export function assertManualLogisticsTransition(currentStatus: string, nextStatus: string) {
+  if (!MANUAL_LOGISTICS_STATUSES.has(currentStatus)) {
+    throw createError(
+      "ORDER_INVALID_STATUS_TRANSITION",
+      `Le statut logistique ne peut pas être modifié depuis ${currentStatus}`
+    );
+  }
+
+  if (!MANUAL_LOGISTICS_STATUSES.has(nextStatus)) {
+    throw createError(
+      "ORDER_INVALID_STATUS_TRANSITION",
+      `Le statut logistique cible ${nextStatus} n'est pas autorisé`
+    );
+  }
+}
+
 export function assertStatusTransition(currentStatus: string, nextStatus: string) {
   const allowed = ALLOWED_STATUS_TRANSITIONS[currentStatus];
   if (allowed?.includes(nextStatus)) {
@@ -181,9 +227,14 @@ export async function applyOrderStatusTransition(
   order: OrderWithRelations,
   nextStatus: string,
   changedBy: string,
-  notes?: string
+  notes?: string,
+  options?: { manual?: boolean }
 ) {
-  assertStatusTransition(order.status, nextStatus);
+  if (options?.manual) {
+    assertManualLogisticsTransition(order.status, nextStatus);
+  } else {
+    assertStatusTransition(order.status, nextStatus);
+  }
 
   return db.$transaction(async (tx) => {
     const updated = await tx.customerOrder.update({

@@ -1,7 +1,8 @@
 import { simulateDelay } from '~/lib/api/client'
 import { createInitialShipments } from '~/fixtures/shipment/deliveries'
 import type { ShipmentAdapter } from '~/lib/adapters/types'
-import type { CreateShipmentInput, DeliveryStatus, Shipment } from '~/types'
+import { mapBackendStatusToUi, mapUiShipmentStatus } from '~/lib/mappers/shipment'
+import type { CreateShipmentInput, DeliveryStatus, Shipment, UpdateShipmentInput } from '~/types'
 import { ApiClientError } from '~/lib/api/envelope'
 
 const shipmentsStore: Shipment[] = createInitialShipments()
@@ -9,7 +10,7 @@ let nextShipmentId = 4
 let nextShipmentNum = 404
 
 export function getMockShipments(): Shipment[] {
-  return shipmentsStore
+  return [...shipmentsStore]
 }
 
 export function createMockShipmentAdapter(): ShipmentAdapter {
@@ -28,7 +29,8 @@ export function createMockShipmentAdapter(): ShipmentAdapter {
         client: input.client,
         address: input.address,
         carrier: input.carrier,
-        status: 'loading',
+        status: 'planned',
+        backendStatus: 'PLANNED',
         departureDate: new Date().toISOString().slice(0, 10),
         estimatedDelivery: input.estimatedDelivery,
         delayDays: 0,
@@ -38,11 +40,38 @@ export function createMockShipmentAdapter(): ShipmentAdapter {
       return shipment
     },
 
-    async updateStatus(id: number, status: DeliveryStatus) {
+    async update(id: number, input: UpdateShipmentInput, _backendId?: string) {
       await simulateDelay()
       const idx = shipmentsStore.findIndex(s => s.id === id)
       if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Expédition introuvable')
-      shipmentsStore[idx] = { ...shipmentsStore[idx]!, status }
+      const finalBackend = mapUiShipmentStatus(input.status)
+      shipmentsStore[idx] = {
+        ...shipmentsStore[idx]!,
+        client: input.client,
+        orderNumber: input.orderNumber,
+        address: input.address,
+        carrier: input.carrier,
+        departureDate: input.departureDate,
+        estimatedDelivery: input.estimatedDelivery,
+        emoji: input.emoji,
+        backendStatus: finalBackend,
+        status: mapBackendStatusToUi(finalBackend)
+      }
+      return shipmentsStore[idx]!
+    },
+
+    async updateStatus(id: number, status: DeliveryStatus, _backendId?: string) {
+      await simulateDelay()
+      const idx = shipmentsStore.findIndex(s => s.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Expédition introuvable')
+      const current = shipmentsStore[idx]!
+      if (current.status === status) return current
+      const finalBackend = mapUiShipmentStatus(status)
+      shipmentsStore[idx] = {
+        ...current,
+        backendStatus: finalBackend,
+        status: mapBackendStatusToUi(finalBackend)
+      }
       return shipmentsStore[idx]!
     }
   }

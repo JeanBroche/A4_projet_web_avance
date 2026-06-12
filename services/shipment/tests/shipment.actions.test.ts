@@ -291,22 +291,23 @@ describe("shipment.shipment", () => {
     assert.equal(picked.shipment.status, "PICKED");
   });
 
-  it("rejects invalid status transition", async (t) => {
+  it("allows direct status override", async (t) => {
     if (skipIfNoDb(t)) return;
     if (!seedShipmentId) {
       t.skip("Seed shipment missing");
       return;
     }
 
-    await assert.rejects(
-      () =>
-        callAction("shipment.shipment.updateStatus", {
-          accessToken: tokens.logistique,
-          id: seedShipmentId,
-          status: "DELIVERED"
-        }),
-      (error: unknown) => getErrorCode(error) === "SHIPMENT_INVALID_STATUS_TRANSITION"
+    const delivered = await callAction<{ shipment: { status: string } }>(
+      "shipment.shipment.updateStatus",
+      {
+        accessToken: tokens.logistique,
+        id: seedShipmentId,
+        status: "DELIVERED"
+      }
     );
+
+    assert.equal(delivered.shipment.status, "DELIVERED");
   });
 
   it("lists shipment history with pagination", async (t) => {

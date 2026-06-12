@@ -55,11 +55,14 @@ model Shipment {
   orderNumber     String
   clientCode      String?
   siteCode        String
-  status          String                  @default("PLANNED")
-  carrier         String?
-  plannedShipDate DateTime?               @db.Date
-  shippedAt       DateTime?
-  deliveredAt     DateTime?
+  status              String                  @default("PLANNED")
+  carrier             String?
+  deliveryAddress     String?
+  emoji               String?                 @default("🚚")
+  plannedShipDate     DateTime?               @db.Date
+  plannedDeliveryDate DateTime?               @db.Date
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
   deletedAt       DateTime?
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt

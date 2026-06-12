@@ -222,25 +222,61 @@ export function createMockStockAdapter(): StockAdapter {
 
     async getRuptureForecast() {
       await simulateDelay(80)
+      const windowDays = 30
+      const windowStart = Date.now() - windowDays * 86400000
       const forecasts: RuptureForecast[] = partsStore.map((p) => {
-        const ratio = p.minQty > 0 ? p.available / p.minQty : p.available > 0 ? 2 : 0
+        const totalOut = movementsStore
+          .filter(m =>
+            m.materialReference === p.reference
+            && m.type === 'OUT'
+            && m.createdAt.getTime() >= windowStart
+          )
+          .reduce((sum, m) => sum + m.quantity, 0)
+        const activeReservationQty = listMockReservations()
+          .filter(r => r.materialId === p.reference && r.status === 'ACTIVE')
+          .reduce((sum, r) => sum + r.quantity, 0)
+        const historicalDaily = totalOut / windowDays
+        const reservationDaily = activeReservationQty > 0 ? activeReservationQty / 7 : 0
+        const consumptionPerDay = Math.round(Math.max(historicalDaily, reservationDaily) * 100) / 100
+
         let score = 0
-        if (p.available === 0) score = 100
-        else if (ratio < 0.5) score = 85
-        else if (ratio < 1) score = 60
-        else if (ratio < 1.5) score = 30
-        else score = 10
-        const dailyUse = Math.max(1, Math.ceil(p.minQty / 14))
-        const estimatedDaysUntilRupture =
-          p.available === 0 ? 0 : Math.max(1, Math.floor(p.available / dailyUse))
+        let status: RuptureForecast['status'] = 'ok'
+        let estimatedDaysUntilRupture: number | null = null
+
+        if (p.available <= 0) {
+          score = 100
+          status = 'rupture'
+          estimatedDaysUntilRupture = 0
+        } else if (consumptionPerDay <= 0) {
+          if (p.available < p.minQty) {
+            const ratio = p.available / Math.max(p.minQty, 1)
+            score = Math.min(100, Math.round(40 + (1 - ratio) * 60))
+            status = score >= 70 ? 'critical' : 'warning'
+          }
+        } else {
+          const daysToRupture = p.available / consumptionPerDay
+          const windowRatio = 1 - daysToRupture / windowDays
+          score = Math.min(100, Math.max(0, Math.round(windowRatio * 100)))
+          if (p.available < p.minQty) {
+            score = Math.min(100, score + Math.round((1 - p.available / Math.max(p.minQty, 1)) * 25))
+          }
+          estimatedDaysUntilRupture = Math.round(daysToRupture * 10) / 10
+          if (score >= 80 || daysToRupture <= 3) status = 'critical'
+          else if (score >= 50 || daysToRupture <= windowDays / 2) status = 'warning'
+        }
+
         return {
           reference: p.reference,
           name: p.name,
           available: p.available,
           minQty: p.minQty,
           unit: p.unit,
+          reserved: p.reserved,
+          activeReservationQty,
+          consumptionPerDay,
           score,
-          estimatedDaysUntilRupture: p.available === 0 ? 0 : estimatedDaysUntilRupture
+          status,
+          estimatedDaysUntilRupture
         }
       })
       return forecasts.sort((a, b) => b.score - a.score)

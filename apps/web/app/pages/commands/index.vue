@@ -7,12 +7,12 @@ definePageMeta({ layout: 'sidebar' })
 type PreparedOrder = Order
 
 const {
-  orders, status, error, isMutating, refresh, create,
+  orders, status, error, mutationError, isMutating, refresh, create,
   updateStatus: updateOrderStatus, validate, reject, changePriority,
   clientStats, orderHistory, loadClientStats, loadOrderHistory
 } = useOrders()
 
-const { canManageOrders, canPlanShipments, pageSubtitle } = useRoleCapabilities()
+const { canManageOrders, canUpdateOrderLogistics, canPlanShipments, pageSubtitle } = useRoleCapabilities()
 
 onMounted(() => refresh())
 
@@ -187,6 +187,7 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
 
       <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
       <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refresh">Réessayer</UButton>
+      <UAlert v-if="mutationError" color="error" variant="soft" :title="mutationError" class="mb-4" />
 
       <div v-if="status === 'pending'" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <USkeleton v-for="i in 3" :key="i" class="h-40 w-full" />
@@ -300,7 +301,7 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
           </div>
 
           <div class="flex items-center justify-between pt-3 border-t border-gray-100 gap-2" @click.stop>
-            <UDropdownMenu v-if="canManageOrders" :items="[statusOptions.map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(order, s.value as OrderStatus) }))]">
+            <UDropdownMenu v-if="canUpdateOrderLogistics" :items="[statusOptions.map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(order, s.value as OrderStatus) }))]">
               <UButton 
                 :class="statusConfig[order.status].class" 
                 variant="subtle" 
@@ -409,7 +410,7 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
                 {{ statusConfig[selected.status].label }}
               </span>
             </div>
-            <UDropdownMenu v-if="canManageOrders" :items="[statusOptions.map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(selected!, s.value as OrderStatus) }))]">
+            <UDropdownMenu v-if="canUpdateOrderLogistics" :items="[statusOptions.map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(selected!, s.value as OrderStatus) }))]">
               <UButton label="Modifier le flux" color="neutral" variant="outline" size="xs" trailing-icon="i-lucide-chevron-down" />
             </UDropdownMenu>
           </div>

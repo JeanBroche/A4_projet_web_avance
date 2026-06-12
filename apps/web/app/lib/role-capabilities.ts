@@ -30,6 +30,10 @@ export function canManageOrders(role: UserRole | null): boolean {
   return role === 'commercial' || role === 'admin'
 }
 
+export function canUpdateOrderLogistics(role: UserRole | null): boolean {
+  return role === 'commercial' || role === 'logistique' || role === 'admin'
+}
+
 export function canViewDashboard(role: UserRole | null): boolean {
   return role === 'direction' || role === 'admin'
 }

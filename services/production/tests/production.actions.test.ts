@@ -273,6 +273,26 @@ describe("production.bom.create", () => {
   });
 });
 
+describe("production.product.list", () => {
+  it("lists seeded products for operateur site", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const result = await callAction<{ total: number; items: { productCode: string }[] }>(
+      "production.product.list",
+      { accessToken: tokens.operateur }
+    );
+    assert.ok(result.total >= 1);
+    assert.ok(result.items.some((item) => item.productCode === "PROD-001"));
+  });
+
+  it("lists products for logistique read-only role", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const result = await callAction<{ total: number }>("production.product.list", {
+      accessToken: tokens.logistique
+    });
+    assert.ok(result.total >= 0);
+  });
+});
+
 describe("production.product.get", () => {
   it("returns seeded product PROD-001", async (t) => {
     if (skipIfNoDb(t)) return;

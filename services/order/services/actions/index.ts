@@ -15,3 +15,4 @@ export { orderStartProductionAction } from "./orderStartProductionAction.js";
 export { orderFinishAction } from "./orderFinishAction.js";
 export { orderMarkShippedAction } from "./orderMarkShippedAction.js";
 export { orderMarkDeliveredAction } from "./orderMarkDeliveredAction.js";
+export { orderSetLogisticsStatusAction } from "./orderSetLogisticsStatusAction.js";

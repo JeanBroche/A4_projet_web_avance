@@ -52,6 +52,8 @@ export interface CreateStockLevelInput {
   minQty: number
 }
 
+export type RuptureForecastStatus = 'rupture' | 'critical' | 'warning' | 'ok'
+
 /** Score de risque de rupture (0 = faible, 100 = critique). */
 export interface RuptureForecast {
   reference: string
@@ -59,7 +61,11 @@ export interface RuptureForecast {
   available: number
   minQty: number
   unit: StockUnit
+  reserved: number
+  activeReservationQty: number
+  consumptionPerDay: number
   score: number
+  status: RuptureForecastStatus
   estimatedDaysUntilRupture: number | null
 }
 

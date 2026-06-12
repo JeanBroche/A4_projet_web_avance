@@ -18,14 +18,6 @@ export const SHIPMENT_STATUS = {
   CANCELLED: "CANCELLED"
 } as const;
 
-const ALLOWED_SHIPMENT_TRANSITIONS: Record<ShipmentStatus, ShipmentStatus[]> = {
-  PLANNED: ["PICKED", "CANCELLED"],
-  PICKED: ["IN_TRANSIT", "CANCELLED"],
-  IN_TRANSIT: ["DELIVERED"],
-  DELIVERED: [],
-  CANCELLED: []
-};
-
 type DbClient = Pick<
   typeof prisma,
   "pickList" | "shipment" | "shipmentTrackingEvent"
@@ -49,15 +41,8 @@ export function resolveSiteCode(params: { siteCode?: string; siteId?: string }) 
   return params.siteCode || params.siteId || null;
 }
 
-export function assertShipmentTransition(current: string, next: ShipmentStatus) {
-  const allowed = ALLOWED_SHIPMENT_TRANSITIONS[current as ShipmentStatus] || [];
-  if (!allowed.includes(next)) {
-    throw createError(
-      "SHIPMENT_INVALID_STATUS_TRANSITION",
-      `${current} → ${next} not allowed`
-    );
-  }
-}
+/** Manual status updates — any target status is allowed. */
+export function assertShipmentTransition(_current: string, _next: ShipmentStatus) {}
 
 export async function generatePickListCode(db: DbClient, year = new Date().getFullYear()) {
   return withDistributedLock({ key: `lock:code:pick:${year}` }, async () => {
@@ -161,7 +146,10 @@ export function toShipmentSummary(shipment: ShipmentWithRelations) {
     siteCode: shipment.siteCode,
     status: shipment.status,
     carrier: shipment.carrier,
+    deliveryAddress: shipment.deliveryAddress,
+    emoji: shipment.emoji,
     plannedShipDate: shipment.plannedShipDate,
+    plannedDeliveryDate: shipment.plannedDeliveryDate,
     shippedAt: shipment.shippedAt,
     deliveredAt: shipment.deliveredAt,
     createdAt: shipment.createdAt,

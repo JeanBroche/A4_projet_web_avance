@@ -39,8 +39,12 @@ type BackendForecast = {
   available?: number
   minimum?: number
   unit?: string
+  reserved?: number
+  activeReservationQty?: number
+  consumptionPerDay?: number
   riskScore?: number
   score?: number
+  status?: string
   estimatedDaysUntilRupture?: number | null
   estimatedDaysToRupture?: number | null
 }
@@ -246,13 +250,29 @@ export function mapMovementToUi(movement: BackendMovement) {
 }
 
 export function mapForecastToUi(item: BackendForecast) {
+  const status = item.status
+  const normalizedStatus =
+    status === 'rupture' || status === 'critical' || status === 'warning' || status === 'ok'
+      ? status
+      : (item.available ?? 0) <= 0
+        ? 'rupture'
+        : (item.score ?? 0) >= 80
+          ? 'critical'
+          : (item.score ?? 0) >= 50
+            ? 'warning'
+            : 'ok'
+
   return {
     reference: item.materialCode ?? item.code ?? '—',
     name: item.description ?? item.materialCode ?? item.code ?? '—',
     available: item.available ?? 0,
     minQty: item.minimum ?? 0,
     unit: (item.unit ?? 'pcs') as 'pcs',
+    reserved: item.reserved ?? 0,
+    activeReservationQty: item.activeReservationQty ?? 0,
+    consumptionPerDay: item.consumptionPerDay ?? 0,
     score: item.riskScore ?? item.score ?? 0,
+    status: normalizedStatus,
     estimatedDaysUntilRupture: item.estimatedDaysUntilRupture ?? item.estimatedDaysToRupture ?? null
   }
 }

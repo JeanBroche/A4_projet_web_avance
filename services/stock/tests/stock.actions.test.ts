@@ -338,11 +338,24 @@ describe("stock.forecast", () => {
     const forecast = (await broker.call("stock.forecast.rupture", {
       accessToken: tokens.logistique,
       siteCode: "SITE-LYO"
-    })) as Array<{ score: number }>;
+    })) as Array<{
+      score: number;
+      code: string;
+      description: string;
+      unit: string;
+      status: string;
+    }>;
     assert.ok(Array.isArray(forecast));
     assert.ok(forecast.length >= 1);
     for (let i = 1; i < forecast.length; i++) {
       assert.ok(forecast[i - 1].score >= forecast[i].score, "results must be sorted by score desc");
+    }
+    const graisse = forecast.find((row) => row.code === "MAT-004");
+    if (graisse) {
+      assert.equal(graisse.score, 100);
+      assert.equal(graisse.status, "rupture");
+      assert.ok(graisse.description.length > 0);
+      assert.equal(graisse.unit, "kg");
     }
   });
 });

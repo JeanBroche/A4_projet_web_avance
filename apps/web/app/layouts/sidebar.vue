@@ -262,9 +262,6 @@ const userItems = computed<DropdownMenuItem[][]>(() => [
       </header>
 
       <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50/50 px-3 py-4 sm:px-5 sm:py-6">
-        <ClientOnly>
-          <RoleNotificationBar />
-        </ClientOnly>
         <slot />
       </main>
     </div>

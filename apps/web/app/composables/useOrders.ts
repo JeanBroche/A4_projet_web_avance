@@ -16,6 +16,7 @@ export function useOrders() {
   const orders = ref<Order[]>([])
   const status = ref<AsyncStatus>('idle')
   const error = ref<string | null>(null)
+  const mutationError = ref<string | null>(null)
   const isMutating = ref(false)
   const clientStats = ref<ClientStats | null>(null)
   const orderHistory = ref<OrderHistoryEntry[]>([])
@@ -46,10 +47,13 @@ export function useOrders() {
 
   async function updateStatus(id: number, orderStatus: OrderStatus) {
     isMutating.value = true
+    mutationError.value = null
     try {
       await adapters.order.updateStatus(id, orderStatus)
       await refresh()
       await syncNotificationsAfterMutation()
+    } catch (e) {
+      mutationError.value = toFailureResult(e).message
     } finally {
       isMutating.value = false
     }
@@ -108,6 +112,7 @@ export function useOrders() {
     orders,
     status,
     error,
+    mutationError,
     isMutating,
     clientStats,
     orderHistory,
