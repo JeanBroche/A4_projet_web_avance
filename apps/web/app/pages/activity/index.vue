@@ -116,28 +116,34 @@ function capitalize(s: string) {
         <USkeleton v-for="i in 5" :key="i" class="h-20 w-full" />
       </div>
 
-      <div v-else :class="TOOLBAR">
-        <UInput v-model="search" icon="i-lucide-search" placeholder="Rechercher dans l'historique…" class="w-full sm:flex-1" />
-        <USelectMenu
-          v-model="dateSort"
-          :items="dateSortOptions"
-          value-key="value"
-          icon="i-lucide-arrow-down-up"
-          class="w-full sm:w-44"
-          aria-label="Trier par date"
+      <div v-else class="space-y-3 mb-4 sm:mb-6">
+        <UInput
+          v-model="search"
+          icon="i-lucide-search"
+          placeholder="Rechercher dans l'historique…"
+          class="w-full"
         />
-        <div class="flex gap-1 flex-wrap sm:flex-nowrap">
-          <UButton
-            v-for="btn in filterButtons" :key="btn.key"
-            :icon="btn.icon"
-            :variant="activeFilter === btn.key ? 'solid' : 'outline'"
-            :class="['flex-1 sm:flex-none justify-center', activeFilter === btn.key ? 'bg-[#0F62BC] text-white border-[#0F62BC]' : 'text-gray-500 border-gray-200 hover:border-[#0F62BC] hover:text-[#0F62BC]']"
-            size="sm"
-            @click="activeFilter = btn.key"
-          >
-            <span class="text-xs sm:hidden">{{ btn.label }}</span>
-            <span class="hidden sm:inline">{{ btn.label }}</span>
-          </UButton>
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <USelectMenu
+            v-model="dateSort"
+            :items="dateSortOptions"
+            value-key="value"
+            icon="i-lucide-arrow-down-up"
+            class="w-full sm:w-44 shrink-0"
+            aria-label="Trier par date"
+          />
+          <div class="flex gap-1 flex-wrap">
+            <UButton
+              v-for="btn in filterButtons" :key="btn.key"
+              :icon="btn.icon"
+              :variant="activeFilter === btn.key ? 'solid' : 'outline'"
+              :class="['justify-center', activeFilter === btn.key ? 'bg-[#0F62BC] text-white border-[#0F62BC]' : 'text-gray-500 border-gray-200 hover:border-[#0F62BC] hover:text-[#0F62BC]']"
+              size="sm"
+              @click="activeFilter = btn.key"
+            >
+              {{ btn.label }}
+            </UButton>
+          </div>
         </div>
       </div>
 
