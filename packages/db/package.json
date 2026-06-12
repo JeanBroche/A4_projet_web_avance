@@ -18,6 +18,7 @@
     "build": "tsc --noEmit",
     "migrate:all": "node --import tsx scripts/migrate-all.ts deploy",
     "migrate:all:dev": "node --import tsx scripts/migrate-all.ts dev",
+    "generate:all": "node --import tsx scripts/generate-all.ts",
     "seed:all": "node --import tsx scripts/seed-all.ts",
     "verify-seed": "node --import tsx scripts/verify-seed.ts",
     "lint": "tsc --noEmit && tsc -p tsconfig.scripts.json --noEmit",

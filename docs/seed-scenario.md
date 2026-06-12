@@ -30,29 +30,53 @@ pnpm db:verify-seed   # assertions post-seed (optionnel)
 
 | Numéro | Statut | Usage UI |
 |--------|--------|----------|
-| `CMD-2025-00001` | DRAFT | Commercial : valider |
-| `CMD-2025-00002` | DRAFT + urgent | Priorité + delay-risk |
-| `CMD-2025-00003` | VALIDATED | Historique statuts |
-| `CMD-2025-00004` | IN_PRODUCTION | Lié `BATCH-SEED-001` |
-| `CMD-2025-00005` | DELIVERED | Funnel complet |
+| `CMD-2025-00001` | DRAFT | Commercial : valider — lié OF terminé (Bras BA-320) |
+| `CMD-2025-00002` | DRAFT + urgent | Priorité — lot vérin en cours |
+| `CMD-2025-00003` | VALIDATED | Historique statuts — lot plaque en attente |
+| `CMD-2025-00004` | IN_PRODUCTION | Lié `BATCH-SEED-001` (palier + anomalie) |
+| `CMD-2025-00005` | DELIVERED | Funnel complet — lot palier terminé |
 
 Paris : `CMD-PAR-00001` (DRAFT).
 
-## Production
+## Matrice démo — Ordres de fabrication (`SEED_BOM_CATALOG`)
 
-| Lot | Statut | Détail |
-|-----|--------|--------|
-| `BATCH-SEED-001` | IN_PROGRESS 25 % | Anomalie `ANOMALY-SEED-001` ouverte |
-| `BATCH-SEED-002` | COMPLETED 100 % | KPI avancement |
-| `BATCH-SEED-PAR-001` | PENDING | Multi-site |
+Couvre les combinaisons affichées sur `/bom` :
 
-Nomenclatures : `BOM-SEED-001` (IN_PROGRESS), `BOM-SEED-002` (plaque).
+| Code | Produit | Statut OF | Priorité | Matières | Réservations | Exemple UI |
+|------|---------|-----------|----------|----------|--------------|------------|
+| `BOM-SEED-001` | Palier haute précision PN-100 | En cours | Normale | Toutes OK | Oui (3 matières) | 2 lots, anomalie QC, bookmark |
+| `BOM-SEED-002` | Plaque fixation module embarqué LP-200 | En attente | Normale | Toutes OK | Non | 1 lot à 0 % |
+| `BOM-SEED-003` | Vérin hydraulique VH-450 | En attente | Haute | Rupture + insuffisant | Non | Titane insuffisant, graisse rupture |
+| `BOM-SEED-004` | Bras articulé BA-320 | Terminée | Critique | Toutes OK | Non | Filtre « Terminée », lot 100 % |
+
+### Détail matières par OF
+
+| OF | Besoins unitaires |
+|----|-------------------|
+| Palier PN-100 | Acier 316L ×2 kg, Titane ×4 kg, Joint ×8 pcs |
+| Plaque LP-200 | Acier ×36 kg, Joint ×12 pcs |
+| Vérin VH-450 | Acier ×3 kg, Titane ×10 kg (stock insuffisant), Graisse ×2 kg (rupture) |
+| Bras BA-320 | Acier ×8 kg, Joint ×16 pcs |
+
+## Production — Lots (`SEED_BATCH_SPECS`)
+
+| Lot | BOM | Statut | Avancement | Détail |
+|-----|-----|--------|------------|--------|
+| `BATCH-SEED-001` | Palier | En cours | ~83 % | Prep + fab OK, QC en cours — **anomalie ouverte** |
+| `BATCH-SEED-002` | Palier | Terminé | 100 % | 3/3 étapes |
+| `BATCH-SEED-003` | Plaque | En attente | 0 % | Aucune étape démarrée |
+| `BATCH-SEED-004` | Vérin | En cours | ~50 % | Prep OK, fabrication en cours — sans anomalie |
+| `BATCH-SEED-005` | Bras | Terminé | 100 % | OF historique terminé |
+| `BATCH-SEED-PAR-001` | Palier | En attente | 0 % | Multi-site Paris |
+
+L'avancement est calculé depuis les étapes (`STEP-01` préparation, `STEP-02` fabrication, `STEP-03` contrôle qualité).
 
 ## Stock
 
-- Alerte critique titane (`MAT-002`), retard fournisseur AeroMat FR
-- 2 réservations ACTIVE sur `BATCH-SEED-001` (MAT-001, MAT-002)
-- Mouvement retour (`RET-2025-001`) pour `/inventaire/returned`
+- Alerte critique titane (`MAT-002`) : disponible 8 kg < seuil 15 kg
+- Graisse (`MAT-004`) : stock 0 kg → rupture sur vérin VH-450
+- Retard fournisseur AeroMat FR sur titane
+- 3 réservations ACTIVE sur `BOM-SEED-001` (alignées BOM palier)
 
 ## Expéditions
 
@@ -77,7 +101,7 @@ Nomenclatures : `BOM-SEED-001` (IN_PROGRESS), `BOM-SEED-002` (plaque).
 
 | Rôle | Pages |
 |------|-------|
-| **operateur** | `/bom`, `/batch` — anomalie + traçabilité |
+| **operateur** | `/bom`, `/batch` — 4 OF, filtres statut, anomalie + traçabilité |
 | **logistique** | `/inventaire/spare`, `/delivery` — réservations + 3 statuts expédition |
 | **commercial** | `/commands` — draft/urgent + historique |
 | **direction** | `/dashboard`, `/notifications`, `/activity` — KPI + incidents |

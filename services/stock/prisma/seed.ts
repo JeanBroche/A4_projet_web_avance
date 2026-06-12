@@ -3,7 +3,9 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createPrismaClient } from "@aeronexis/db";
 import {
-  SEED_BATCHES,
+  SEED_BOM,
+  SEED_BOM_CATALOG,
+  SEED_MATERIAL_LABELS,
   SEED_MATERIALS,
   SEED_SITES
 } from "@aeronexis/shared";
@@ -27,38 +29,68 @@ type MaterialSeed = {
 const MATERIALS: MaterialSeed[] = [
   {
     code: SEED_MATERIALS.ACIER,
-    description: "Acier inox 316L",
-    unit: "kg",
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.ACIER].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.ACIER].unit,
     currentStock: 120,
     minimumStock: 50,
-    reservedStock: 10,
+    reservedStock: 2,
     supplier: "MetalSupply SA",
     siteCode: SEED_SITES.LYO
   },
   {
     code: SEED_MATERIALS.TITANE,
-    description: "Titanium grade 5",
-    unit: "kg",
-    currentStock: 8,
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.TITANE].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.TITANE].unit,
+    currentStock: 12,
     minimumStock: 15,
-    reservedStock: 2,
+    reservedStock: 4,
     supplier: "AeroMat FR",
     siteCode: SEED_SITES.LYO
   },
   {
     code: SEED_MATERIALS.JOINT,
-    description: "Joint torique viton",
-    unit: "pcs",
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.JOINT].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.JOINT].unit,
     currentStock: 500,
     minimumStock: 100,
-    reservedStock: 0,
+    reservedStock: 8,
     supplier: "SealTech",
     siteCode: SEED_SITES.LYO
   },
   {
+    code: SEED_MATERIALS.GRAISSE,
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.GRAISSE].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.GRAISSE].unit,
+    currentStock: 0,
+    minimumStock: 5,
+    reservedStock: 0,
+    supplier: "Lubricants Aero",
+    siteCode: SEED_SITES.LYO
+  },
+  {
+    code: SEED_MATERIALS.ALU,
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.ALU].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.ALU].unit,
+    currentStock: 45,
+    minimumStock: 20,
+    reservedStock: 0,
+    supplier: "AeroMat FR",
+    siteCode: SEED_SITES.LYO
+  },
+  {
+    code: SEED_MATERIALS.VIS,
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.VIS].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.VIS].unit,
+    currentStock: 1200,
+    minimumStock: 200,
+    reservedStock: 0,
+    supplier: "FastenAir",
+    siteCode: SEED_SITES.LYO
+  },
+  {
     code: SEED_MATERIALS.ACIER,
-    description: "Acier inox 316L",
-    unit: "kg",
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.ACIER].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.ACIER].unit,
     currentStock: 80,
     minimumStock: 40,
     reservedStock: 0,
@@ -119,7 +151,7 @@ async function main() {
 
   if (matLyoAcier) {
     const movementsExist = await prisma.stockMovement.findFirst({
-      where: { materialId: matLyoAcier, reason: "Consommation OF-2025-001" }
+      where: { materialId: matLyoAcier, reason: "Consommation lot BATCH-SEED-002" }
     });
     if (!movementsExist) {
       await prisma.stockMovement.createMany({
@@ -129,7 +161,7 @@ async function main() {
             siteCode: SEED_SITES.LYO,
             type: "OUT",
             quantity: 5,
-            reason: "Consommation OF-2025-001",
+            reason: "Consommation lot BATCH-SEED-002",
             createdAt: daysAgo(20)
           },
           {
@@ -137,7 +169,7 @@ async function main() {
             siteCode: SEED_SITES.LYO,
             type: "OUT",
             quantity: 8,
-            reason: "Consommation OF-2025-002",
+            reason: "Consommation lot BATCH-SEED-001",
             createdAt: daysAgo(10)
           },
           {
@@ -150,23 +182,6 @@ async function main() {
             createdAt: daysAgo(5)
           }
         ]
-      });
-    }
-
-    const returnExists = await prisma.stockMovement.findFirst({
-      where: { materialId: matLyoAcier, reason: "Retour stock client" }
-    });
-    if (!returnExists) {
-      await prisma.stockMovement.create({
-        data: {
-          materialId: matLyoAcier,
-          siteCode: SEED_SITES.LYO,
-          type: "IN",
-          quantity: 2,
-          reason: "Retour stock client",
-          documentRef: "RET-2025-001",
-          createdAt: daysAgo(2)
-        }
       });
     }
   }
@@ -200,19 +215,38 @@ async function main() {
     }
   }
 
-  if (matLyoAcier && matLyoJoint) {
-    await upsertReservation(SEED_BATCHES.LYO_IN_PROGRESS, matLyoAcier, SEED_SITES.LYO, 1);
-    await upsertReservation(SEED_BATCHES.LYO_IN_PROGRESS, matLyoTitane!, SEED_SITES.LYO, 2);
+  if (matLyoAcier && matLyoTitane && matLyoJoint) {
+    const palier = SEED_BOM_CATALOG.find((entry) => entry.key === "PALIER");
+    if (palier?.reserveMaterials) {
+      for (const line of palier.lines) {
+        const material =
+          line.material_id === SEED_MATERIALS.ACIER
+            ? matLyoAcier
+            : line.material_id === SEED_MATERIALS.TITANE
+              ? matLyoTitane
+              : line.material_id === SEED_MATERIALS.JOINT
+                ? matLyoJoint
+                : null;
+        if (!material) continue;
+        await upsertReservation(
+          palier.bomCode,
+          material,
+          SEED_SITES.LYO,
+          line.quantity
+        );
+      }
+    }
   }
 
   const reservationCount = await prisma.stockReservation.count({
-    where: { ofId: SEED_BATCHES.LYO_IN_PROGRESS, status: "ACTIVE" }
+    where: { ofId: SEED_BOM.PALIER, status: "ACTIVE" }
   });
 
   console.log("Stock seed completed:", {
     materials: MATERIALS.length,
     sites: Array.from(new Set(MATERIALS.map((m) => m.siteCode))),
-    activeReservations: reservationCount
+    activeReservations: reservationCount,
+    reservedForOf: SEED_BOM.PALIER
   });
 }
 

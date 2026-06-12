@@ -8,8 +8,8 @@ export const listBomSchema = accessTokenSchema.extend({
   status: z.string().min(1).optional(),
   siteCode: z.string().min(1).optional(),
   siteId: z.string().min(1).optional(),
-  limit: z.number().int().positive().max(100).optional(),
-  offset: z.number().int().min(0).optional()
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional()
 });
 
 export const listBatchSchema = accessTokenSchema.extend({
@@ -17,8 +17,8 @@ export const listBatchSchema = accessTokenSchema.extend({
   bom_code: z.string().min(1).optional(),
   siteCode: z.string().min(1).optional(),
   siteId: z.string().min(1).optional(),
-  limit: z.number().int().positive().max(100).optional(),
-  offset: z.number().int().min(0).optional()
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional()
 });
 
 export const getBatchSchema = accessTokenSchema.extend({
@@ -57,8 +57,8 @@ export const batchRescheduleSchema = accessTokenSchema.extend({
 
 export const batchHistorySchema = accessTokenSchema.extend({
   batch_code: z.string().min(1),
-  limit: z.number().int().positive().max(100).optional(),
-  offset: z.number().int().min(0).optional()
+  limit: z.coerce.number().int().positive().max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional()
 });
 
 export const batchStepsListSchema = accessTokenSchema.extend({

@@ -1,4 +1,6 @@
+import { SEED_BOM_UI, SEED_MATERIAL_LABELS } from '@aeronexis/shared'
 import { toNumericId } from '~/lib/mappers/id'
+import type { Priority } from '~/types'
 
 type BackendBom = {
   id: string
@@ -21,12 +23,14 @@ type BackendProduct = {
 type BackendBatch = {
   batch_id: string
   batch_code: string
+  bom_id?: string
+  bom_code?: string
   command_id?: string
   status?: string
   progress?: number
   hasAnomaly?: boolean
   createdAt?: string | Date
-  bom?: { description?: string | null }
+  bom?: { description?: string | null; bom_code?: string }
 }
 
 const BOM_STATUS: Record<string, 'pending' | 'in_progress' | 'done'> = {
@@ -71,22 +75,41 @@ export function mapUiBatchStatus(status: string) {
   return UI_BATCH_STATUS[status] ?? status.toUpperCase()
 }
 
+function materialLabel(materialId: string) {
+  return SEED_MATERIAL_LABELS[materialId as keyof typeof SEED_MATERIAL_LABELS]
+}
+
+function bomUiMeta(bomCode: string) {
+  return SEED_BOM_UI[bomCode]
+}
+
+function bomEmoji(bomCode: string) {
+  return bomUiMeta(bomCode)?.emoji ?? '🏭'
+}
+
+function bomPriority(bomCode: string): Priority {
+  return bomUiMeta(bomCode)?.priority ?? 'normal'
+}
+
 export function mapBomToUi(bom: BackendBom) {
-  const lines = (bom.lines ?? []).map(line => ({
-    reference: line.material_id,
-    name: line.material_id,
-    qtyNeeded: line.quantity,
-    qtyStock: line.quantity,
-    unit: 'pcs'
-  }))
+  const lines = (bom.lines ?? []).map((line) => {
+    const label = materialLabel(line.material_id)
+    return {
+      reference: line.material_id,
+      name: label?.name ?? line.material_id,
+      qtyNeeded: line.quantity,
+      qtyStock: 0,
+      unit: label?.unit ?? 'pcs'
+    }
+  })
   return {
     id: toNumericId(bom.id),
     name: bom.description ?? bom.bom_code,
-    emoji: '🏭',
+    emoji: bomEmoji(bom.bom_code),
     ofNumber: bom.bom_code,
     qty: bom.quantity ?? 1,
     status: mapBomStatusToUi(bom.status),
-    priority: 'normal' as const,
+    priority: bomPriority(bom.bom_code),
     bom: lines.length
       ? lines
       : [{ reference: bom.bom_code, name: bom.description ?? bom.bom_code, qtyNeeded: bom.quantity ?? 1, qtyStock: 0, unit: 'pcs' }]
@@ -98,12 +121,14 @@ export function mapBatchToUi(batch: BackendBatch) {
     id: toNumericId(batch.batch_id),
     lotNumber: batch.batch_code,
     ofNumber: batch.command_id ?? batch.batch_code,
+    bomCode: batch.bom_code ?? batch.bom?.bom_code ?? '',
     productName: batch.bom?.description ?? batch.batch_code,
-    emoji: '⚙️',
+    emoji: bomEmoji(batch.bom_code ?? batch.bom?.bom_code ?? ''),
     qty: 1,
     status: mapBatchStatusToUi(batch.status),
-    priority: 'normal' as const,
+    priority: bomPriority(batch.bom_code ?? batch.bom?.bom_code ?? ''),
     hasAnomaly: batch.hasAnomaly ?? false,
+    progress: batch.progress ?? 0,
     createdAt: batch.createdAt
       ? new Date(batch.createdAt).toISOString().slice(0, 10)
       : new Date().toISOString().slice(0, 10),

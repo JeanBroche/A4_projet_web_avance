@@ -109,10 +109,25 @@ describe("production.ping", () => {
 });
 
 describe("production RBAC", () => {
-  it("rejects logistique role on bom.list", async (t) => {
+  it("allows logistique read on bom.list", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const result = await callAction<{ total: number }>(
+      "production.bom.list",
+      { accessToken: tokens.logistique }
+    );
+    assert.ok(result.total >= 0);
+  });
+
+  it("rejects logistique role on bom.create", async (t) => {
     if (skipIfNoDb(t)) return;
     await assert.rejects(
-      () => callAction("production.bom.list", { accessToken: tokens.logistique }),
+      () =>
+        callAction("production.bom.create", {
+          accessToken: tokens.logistique,
+          description: "Test RBAC",
+          material_id: "MAT-001",
+          quantity: 1
+        }),
       (error: unknown) => getErrorCode(error) === "FORBIDDEN"
     );
   });

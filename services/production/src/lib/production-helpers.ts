@@ -192,6 +192,54 @@ export function resolveStatusFromProgress(progress: number, currentStatus: strin
   return currentStatus;
 }
 
+/** Avancement dérivé des étapes : COMPLETED = 1, IN_PROGRESS = 0,5, PENDING = 0. */
+export function computeProgressFromSteps(steps: Array<{ status: string }>): number {
+  if (steps.length === 0) {
+    return 0;
+  }
+
+  let weighted = 0;
+  for (const step of steps) {
+    if (step.status === STEP_STATUSES.COMPLETED) {
+      weighted += 1;
+    } else if (step.status === STEP_STATUSES.IN_PROGRESS) {
+      weighted += 0.5;
+    }
+  }
+
+  return Math.round((weighted / steps.length) * 100);
+}
+
+export function resolveStatusFromSteps(steps: Array<{ status: string }>): string {
+  const progress = computeProgressFromSteps(steps);
+  if (progress >= 100) {
+    return PROD_STATUSES.COMPLETED;
+  }
+  if (
+    steps.some(
+      (step) =>
+        step.status === STEP_STATUSES.IN_PROGRESS || step.status === STEP_STATUSES.COMPLETED
+    )
+  ) {
+    return PROD_STATUSES.IN_PROGRESS;
+  }
+  return PROD_STATUSES.PENDING;
+}
+
+export async function syncBatchProgressFromSteps(db: DbClient, batch_id: string) {
+  const steps = await db.productionStep.findMany({
+    where: { batch_id },
+    orderBy: { order_index: "asc" }
+  });
+  const progress = computeProgressFromSteps(steps);
+  const status = resolveStatusFromSteps(steps);
+
+  return db.batchProduct.update({
+    where: { batch_id },
+    data: { progress, status }
+  });
+}
+
 export async function recordBatchHistory(
   db: DbClient,
   batch_id: string,

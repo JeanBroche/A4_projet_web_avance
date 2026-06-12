@@ -20,7 +20,7 @@ const checks: Check[] = [
     name: "stock reservations ACTIVE",
     url: process.env.STOCK_DATABASE_URL,
     query: `SELECT COUNT(*)::int AS c FROM stock.stock_reservations WHERE status = 'ACTIVE'`,
-    min: 2
+    min: 3
   },
   {
     name: "order statuses",
@@ -32,7 +32,7 @@ const checks: Check[] = [
     name: "production batches",
     url: process.env.PRODUCTION_DATABASE_URL,
     query: `SELECT COUNT(*)::int AS c FROM production.batch_products WHERE "deletedAt" IS NULL`,
-    min: 3
+    min: 4
   },
   {
     name: "shipments",

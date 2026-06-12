@@ -55,7 +55,7 @@ Points clés jury : adapter pattern, JWT + refresh, proxy `/api`, RBAC route + U
 
 ## Assistant IA — création d'OF
 
-L'assistant Mistral (via Ollama local) pré-remplit le formulaire « Nouvel OF » sur `/bom` (rôles logistique / admin).
+L'assistant Mistral (via Ollama local) pré-remplit le formulaire « Nouvel OF » sur `/bom` (rôles opérateur / admin).
 
 ```bash
 ollama pull mistral

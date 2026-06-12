@@ -110,7 +110,7 @@ export async function requireStockRead(
   ctx: Context,
   accessToken?: string | null
 ): Promise<AccessTokenPayload> {
-  return requireAnyRole(ctx, accessToken ?? null, ["logistique", "direction"]);
+  return requireAnyRole(ctx, accessToken ?? null, ["operateur", "logistique", "direction"]);
 }
 
 export async function requireOrderRead(
@@ -143,5 +143,5 @@ export async function requireProductionRead(
   ctx: Context,
   accessToken?: string | null
 ): Promise<AccessTokenPayload> {
-  return requireAnyRole(ctx, accessToken ?? null, ["operateur", "direction"]);
+  return requireAnyRole(ctx, accessToken ?? null, ["operateur", "logistique", "direction"]);
 }

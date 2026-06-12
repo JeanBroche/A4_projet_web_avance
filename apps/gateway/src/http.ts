@@ -3,6 +3,8 @@ import { getAccessTokenFromRequest } from "./cookies.js";
 
 type IncomingRequest = {
   headers?: Record<string, string | string[] | undefined>;
+  /** Params merged by moleculer-web (path, query, body) before the action call. */
+  $params?: Record<string, unknown>;
 };
 
 function headerValue(
@@ -24,6 +26,7 @@ export function normalizeMsParams(params: Record<string, unknown>) {
   if (out.anomalyCode != null && out.anomaly_code == null) out.anomaly_code = out.anomalyCode;
   if (out.stepCode != null && out.step_code == null) out.step_code = out.stepCode;
   if (out.lotNumber != null && out.lot_number == null) out.lot_number = out.lotNumber;
+  if (out.userId != null && out.id == null) out.id = out.userId;
   return out;
 }
 
@@ -50,11 +53,19 @@ export function applyHttpMeta(ctx: Context, req: IncomingRequest) {
     meta.correlationId = correlationId;
   }
 
-  const params = normalizeMsParams(
-    ctx.params && typeof ctx.params === "object" ? (ctx.params as Record<string, unknown>) : {}
-  );
+  const rawParams =
+    req.$params && typeof req.$params === "object"
+      ? req.$params
+      : ctx.params && typeof ctx.params === "object"
+        ? (ctx.params as Record<string, unknown>)
+        : {};
+
+  const params = normalizeMsParams(rawParams);
   if (meta.accessToken && !params.accessToken) {
     params.accessToken = meta.accessToken;
   }
   ctx.params = params;
+  if (req.$params) {
+    Object.assign(req.$params, params);
+  }
 }

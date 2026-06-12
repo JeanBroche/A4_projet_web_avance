@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mapOrderToUi } from '~/lib/mappers/order'
+import { mapBomToUi } from '~/lib/mappers/production'
 import { mapMaterialToStockLevel } from '~/lib/mappers/stock'
 import { toNumericId } from '~/lib/mappers/id'
 
@@ -35,5 +36,18 @@ describe('front mappers', () => {
     expect(ui.reference).toBe('MAT-001')
     expect(ui.available).toBe(8)
     expect(ui.id).toBe(toNumericId('mat-1'))
+  })
+
+  it('does not copy BOM line quantity into qtyStock', () => {
+    const ui = mapBomToUi({
+      id: 'bom-1',
+      bom_code: 'BOM-SEED-001',
+      description: 'Palier',
+      quantity: 1,
+      status: 'PENDING',
+      lines: [{ material_id: 'MAT-001', quantity: 8 }]
+    })
+    expect(ui.bom[0]?.qtyNeeded).toBe(8)
+    expect(ui.bom[0]?.qtyStock).toBe(0)
   })
 })

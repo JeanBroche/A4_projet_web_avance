@@ -37,7 +37,7 @@
     "db:migrate": "pnpm --filter @aeronexis/db run migrate:all",
     "db:migrate:dev": "pnpm --filter @aeronexis/db run migrate:all:dev",
     "db:seed": "pnpm --filter @aeronexis/db run seed:all",
-    "db:reset": "pnpm db:migrate && pnpm db:seed",
+    "db:reset": "pnpm db:migrate && pnpm --filter @aeronexis/db run generate:all && pnpm db:seed",
     "db:verify-seed": "pnpm --filter @aeronexis/db run verify-seed",
     "db:studio:auth": "pnpm --filter @aeronexis/auth run db:studio",
     "db:studio:stock": "pnpm --filter @aeronexis/stock run db:studio",

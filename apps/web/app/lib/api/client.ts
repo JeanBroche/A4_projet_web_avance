@@ -5,6 +5,9 @@ import type { RequestOptions } from './types'
 
 const AUTH_RETRY_CODES = new Set(['TOKEN_INVALID', 'TOKEN_EXPIRED'])
 
+/** Avoid parallel refresh calls invalidating the rotated refresh token. */
+let refreshInFlight: Promise<void> | null = null
+
 function generateCorrelationId(): string {
   return crypto.randomUUID()
 }
@@ -34,7 +37,11 @@ export function useApiClient() {
   const config = useRuntimeConfig()
 
   async function refreshAuthCookies(): Promise<void> {
-    await $fetch(`${config.public.apiBase}/auth/refresh`, {
+    if (refreshInFlight) {
+      return refreshInFlight
+    }
+
+    refreshInFlight = $fetch(`${config.public.apiBase}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -42,6 +49,12 @@ export function useApiClient() {
       },
       credentials: 'include'
     })
+      .then(() => undefined)
+      .finally(() => {
+        refreshInFlight = null
+      })
+
+    return refreshInFlight
   }
 
   async function request<T>(

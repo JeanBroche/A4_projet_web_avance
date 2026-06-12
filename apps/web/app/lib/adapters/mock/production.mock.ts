@@ -114,12 +114,14 @@ export function createMockProductionAdapter(): ProductionAdapter {
         id: nextBatchId++,
         lotNumber: `LOT-24-${String(nextLotNum++).padStart(3, '0')}`,
         ofNumber: input.ofNumber,
+        bomCode: ofOrder.ofNumber,
         productName: input.productName,
         emoji: input.emoji,
         qty: input.qty,
         status: 'pending',
         priority: input.priority,
         hasAnomaly: false,
+        progress: 0,
         createdAt: new Date().toISOString().slice(0, 10),
         bom
       }

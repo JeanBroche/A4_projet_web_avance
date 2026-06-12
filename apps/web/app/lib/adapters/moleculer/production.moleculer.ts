@@ -74,17 +74,21 @@ export function createMoleculerProductionAdapter(
   }
 
   async function batchHasOpenAnomaly(batchCode: string): Promise<boolean> {
-    const history = await request<{ items?: Array<{ action?: string, details?: string }> }>(
-      `/production/batches/${encodeURIComponent(batchCode)}/history`,
-      { params: { limit: 50 } }
-    )
-    const reported = (history.items ?? []).filter(h => h.action === 'batch.anomaly_reported')
-    const closed = new Set(
-      (history.items ?? [])
-        .filter(h => h.action === 'batch.anomaly_updated')
-        .map(h => h.details?.split(' -> ')[0])
-    )
-    return reported.some(h => h.details && !closed.has(h.details))
+    try {
+      const history = await request<{ items?: Array<{ action?: string, details?: string }> }>(
+        `/production/batches/${encodeURIComponent(batchCode)}/history`,
+        { params: { limit: 50 } }
+      )
+      const reported = (history.items ?? []).filter(h => h.action === 'batch.anomaly_reported')
+      const closed = new Set(
+        (history.items ?? [])
+          .filter(h => h.action === 'batch.anomaly_updated')
+          .map(h => h.details?.split(' -> ')[0])
+      )
+      return reported.some(h => h.details && !closed.has(h.details))
+    } catch {
+      return false
+    }
   }
 
   return {
@@ -144,12 +148,25 @@ export function createMoleculerProductionAdapter(
     },
 
     async listBatches() {
-      const items = await listRawBatches()
+      const [items, bomResult] = await Promise.all([
+        listRawBatches(),
+        request<{ items: Array<{ id: string, bom_code: string }> }>(
+          '/production/bom',
+          { params: { siteCode: siteCode() } }
+        )
+      ])
+      const bomIdToCode = new Map(
+        (bomResult.items ?? []).map(b => [String(b.id), String(b.bom_code)])
+      )
       const batches = await Promise.all(
         items.map(async (b) => {
           const batchCode = String(b.batch_code)
           const hasAnomaly = await batchHasOpenAnomaly(batchCode)
-          return mapBatchToUi({ ...b, hasAnomaly } as Parameters<typeof mapBatchToUi>[0])
+          return mapBatchToUi({
+            ...b,
+            bom_code: bomIdToCode.get(String(b.bom_id)) ?? '',
+            hasAnomaly
+          } as Parameters<typeof mapBatchToUi>[0])
         })
       )
       return batches

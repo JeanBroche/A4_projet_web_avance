@@ -11,6 +11,10 @@ const route = useRoute()
 
 onMounted(async () => {
   await Promise.all([refreshBatches(), refreshBom()])
+  const bomQuery = route.query.bom
+  if (typeof bomQuery === 'string') {
+    filterBomCode.value = bomQuery
+  }
   const batchId = route.query.id
   if (batchId) {
     const lot = batches.value.find(b => b.id === Number(batchId))
@@ -44,6 +48,7 @@ const priorityOptions = [
 ]
 
 const filterStatus = ref<'all' | BatchStatus>('all')
+const filterBomCode = ref<string | null>(null)
 const search = ref('')
 const selected = ref<Batch | null>(null)
 
@@ -64,11 +69,18 @@ const createForm = ref({
 
 const filtered = computed(() =>
   batches.value.filter(b => {
-    const matchSearch = b.productName.toLowerCase().includes(search.value.toLowerCase()) || b.lotNumber.toLowerCase().includes(search.value.toLowerCase())
+    const matchSearch = b.productName.toLowerCase().includes(search.value.toLowerCase())
+      || b.lotNumber.toLowerCase().includes(search.value.toLowerCase())
+      || b.bomCode.toLowerCase().includes(search.value.toLowerCase())
     const matchStatus = filterStatus.value === 'all' || b.status === filterStatus.value
-    return matchSearch && matchStatus
+    const matchBom = !filterBomCode.value || b.bomCode === filterBomCode.value
+    return matchSearch && matchStatus && matchBom
   })
 )
+
+function clearBomFilter() {
+  filterBomCode.value = null
+}
 
 function openModal(batch: Batch) {
   selected.value = JSON.parse(JSON.stringify(batch)) // Clone pour édition locale
@@ -182,6 +194,16 @@ function formatTraceDate(d: Date) {
           <span class="sm:hidden">Nouveau</span>
           <span class="hidden sm:inline">Nouveau Lot</span>
         </UButton>
+      </div>
+
+      <div
+        v-if="filterBomCode"
+        class="mb-4 flex flex-col gap-2 rounded-xl border border-[#0F62BC]/20 bg-[#0F62BC]/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p class="text-sm text-[#0F62BC]">
+          Affichage des lots pour l'OF <span class="font-mono font-semibold">{{ filterBomCode }}</span>
+        </p>
+        <UButton size="xs" variant="outline" @click="clearBomFilter">Voir tous les lots</UButton>
       </div>
 
       <div :class="TOOLBAR">

@@ -25,12 +25,14 @@ export interface Batch {
   id: number
   lotNumber: string
   ofNumber: string
+  bomCode: string
   productName: string
   emoji: string
   qty: number
   status: BatchStatus
   priority: Priority
   hasAnomaly: boolean
+  progress: number
   createdAt: string
   bom: BomItem[]
 }

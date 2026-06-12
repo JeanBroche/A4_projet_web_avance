@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { createBomOrderSchema, createReservationSchema, firstZodError } from '~/lib/validation/schemas'
+import { buildMaterialReferenceOptions } from '~/lib/material-catalog'
 import type { AiOfProposal } from '~/lib/validation/ai-of'
 import type { BomItem, BomStatus, ManufacturingOrder, Priority } from '~/types'
 
@@ -20,7 +21,7 @@ interface ReserveLine {
 }
 
 const route = useRoute()
-const { bomOrders, status, error, isMutating, refreshBom, createBomOrder, updateBomOrder, updateBomOrderStatus } = useProduction()
+const { bomOrders, batches, status, error, isMutating, refreshBom, refreshBatches, createBomOrder, updateBomOrder, updateBomOrderStatus } = useProduction()
 const {
   levels,
   error: stockError,
@@ -49,8 +50,12 @@ const {
 const createModalTab = ref<'form' | 'assistant'>('form')
 
 
+async function reloadPageData() {
+  await Promise.all([refreshBom(), refreshStock(), refreshBatches()])
+}
+
 onMounted(async () => {
-  await Promise.all([refreshBom(), refreshStock()])
+  await reloadPageData()
   const ofQuery = route.query.of
   if (typeof ofQuery === 'string') {
     const order = bomOrders.value.find(o => o.ofNumber === ofQuery)
@@ -73,6 +78,12 @@ const priorityConfig = {
   critical: { label: 'Critique', class: 'text-red-600 bg-red-50',       dot: 'bg-red-500'    },
 }
 
+const batchStatusConfig = {
+  pending: { label: 'Planifié', class: 'text-gray-500 bg-gray-100' },
+  in_progress: { label: 'En cours', class: 'text-blue-600 bg-blue-50' },
+  validated: { label: 'Terminé', class: 'text-green-600 bg-green-50' },
+}
+
 const filterStatus  = ref<'all' | Status>('all')
 const search        = ref('')
 const selected      = ref<ManufacturingOrder | null>(null)
@@ -87,15 +98,7 @@ const editBom = ref<BomItem[]>([])
 const editBomRow = ref({ reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' })
 const bomEditError = ref<string | null>(null)
 
-const stockReferenceOptions = computed(() =>
-  levels.value.map(p => ({
-    label: `${p.reference} — ${p.name}`,
-    value: p.reference,
-    name: p.name,
-    available: p.available,
-    unit: p.unit
-  }))
-)
+const stockReferenceOptions = computed(() => buildMaterialReferenceOptions(levels.value))
 
 // ── État modal création ───────────────────────────────────────────────────────
 const emojis = ['✈️','🔧','⚙️','🛩️','🔩','📦','🚀','🛠️','🔗','🪛']
@@ -199,8 +202,8 @@ const stats = computed(() => ({
   done:        orders.value.filter(o => o.status === 'done').length,
 }))
 
-function stockAvailable(reference: string, fallback: number) {
-  return levelByReference(reference)?.available ?? fallback
+function stockAvailable(reference: string) {
+  return levelByReference(reference)?.available ?? 0
 }
 
 function stockReserved(reference: string) {
@@ -210,9 +213,50 @@ function stockReserved(reference: string) {
 function enrichedBom(bom: BomItem[]) {
   return bom.map(item => ({
     ...item,
-    qtyStock: stockAvailable(item.reference, item.qtyStock),
+    name: levelByReference(item.reference)?.name ?? item.name,
+    qtyStock: stockAvailable(item.reference),
     qtyReserved: stockReserved(item.reference)
   }))
+}
+
+interface MaterialReadiness {
+  total: number
+  ok: number
+  low: number
+  out: number
+  label: string
+  tone: 'success' | 'warning' | 'error'
+}
+
+function getMaterialReadiness(order: ManufacturingOrder): MaterialReadiness {
+  const lines = enrichedBom(order.bom)
+  let ok = 0
+  let low = 0
+  let out = 0
+  for (const item of lines) {
+    const state = bomStatus(item)
+    if (state === 'ok') ok++
+    else if (state === 'low') low++
+    else out++
+  }
+  const total = lines.length
+  const tone = out > 0 ? 'error' : low > 0 ? 'warning' : 'success'
+  const label = total === 0
+    ? 'BOM vide'
+    : out > 0
+      ? `${out} rupture${out > 1 ? 's' : ''}`
+      : low > 0
+        ? `${low} insuffisant${low > 1 ? 's' : ''}`
+        : `${ok}/${total} matières OK`
+  return { total, ok, low, out, label, tone }
+}
+
+function batchesForOrder(order: ManufacturingOrder) {
+  return batches.value.filter(batch => batch.bomCode === order.ofNumber)
+}
+
+function lotLink(order: ManufacturingOrder) {
+  return { path: '/batch', query: { bom: order.ofNumber } }
 }
 
 async function loadOfReservations(ofNumber: string) {
@@ -230,9 +274,10 @@ function openModal(order: ManufacturingOrder) {
 function bomItemFromStock(item: BomItem): BomItem {
   const level = levelByReference(item.reference)
   return {
-    ...item,
+    reference: item.reference,
     name: level?.name ?? item.name,
-    qtyStock: level?.available ?? item.qtyStock,
+    qtyNeeded: item.qtyNeeded,
+    qtyStock: stockAvailable(item.reference),
     unit: level?.unit ?? item.unit
   }
 }
@@ -257,6 +302,15 @@ function onPickStockReference(ref: string) {
   editBomRow.value.name = opt.name
   editBomRow.value.qtyStock = opt.available
   editBomRow.value.unit = opt.unit
+}
+
+function onPickNewBomReference(ref: string) {
+  const opt = stockReferenceOptions.value.find(o => o.value === ref)
+  if (!opt) return
+  newBomRow.value.reference = opt.value
+  newBomRow.value.name = opt.name
+  newBomRow.value.qtyStock = opt.available
+  newBomRow.value.unit = opt.unit
 }
 
 function addEditBomRow() {
@@ -287,13 +341,22 @@ async function saveEditBom() {
       return
     }
   }
-  await updateBomOrder({ id: selected.value.id, bom: editBom.value.map(bomItemFromStock) })
+  await updateBomOrder({
+    id: selected.value.id,
+    bom: editBom.value.map(line => ({
+      reference: line.reference,
+      name: line.name,
+      qtyNeeded: line.qtyNeeded,
+      qtyStock: stockAvailable(line.reference),
+      unit: line.unit
+    }))
+  })
   selected.value = orders.value.find(o => o.id === selected.value!.id) ?? null
   isEditingBom.value = false
 }
 
 function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
-  const available = stockAvailable(item.reference, item.qtyStock)
+  const available = stockAvailable(item.reference)
   if (available === 0) return 'out'
   if (available < item.qtyNeeded) return 'low'
   return 'ok'
@@ -311,7 +374,7 @@ const canReserveMoreForSelected = computed(() => {
   if (!selected.value) return false
   const reserved = reservedMaterialIds(selected.value.ofNumber)
   return selected.value.bom.some(
-    item => !reserved.has(item.reference) && stockAvailable(item.reference, item.qtyStock) > 0
+    item => !reserved.has(item.reference) && stockAvailable(item.reference) > 0
   )
 })
 
@@ -322,7 +385,7 @@ async function openReserveModal() {
   const reserved = reservedMaterialIds(selected.value.ofNumber)
 
   reserveLines.value = selected.value.bom.map((item) => {
-    const available = stockAvailable(item.reference, item.qtyStock)
+    const available = stockAvailable(item.reference)
     const existing = ofReservations.value.find(r => r.materialId === item.reference)
     const alreadyReserved = reserved.has(item.reference)
 
@@ -422,7 +485,7 @@ async function updateStatus(newStatus: Status) {
   <div class="mx-auto w-full max-w-6xl">
 
       <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
-      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refreshBom">Réessayer</UButton>
+      <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="reloadPageData">Réessayer</UButton>
 
       <!-- Header -->
       <div class="flex items-start justify-between mb-5 gap-2">
@@ -515,12 +578,48 @@ async function updateStatus(newStatus: Status) {
                 {{ statusConfig[order.status].label }}
               </div>
             </div>
-            <div class="mt-2 pt-2 border-t border-gray-100 flex items-center gap-1.5">
-              <UIcon name="i-lucide-list" class="text-gray-300 text-sm" />
-              <span class="text-xs text-gray-400">{{ order.bom.length }} pièce{{ order.bom.length > 1 ? 's' : '' }} dans la BOM</span>
-              <span v-if="hasActiveReservations(order.ofNumber)" class="ml-auto text-xs text-indigo-600 font-medium flex items-center gap-1">
-                <UIcon name="i-lucide-bookmark" class="text-sm" /> Réservé
-              </span>
+            <div class="mt-2 pt-2 border-t border-gray-100 space-y-2">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <UIcon name="i-lucide-list" class="text-gray-300 text-sm" />
+                <span class="text-xs text-gray-400">{{ order.bom.length }} pièce{{ order.bom.length > 1 ? 's' : '' }} dans la BOM</span>
+                <UBadge
+                  v-if="order.bom.length > 0"
+                  :color="getMaterialReadiness(order).tone"
+                  variant="subtle"
+                  size="xs"
+                  class="ml-auto"
+                >
+                  {{ getMaterialReadiness(order).label }}
+                </UBadge>
+                <span v-if="hasActiveReservations(order.ofNumber)" class="text-xs text-indigo-600 font-medium flex items-center gap-1">
+                  <UIcon name="i-lucide-bookmark" class="text-sm" /> Réservé
+                </span>
+              </div>
+              <div v-if="order.bom.length > 0" class="space-y-1">
+                <div
+                  v-for="item in enrichedBom(order.bom).slice(0, 3)"
+                  :key="item.reference"
+                  class="flex items-center gap-2 text-[11px] text-gray-500"
+                >
+                  <span
+                    class="w-1.5 h-1.5 rounded-full shrink-0"
+                    :class="{
+                      'bg-green-400': bomStatus(item) === 'ok',
+                      'bg-orange-400': bomStatus(item) === 'low',
+                      'bg-red-500': bomStatus(item) === 'out'
+                    }"
+                  />
+                  <span class="truncate flex-1">{{ item.name }}</span>
+                  <span class="shrink-0 font-mono">{{ item.qtyStock }}/{{ item.qtyNeeded }}</span>
+                </div>
+                <p v-if="order.bom.length > 3" class="text-[10px] text-gray-400 pl-3.5">
+                  +{{ order.bom.length - 3 }} autre{{ order.bom.length - 3 > 1 ? 's' : '' }} matière{{ order.bom.length - 3 > 1 ? 's' : '' }}
+                </p>
+              </div>
+              <div v-if="batchesForOrder(order).length > 0" class="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <UIcon name="i-carbon:classic-batch" class="text-sm" />
+                {{ batchesForOrder(order).length }} lot{{ batchesForOrder(order).length > 1 ? 's' : '' }} associé{{ batchesForOrder(order).length > 1 ? 's' : '' }}
+              </div>
             </div>
           </div>
         </UCard>
@@ -564,6 +663,43 @@ async function updateStatus(newStatus: Status) {
               </div>
             </div>
           </div>
+
+          <div class="mb-5">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <UIcon name="i-carbon:classic-batch" class="text-[#0F62BC]" />
+                Lots de production
+                <span class="text-xs font-normal text-gray-400">— {{ batchesForOrder(selected).length }} lot{{ batchesForOrder(selected).length > 1 ? 's' : '' }}</span>
+              </h3>
+              <NuxtLink v-if="canManageBatches" :to="lotLink(selected)">
+                <UButton size="xs" variant="outline" icon="i-lucide-external-link">
+                  Suivre les lots
+                </UButton>
+              </NuxtLink>
+            </div>
+            <div v-if="batchesForOrder(selected).length === 0" class="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-5 text-center">
+              <p class="text-sm text-gray-400">Aucun lot ordonnancé pour cet OF.</p>
+              <p v-if="canManageBatches" class="text-xs text-gray-400 mt-1">Créez un lot depuis la page Lot pour démarrer la production.</p>
+            </div>
+            <div v-else class="space-y-2">
+              <NuxtLink
+                v-for="batch in batchesForOrder(selected)"
+                :key="batch.id"
+                :to="{ path: '/batch', query: { id: batch.id } }"
+                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white hover:border-[#0F62BC]/30 transition-colors"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800 truncate">{{ batch.lotNumber }}</p>
+                  <p class="text-xs text-gray-400">{{ batch.ofNumber }} — {{ batch.progress }}% avancement</p>
+                </div>
+                <span :class="['text-[11px] font-medium px-2 py-0.5 rounded-full', batchStatusConfig[batch.status].class]">
+                  {{ batchStatusConfig[batch.status].label }}
+                </span>
+                <UBadge v-if="batch.hasAnomaly" color="error" variant="subtle" size="xs">Anomalie</UBadge>
+              </NuxtLink>
+            </div>
+          </div>
+
           <div class="flex items-center justify-between gap-2 mb-3">
             <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
               <UIcon name="i-lucide-list" class="text-[#0F62BC]" />
@@ -594,9 +730,14 @@ async function updateStatus(newStatus: Status) {
                 <div class="flex-1 min-w-0">
                   <p class="text-xs font-medium text-gray-800 truncate">{{ row.name }}</p>
                   <p class="text-[11px] font-mono text-gray-400">{{ row.reference }}</p>
+                  <p class="text-[11px] text-gray-500 mt-0.5">
+                    Dispo stock : <span class="font-semibold">{{ stockAvailable(row.reference) }} {{ row.unit }}</span>
+                  </p>
                 </div>
-                <UInput v-model.number="row.qtyNeeded" type="number" min="1" class="w-20" />
-                <span class="text-xs text-gray-500 shrink-0">{{ row.unit }}</span>
+                <div class="text-right shrink-0">
+                  <p class="text-[10px] text-gray-400 mb-0.5">Besoin</p>
+                  <UInput v-model.number="row.qtyNeeded" type="number" min="1" class="w-20" />
+                </div>
                 <UButton icon="i-lucide-x" variant="ghost" color="error" size="xs" @click="removeEditBomRow(idx)" />
               </div>
             </div>
@@ -711,6 +852,15 @@ async function updateStatus(newStatus: Status) {
           <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between sm:items-center mt-5 pt-4 border-t border-gray-100">
             <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isDetailOpen = false">Fermer</UButton>
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <NuxtLink v-if="canManageBatches && batchesForOrder(selected).length > 0" :to="lotLink(selected)">
+                <UButton
+                  icon="i-carbon:classic-batch"
+                  label="Avancement & anomalies"
+                  size="sm"
+                  variant="outline"
+                  class="w-full sm:w-auto justify-center"
+                />
+              </NuxtLink>
               <UTooltip
                 v-if="canReserveMaterials"
                 :text="canReserveMoreForSelected ? 'Réserver les matières non encore réservées' : 'Toutes les pièces éligibles sont déjà réservées pour cet OF'"
@@ -888,21 +1038,27 @@ async function updateStatus(newStatus: Status) {
 
             <!-- Formulaire ajout ligne -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-gray-50/80 rounded-xl border border-dashed border-gray-200">
-              <UInput v-model="newBomRow.reference" placeholder="Référence" class="font-mono text-xs" />
+              <USelectMenu
+                :model-value="newBomRow.reference || undefined"
+                :items="stockReferenceOptions"
+                value-key="value"
+                placeholder="Référence stock…"
+                class="text-xs sm:col-span-2"
+                @update:model-value="onPickNewBomReference($event as string)"
+              />
               <UInput v-model="newBomRow.name" placeholder="Désignation" class="text-xs" />
-              <UInput v-model.number="newBomRow.qtyNeeded" type="number" min="0" placeholder="Qté besoin" class="text-xs" />
-              <UInput v-model.number="newBomRow.qtyStock" type="number" min="0" placeholder="Qté stock" class="text-xs" />
+              <UInput v-model.number="newBomRow.qtyNeeded" type="number" min="1" placeholder="Qté besoin" class="text-xs" />
               <USelect v-model="newBomRow.unit" :items="unitOptions.map(u => ({ label: u, value: u }))" value-key="value" class="text-xs" />
               <UButton
                 icon="i-lucide-plus"
                 variant="outline"
                 color="neutral"
                 size="sm"
-                class="justify-center border-gray-200 hover:border-[#0F62BC] hover:text-[#0F62BC]"
+                class="justify-center sm:col-span-2 border-gray-200 hover:border-[#0F62BC] hover:text-[#0F62BC]"
                 :disabled="!newBomRow.reference || !newBomRow.name"
                 @click="addBomRow"
               >
-                Ajouter
+                Ajouter à la BOM
               </UButton>
             </div>
           </div>

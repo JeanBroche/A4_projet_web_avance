@@ -5,8 +5,9 @@ export function canManageBatches(role: UserRole | null): boolean {
   return role === 'operateur' || role === 'admin'
 }
 
+/** Création / édition BOM et changement de statut OF — rôle backend `production.bom.*`. */
 export function canManageBomOrders(role: UserRole | null): boolean {
-  return role === 'logistique' || role === 'admin'
+  return role === 'operateur' || role === 'admin'
 }
 
 export function canReserveMaterials(role: UserRole | null): boolean {

@@ -23,6 +23,7 @@ import {
   resolveStatusFromProgress,
   recordBatchHistory,
   createDefaultSteps,
+  syncBatchProgressFromSteps,
   type BomLineInput
 } from "../src/lib/production-helpers.js";
 import {
@@ -147,7 +148,7 @@ const ProductionService: ServiceSchema = {
     "bom.list": {
       async handler(ctx) {
         const params = parseParams(listBomSchema, ctx.params);
-        await requireProduction(ctx, params.accessToken);
+        await requireProductionRead(ctx, params.accessToken);
 
         const where = {
           deletedAt: null,
@@ -164,14 +165,21 @@ const ProductionService: ServiceSchema = {
           prisma.bOMProduct.count({ where })
         ]);
 
-        return { total, limit: params.limit ?? 50, offset: params.offset ?? 0, items };
+        const itemsWithLines = await Promise.all(
+          items.map(async (bom) => ({
+            ...bom,
+            lines: await loadBomLines(prisma, bom.id)
+          }))
+        );
+
+        return { total, limit: params.limit ?? 50, offset: params.offset ?? 0, items: itemsWithLines };
       }
     },
 
     "bom.get": {
       async handler(ctx) {
         const params = parseParams(getBomSchema, ctx.params);
-        await requireProduction(ctx, params.accessToken);
+        await requireProductionRead(ctx, params.accessToken);
 
         const bom = await loadBomByCode(prisma, params.bom_code);
         const lines = await loadBomLines(prisma, bom.id);
@@ -616,17 +624,48 @@ const ProductionService: ServiceSchema = {
             `${params.step_code} -> ${params.status}`,
             authEmail(auth)
           );
-          return updated;
+          const syncedBatch = await syncBatchProgressFromSteps(tx, batch.batch_id);
+          if (syncedBatch.progress > 0) {
+            await recordBatchHistory(
+              tx,
+              batch.batch_id,
+              "batch.progress",
+              `Avancement ${syncedBatch.progress}%`,
+              authEmail(auth)
+            );
+          }
+          return { step: updated, batch: syncedBatch };
         });
+
+        publishProductionEvent(this, DomainEvents.production.batchProgress, {
+          batch_id: step.batch.batch_id,
+          batch_code: step.batch.batch_code,
+          command_id: step.batch.command_id,
+          siteCode: step.batch.siteCode,
+          progress: step.batch.progress,
+          status: step.batch.status
+        });
+
+        if (step.batch.status === PROD_STATUSES.COMPLETED) {
+          publishProductionEvent(
+            this,
+            DomainEvents.production.manuOrderFinished,
+            buildManuOrderFinishedPayload(step.batch)
+          );
+        }
 
         await logProductionMutation(auth, ctx.meta.correlationId, {
           action: "production.batch.steps.update",
           entity: "ProductionStep",
-          entityId: step.id,
-          metadata: { batch_code: params.batch_code, step_code: params.step_code }
+          entityId: step.step.id,
+          metadata: {
+            batch_code: params.batch_code,
+            step_code: params.step_code,
+            progress: step.batch.progress
+          }
         });
 
-        return step;
+        return step.step;
       }
     },
 
