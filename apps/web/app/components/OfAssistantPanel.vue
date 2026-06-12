@@ -61,7 +61,6 @@ function onKeydown(event: KeyboardEvent) {
       variant="soft"
       :title="error"
       class="m-3 mb-0 shrink-0"
-      description="Lancez ollama serve puis ollama pull mistral."
     />
 
     <div class="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
@@ -90,7 +89,7 @@ function onKeydown(event: KeyboardEvent) {
 
       <div v-if="isLoading" class="mr-auto flex items-center gap-2 text-xs text-gray-400 px-2">
         <USkeleton class="h-4 w-4 rounded-full" />
-        <span>Mistral réfléchit…</span>
+        <span>L'assistant réfléchit…</span>
       </div>
 
       <div ref="messagesEnd" />

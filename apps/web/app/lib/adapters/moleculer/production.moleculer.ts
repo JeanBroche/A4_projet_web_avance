@@ -104,6 +104,7 @@ export function createMoleculerProductionAdapter(
       const bom = await request<Parameters<typeof mapBomToUi>[0]>('/production/bom', {
         method: 'POST',
         body: {
+          bom_code: input.ofNumber,
           description: input.name,
           quantity: input.qty,
           priority: input.priority,
@@ -127,7 +128,7 @@ export function createMoleculerProductionAdapter(
           body: {
             lines: input.bom.map(line => ({
               material_id: line.reference,
-              quantity: line.qtyNeeded
+              quantity: line.qtyPerUnit
             }))
           }
         }
@@ -174,6 +175,14 @@ export function createMoleculerProductionAdapter(
       return mapBomToUi(bom)
     },
 
+    async deleteBomOrder(id) {
+      const bomCode = await resolveBomCode(id)
+      if (!bomCode) throw new Error('NOT_FOUND')
+      await request(`/production/bom/${encodeURIComponent(bomCode)}`, {
+        method: 'DELETE'
+      })
+    },
+
     async listBatches() {
       const [items, bomResult] = await Promise.all([
         listRawBatches(),
@@ -189,9 +198,16 @@ export function createMoleculerProductionAdapter(
         items.map(async (b) => {
           const batchCode = String(b.batch_code)
           const hasAnomaly = await batchHasOpenAnomaly(batchCode)
+          const bom_code = String(b.bom_code ?? bomIdToCode.get(String(b.bom_id)) ?? '')
+          const bom_codes = Array.isArray(b.bom_codes) && b.bom_codes.length
+            ? (b.bom_codes as string[])
+            : bom_code
+              ? [bom_code]
+              : []
           return mapBatchToUi({
             ...b,
-            bom_code: bomIdToCode.get(String(b.bom_id)) ?? '',
+            bom_code,
+            bom_codes,
             hasAnomaly
           } as Parameters<typeof mapBatchToUi>[0])
         })
@@ -200,14 +216,13 @@ export function createMoleculerProductionAdapter(
     },
 
     async createBatch(input) {
+      const bomCode = input.ofNumber
       const boms = await request<{ items: Array<Record<string, unknown>> }>(
         '/production/bom',
         { params: { siteCode: siteCode() } }
       )
-      const bomMatch = boms.items?.find(b => String(b.description ?? '').includes(input.ofNumber))
-        ?? boms.items?.[0]
-      const bomCode = bomMatch?.bom_code as string | undefined
-      if (!bomCode) throw new Error('NOT_FOUND')
+      const bomMatch = boms.items?.find(b => String(b.bom_code) === bomCode)
+      if (!bomMatch) throw new Error('NOT_FOUND')
       const batch = await request<Parameters<typeof mapBatchToUi>[0]>('/production/batches', {
         method: 'POST',
         body: {
@@ -216,7 +231,22 @@ export function createMoleculerProductionAdapter(
           siteCode: siteCode()
         }
       })
-      return mapBatchToUi(batch)
+      return mapBatchToUi({
+        ...batch,
+        bom_code: bomCode,
+        bom: { description: input.productName, bom_code: bomCode }
+      } as Parameters<typeof mapBatchToUi>[0])
+    },
+
+    async assignBatchToOf(lotNumber, ofNumber) {
+      const updated = await request<Parameters<typeof mapBatchToUi>[0]>(
+        `/production/batches/${encodeURIComponent(lotNumber)}`,
+        {
+          method: 'PATCH',
+          body: { bom_code: ofNumber }
+        }
+      )
+      return mapBatchToUi(updated)
     },
 
     async updateBatchStatus(id, status) {

@@ -25,6 +25,7 @@ onMounted(async () => {
 const ofOptions = computed(() =>
   bomOrders.value
     .filter(o => o.status !== 'done')
+    .filter(o => !batches.value.some(b => b.bomCodes.includes(o.ofNumber)))
     .map(o => ({ label: `${o.ofNumber} — ${o.name}`, value: o.ofNumber }))
 )
 
@@ -71,9 +72,9 @@ const filtered = computed(() =>
   batches.value.filter(b => {
     const matchSearch = b.productName.toLowerCase().includes(search.value.toLowerCase())
       || b.lotNumber.toLowerCase().includes(search.value.toLowerCase())
-      || b.bomCode.toLowerCase().includes(search.value.toLowerCase())
+      || b.bomCodes.some(code => code.toLowerCase().includes(search.value.toLowerCase()))
     const matchStatus = filterStatus.value === 'all' || b.status === filterStatus.value
-    const matchBom = !filterBomCode.value || b.bomCode === filterBomCode.value
+    const matchBom = !filterBomCode.value || b.bomCodes.includes(filterBomCode.value)
     return matchSearch && matchStatus && matchBom
   })
 )
@@ -236,7 +237,9 @@ function formatTraceDate(d: Date) {
             
             <h3 class="font-bold text-gray-800">{{ lot.lotNumber }}</h3>
             <p class="text-sm text-gray-500">{{ lot.productName }}</p>
-            <p class="text-xs font-mono text-[#0F62BC] mb-4">{{ lot.ofNumber }}</p>
+            <p class="text-xs font-mono text-[#0F62BC] mb-4">
+              {{ lot.bomCodes.length ? lot.bomCodes.join(', ') : lot.ofNumber }}
+            </p>
             
             <div class="flex items-center justify-between pt-3 border-t border-gray-50">
               <span class="text-xs font-medium text-gray-400">Qté: {{ lot.qty }}</span>
@@ -263,7 +266,9 @@ function formatTraceDate(d: Date) {
               <div>
                 <h2 id="batch-detail-title" class="text-lg sm:text-xl font-bold text-gray-800 break-all">{{ selected.lotNumber }}</h2>
                 <p class="text-sm text-[#0F62BC] font-medium">{{ selected.productName }}</p>
-                <p class="text-xs font-mono text-gray-400 mt-0.5">OF {{ selected.ofNumber }}</p>
+                <p class="text-xs font-mono text-gray-400 mt-0.5">
+                  OF {{ selected.bomCodes.length ? selected.bomCodes.join(', ') : selected.ofNumber }}
+                </p>
               </div>
             </div>
             

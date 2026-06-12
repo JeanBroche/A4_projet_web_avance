@@ -30,6 +30,8 @@ import {
 
   createDefaultSteps,
 
+  linkBatchToBom,
+
   recordBatchHistory,
 
   replaceBomLines,
@@ -215,6 +217,8 @@ async function upsertBatch(
       }
 
     });
+
+    await linkBatchToBom(prisma, batch.batch_id, bomId);
 
     await createDefaultSteps(prisma, batch.batch_id);
 

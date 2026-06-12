@@ -64,9 +64,14 @@ export function useProduction() {
 
   async function createBomOrder(input: CreateManufacturingOrderInput) {
     isMutating.value = true
+    error.value = null
     try {
       await adapters.production.createBomOrder(input)
       await refreshBom()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
     } finally {
       isMutating.value = false
     }
@@ -112,12 +117,49 @@ export function useProduction() {
     }
   }
 
+  async function deleteBomOrder(id: number) {
+    isMutating.value = true
+    error.value = null
+    try {
+      await adapters.production.deleteBomOrder(id)
+      await refreshBom()
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function createBatch(input: CreateBatchInput) {
     isMutating.value = true
+    error.value = null
     try {
       await adapters.production.createBatch(input)
       await refreshBatches()
       await syncNotificationsAfterMutation()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function assignBatchToOf(lotNumber: string, ofNumber: string) {
+    isMutating.value = true
+    error.value = null
+    try {
+      await adapters.production.assignBatchToOf(lotNumber, ofNumber)
+      await refreshBatches()
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
     } finally {
       isMutating.value = false
     }
@@ -201,7 +243,9 @@ export function useProduction() {
     updateBomOrderStatus,
     updateBomOrderPriority,
     updateBomOrderQuantity,
+    deleteBomOrder,
     createBatch,
+    assignBatchToOf,
     updateBatchStatus,
     reportAnomaly,
     clearAnomaly,

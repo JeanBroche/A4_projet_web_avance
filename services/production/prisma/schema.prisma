@@ -39,8 +39,9 @@ model BOMProduct {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  batches BatchProduct[]
-  lines   BOMLine[]
+  batches    BatchProduct[]
+  lines      BOMLine[]
+  batchLinks BatchBomLink[]
 
   @@index([bom_code])
   @@index([siteCode])
@@ -77,6 +78,7 @@ model BatchProduct {
   updatedAt      DateTime  @updatedAt
 
   bom       BOMProduct           @relation(fields: [bom_id], references: [id])
+  bomLinks  BatchBomLink[]
   anomalies Anomalies_Batch[]
   steps     ProductionStep[]
   history   BatchActionHistory[]
@@ -86,6 +88,21 @@ model BatchProduct {
   @@index([siteCode])
   @@index([status])
   @@index([deletedAt])
+  @@schema("production")
+}
+
+model BatchBomLink {
+  id        String   @id @default(cuid())
+  batch_id  String
+  bom_id    String
+  createdAt DateTime @default(now())
+
+  batch BatchProduct @relation(fields: [batch_id], references: [batch_id], onDelete: Cascade)
+  bom   BOMProduct   @relation(fields: [bom_id], references: [id], onDelete: Cascade)
+
+  @@unique([batch_id, bom_id])
+  @@index([batch_id])
+  @@index([bom_id])
   @@schema("production")
 }
 

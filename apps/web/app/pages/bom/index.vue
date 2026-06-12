@@ -23,7 +23,7 @@ interface ReserveLine {
 }
 
 const route = useRoute()
-const { bomOrders, batches, status, error, isMutating, refreshBom, refreshBatches, createBomOrder, updateBomOrder, updateBomOrderStatus, updateBomOrderPriority, updateBomOrderQuantity } = useProduction()
+const { bomOrders, batches, status, error, isMutating, refreshBom, refreshBatches, createBomOrder, assignBatchToOf, updateBomOrder, updateBomOrderStatus, updateBomOrderPriority, updateBomOrderQuantity, deleteBomOrder } = useProduction()
 const {
   levels,
   reservations,
@@ -50,6 +50,7 @@ const {
 } = useOfAssistant()
 
 const createModalTab = ref<'form' | 'assistant'>('form')
+const createError = ref<string | null>(null)
 
 
 async function reloadPageData() {
@@ -90,10 +91,13 @@ const filterStatus  = ref<'all' | Status>('all')
 const search        = ref('')
 const selected      = ref<ManufacturingOrder | null>(null)
 const isDetailOpen  = ref(false)
+const isDeleteOfOpen = ref(false)
 const isCreateOpen  = ref(false)
 const isReserveOpen = ref(false)
 const reserveError  = ref<string | null>(null)
 const reservationActionError = ref<string | null>(null)
+const batchActionError = ref<string | null>(null)
+const assignLotDraft = ref<string | null>(null)
 const reserveLines  = ref<ReserveLine[]>([])
 const ofReservations = ref<import('~/types').StockReservation[]>([])
 const isEditingBom = ref(false)
@@ -139,8 +143,27 @@ function openCreate() {
   newBomRow.value = emptyBomRow()
   tempBom.value = []
   createModalTab.value = 'form'
+  createError.value = null
   resetAssistant()
   isCreateOpen.value = true
+}
+
+function flushPendingBomRow(): boolean {
+  if (!newBomRow.value.reference && !newBomRow.value.name) return true
+  if (!newBomRow.value.reference || !newBomRow.value.name) {
+    createError.value = 'Complétez la ligne BOM ou videz les champs avant de créer l\'OF.'
+    return false
+  }
+  if (tempBom.value.some(l => l.reference === newBomRow.value.reference)) {
+    createError.value = `La référence ${newBomRow.value.reference} est déjà dans la BOM.`
+    return false
+  }
+  tempBom.value.push({
+    ...newBomRow.value,
+    qtyNeeded: computeBomNeed(newBomRow.value.qtyPerUnit, newOf.value.qty)
+  })
+  newBomRow.value = emptyBomRow()
+  return true
 }
 
 function onAssistantSend(text: string) {
@@ -151,6 +174,7 @@ function onApplyProposal(proposal: AiOfProposal) {
   const patch = buildFormPatch(proposal, ref => levelByReference(ref))
   newOf.value = patch.of
   tempBom.value = patch.bom
+  createError.value = null
   createModalTab.value = 'form'
 }
 
@@ -168,6 +192,9 @@ function removeBomRow(idx: number) {
 }
 
 async function confirmCreate() {
+  createError.value = null
+  if (!flushPendingBomRow()) return
+
   const payload = {
     name: newOf.value.name,
     ofNumber: newOf.value.ofNumber,
@@ -177,17 +204,29 @@ async function confirmCreate() {
     emoji: newOf.value.emoji
   }
   const parsed = createBomOrderSchema.safeParse(payload)
-  if (!parsed.success) return
-  await createBomOrder({
-    name: newOf.value.name,
-    ofNumber: newOf.value.ofNumber,
-    qty: newOf.value.qty,
-    status: newOf.value.status,
-    priority: newOf.value.priority,
-    emoji: newOf.value.emoji,
-    bom: [...tempBom.value]
-  })
-  isCreateOpen.value = false
+  if (!parsed.success) {
+    createError.value = firstZodError(parsed.error)
+    return
+  }
+  if (tempBom.value.length === 0) {
+    createError.value = 'Ajoutez au moins une pièce à la nomenclature (BOM).'
+    return
+  }
+
+  try {
+    await createBomOrder({
+      name: newOf.value.name,
+      ofNumber: newOf.value.ofNumber,
+      qty: newOf.value.qty,
+      status: newOf.value.status,
+      priority: newOf.value.priority,
+      emoji: newOf.value.emoji,
+      bom: [...tempBom.value]
+    })
+    isCreateOpen.value = false
+  } catch (e) {
+    createError.value = error.value ?? toFailureResult(e).message
+  }
 }
 
 // ── Filtres / stats ───────────────────────────────────────────────────────────
@@ -273,12 +312,42 @@ function getMaterialReadiness(order: ManufacturingOrder): MaterialReadiness {
   return { total, ok, low, out, label, tone }
 }
 
-function batchesForOrder(order: ManufacturingOrder) {
-  return batches.value.filter(batch => batch.bomCode === order.ofNumber)
+function lotForOrder(order: ManufacturingOrder) {
+  return batches.value.find(batch => batch.bomCodes.includes(order.ofNumber)) ?? null
 }
 
-function lotLink(order: ManufacturingOrder) {
-  return { path: '/batch', query: { bom: order.ofNumber } }
+const selectedOrderLot = computed(() =>
+  selected.value ? lotForOrder(selected.value) : null
+)
+
+const assignableLots = computed(() => {
+  if (!selected.value || lotForOrder(selected.value)) return []
+  const currentOf = selected.value.ofNumber
+  return batches.value.filter(batch => !batch.bomCodes.includes(currentOf))
+})
+
+const assignLotOptions = computed(() =>
+  assignableLots.value.map(batch => ({
+    label: batch.bomCodes.length
+      ? `${batch.lotNumber} — ${batch.bomCodes.join(', ')}`
+      : `${batch.lotNumber} — sans OF`,
+    value: batch.lotNumber
+  }))
+)
+
+function pickAssignLot(value: unknown) {
+  if (value == null || value === '') {
+    assignLotDraft.value = null
+    return
+  }
+  if (typeof value === 'string') {
+    assignLotDraft.value = value
+    return
+  }
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    const picked = (value as { value: unknown }).value
+    assignLotDraft.value = picked != null ? String(picked) : null
+  }
 }
 
 async function loadOfReservations(ofNumber: string) {
@@ -290,9 +359,53 @@ function openModal(order: ManufacturingOrder) {
   isEditingBom.value = false
   bomEditError.value = null
   reservationActionError.value = null
+  batchActionError.value = null
+  assignLotDraft.value = null
   detailQtyDraft.value = order.qty
   isDetailOpen.value = true
   loadOfReservations(order.ofNumber)
+}
+
+const deleteOfMessage = computed(() => {
+  if (!selected.value) return 'Cette action est irréversible.'
+  const lot = lotForOrder(selected.value)
+  if (lot) {
+    return `L'OF ${selected.value.ofNumber} sera supprimé. Le lot ${lot.lotNumber} restera en base mais ne sera plus lié à cet OF.`
+  }
+  return `L'ordre de fabrication ${selected.value.ofNumber} sera supprimé définitivement.`
+})
+
+async function confirmDeleteOf() {
+  if (!selected.value) return
+  try {
+    await deleteBomOrder(selected.value.id)
+    isDeleteOfOpen.value = false
+    isDetailOpen.value = false
+    selected.value = null
+  } catch {
+    // error affiché via error / UAlert global
+  }
+}
+
+async function assignLotToSelected() {
+  if (!selected.value || !canManageBatches.value) return
+  if (lotForOrder(selected.value)) {
+    batchActionError.value = `Cet OF a déjà un lot assigné (${lotForOrder(selected.value)!.lotNumber}).`
+    return
+  }
+  const lotNumber = assignLotDraft.value?.trim()
+  if (!lotNumber) {
+    batchActionError.value = 'Sélectionnez un lot dans la liste.'
+    return
+  }
+  batchActionError.value = null
+  try {
+    await assignBatchToOf(lotNumber, selected.value.ofNumber)
+    assignLotDraft.value = null
+    await refreshBatches()
+  } catch (e) {
+    batchActionError.value = error.value ?? toFailureResult(e).message
+  }
 }
 
 function bomQtyNeeded(materialId: string): number | null {
@@ -703,9 +816,9 @@ const selectedEnrichedBom = computed(() =>
                   +{{ order.bom.length - 3 }} autre{{ order.bom.length - 3 > 1 ? 's' : '' }} matière{{ order.bom.length - 3 > 1 ? 's' : '' }}
                 </p>
               </div>
-              <div v-if="batchesForOrder(order).length > 0" class="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <div v-if="lotForOrder(order)" class="flex items-center gap-1.5 text-[11px] text-gray-500">
                 <UIcon name="i-carbon:classic-batch" class="text-sm" />
-                {{ batchesForOrder(order).length }} lot{{ batchesForOrder(order).length > 1 ? 's' : '' }} associé{{ batchesForOrder(order).length > 1 ? 's' : '' }}
+                Lot {{ lotForOrder(order)!.lotNumber }}
               </div>
             </div>
           </div>
@@ -792,36 +905,66 @@ const selectedEnrichedBom = computed(() =>
             <div class="flex items-center justify-between gap-2 mb-2">
               <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
                 <UIcon name="i-carbon:classic-batch" class="text-[#0F62BC]" />
-                Lots de production
-                <span class="text-xs font-normal text-gray-400">— {{ batchesForOrder(selected).length }} lot{{ batchesForOrder(selected).length > 1 ? 's' : '' }}</span>
+                Lot de production
+                <span v-if="selectedOrderLot" class="text-xs font-normal text-gray-400">— {{ selectedOrderLot.lotNumber }}</span>
               </h3>
-              <NuxtLink v-if="canManageBatches" :to="lotLink(selected)">
+              <NuxtLink v-if="selectedOrderLot" :to="{ path: '/batch', query: { id: selectedOrderLot.id } }">
                 <UButton size="xs" variant="outline" icon="i-lucide-external-link">
-                  Suivre les lots
+                  Suivre le lot
                 </UButton>
               </NuxtLink>
             </div>
-            <div v-if="batchesForOrder(selected).length === 0" class="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-5 text-center">
-              <p class="text-sm text-gray-400">Aucun lot ordonnancé pour cet OF.</p>
-              <p v-if="canManageBatches" class="text-xs text-gray-400 mt-1">Créez un lot depuis la page Lot pour démarrer la production.</p>
-            </div>
-            <div v-else class="space-y-2">
-              <NuxtLink
-                v-for="batch in batchesForOrder(selected)"
-                :key="batch.id"
-                :to="{ path: '/batch', query: { id: batch.id } }"
-                class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white hover:border-[#0F62BC]/30 transition-colors"
+            <UAlert
+              v-if="batchActionError"
+              color="error"
+              variant="soft"
+              :title="batchActionError"
+              class="mb-2"
+            />
+            <div
+              v-if="canManageBatches && assignLotOptions.length > 0"
+              class="flex flex-col sm:flex-row gap-2 mb-3"
+            >
+              <USelectMenu
+                :model-value="assignLotDraft ?? undefined"
+                :items="assignLotOptions"
+                value-key="value"
+                placeholder="Choisir un lot existant…"
+                class="flex-1"
+                @update:model-value="pickAssignLot"
+              />
+              <UButton
+                icon="i-lucide-link"
+                class="bg-[#0F62BC] hover:bg-[#0d56a8] text-white shrink-0"
+                :disabled="!assignLotDraft"
+                :loading="isMutating"
+                @click="assignLotToSelected"
               >
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-800 truncate">{{ batch.lotNumber }}</p>
-                  <p class="text-xs text-gray-400">{{ batch.ofNumber }} — {{ batch.progress }}% avancement</p>
-                </div>
-                <span :class="['text-[11px] font-medium px-2 py-0.5 rounded-full', batchStatusConfig[batch.status].class]">
-                  {{ batchStatusConfig[batch.status].label }}
-                </span>
-                <UBadge v-if="batch.hasAnomaly" color="error" variant="subtle" size="xs">Anomalie</UBadge>
-              </NuxtLink>
+                Assigner le lot
+              </UButton>
             </div>
+            <div v-if="!selectedOrderLot" class="rounded-xl border border-dashed border-gray-200 bg-gray-50/50 px-4 py-5 text-center">
+              <p class="text-sm text-gray-400">Aucun lot assigné à cet OF.</p>
+              <p v-if="canManageBatches && assignLotOptions.length === 0" class="text-xs text-gray-400 mt-1">
+                Aucun lot disponible — créez-en un depuis la page Lot.
+              </p>
+            </div>
+            <NuxtLink
+              v-else
+              :to="{ path: '/batch', query: { id: selectedOrderLot.id } }"
+              class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white hover:border-[#0F62BC]/30 transition-colors"
+            >
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-800 truncate">{{ selectedOrderLot.lotNumber }}</p>
+                <p class="text-xs text-gray-400">
+                  {{ selectedOrderLot.bomCodes.join(', ') }} — {{ selectedOrderLot.progress }}% avancement
+                </p>
+              </div>
+              <span :class="['text-[11px] font-medium px-2 py-0.5 rounded-full', batchStatusConfig[selectedOrderLot.status].class]">
+                {{ batchStatusConfig[selectedOrderLot.status].label }}
+              </span>
+              <UBadge v-if="selectedOrderLot.hasAnomaly" color="error" variant="subtle" size="xs">Anomalie</UBadge>
+            </NuxtLink>
           </div>
 
           <div class="flex items-center justify-between gap-2 mb-3">
@@ -1025,7 +1168,7 @@ const selectedEnrichedBom = computed(() =>
             </div>
           </div>
 
-          <div class="mt-5 pt-4 border-t border-gray-100 space-y-3">
+          <div class="mt-5 pt-4 border-t border-gray-100 flex flex-col gap-2">
             <UTooltip
               v-if="canReserveMaterials"
               :text="canReserveMoreForSelected ? 'Réserver les matières non encore réservées' : 'Toutes les pièces éligibles sont déjà réservées pour cet OF'"
@@ -1039,19 +1182,28 @@ const selectedEnrichedBom = computed(() =>
                 @click="openReserveModal"
               />
             </UTooltip>
-
             <UButton
-              variant="ghost"
-              color="neutral"
-              class="w-full sm:w-auto justify-center sm:justify-start"
-              @click="isDetailOpen = false"
-            >
-              Fermer
-            </UButton>
+              v-if="canManageBomOrders"
+              icon="i-lucide-trash-2"
+              label="Supprimer l'OF"
+              variant="outline"
+              color="error"
+              size="sm"
+              class="w-full justify-center"
+              @click="isDeleteOfOpen = true"
+            />
           </div>
         </div>
       </template>
     </UModal>
+
+    <ConfirmDeleteModal
+      v-model:open="isDeleteOfOpen"
+      :title="selected ? `Supprimer ${selected.ofNumber} ?` : 'Supprimer cet OF ?'"
+      :message="deleteOfMessage"
+      :loading="isMutating"
+      @confirm="confirmDeleteOf"
+    />
 
     <!-- ═══ Modal réservation matières ═══ -->
     <UModal v-model:open="isReserveOpen" :ui="modalUi('lg')">
@@ -1138,6 +1290,14 @@ const selectedEnrichedBom = computed(() =>
             </div>
           </div>
 
+          <UAlert
+            v-if="createError"
+            color="error"
+            variant="soft"
+            :title="createError"
+            class="mb-4"
+          />
+
           <UTabs
             v-if="canManageBomOrders"
             v-model="createModalTab"
@@ -1171,7 +1331,7 @@ const selectedEnrichedBom = computed(() =>
             </UFormField>
 
             <UFormField label="Numéro OF *" name="ofNumber">
-              <UInput v-model="newOf.ofNumber" placeholder="Ex : OF-2024-0146" class="w-full font-mono" />
+              <UInput v-model="newOf.ofNumber" placeholder="Ex : OF-2026-0042" class="w-full font-mono" />
             </UFormField>
 
             <UFormField label="Quantité" name="qty">

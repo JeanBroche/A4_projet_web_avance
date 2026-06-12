@@ -32,6 +32,7 @@ type DbClient = Pick<
   | "bOMProduct"
   | "bOMLine"
   | "batchProduct"
+  | "batchBomLink"
   | "anomalies_Batch"
   | "anomalies"
   | "productionStep"
@@ -116,6 +117,43 @@ export async function loadBomByCode(db: DbClient, bom_code: string) {
   return bom;
 }
 
+export async function assertSingleBatchPerBom(
+  db: DbClient,
+  bom_id: string,
+  excludeBatchId?: string
+) {
+  const existing = await db.batchBomLink.findFirst({
+    where: {
+      bom_id,
+      ...(excludeBatchId ? { batch_id: { not: excludeBatchId } } : {}),
+      batch: { deletedAt: null }
+    },
+    include: { batch: { select: { batch_code: true } } }
+  });
+
+  if (existing) {
+    throw createError(
+      "CONFLICT",
+      `Un lot est déjà assigné à cet OF (${existing.batch.batch_code})`
+    );
+  }
+}
+
+export async function linkBatchToBom(db: DbClient, batch_id: string, bom_id: string) {
+  await db.batchBomLink.upsert({
+    where: { batch_id_bom_id: { batch_id, bom_id } },
+    create: { batch_id, bom_id },
+    update: {}
+  });
+}
+
+export function collectBatchBomCodes(batch: {
+  bom: { bom_code: string };
+  bomLinks: Array<{ bom: { bom_code: string } }>;
+}) {
+  return [...new Set([batch.bom.bom_code, ...batch.bomLinks.map((link) => link.bom.bom_code)])];
+}
+
 export async function loadBomLines(db: DbClient, bom_id: string): Promise<BomLineInput[]> {
   const lines = await db.bOMLine.findMany({
     where: { bom_id },
@@ -192,7 +230,6 @@ export function resolveStatusFromProgress(progress: number, currentStatus: strin
   return currentStatus;
 }
 
-/** Avancement dérivé des étapes : COMPLETED = 1, IN_PROGRESS = 0,5, PENDING = 0. */
 export function computeProgressFromSteps(steps: Array<{ status: string }>): number {
   if (steps.length === 0) {
     return 0;

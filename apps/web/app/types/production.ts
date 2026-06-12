@@ -28,7 +28,10 @@ export interface Batch {
   id: number
   lotNumber: string
   ofNumber: string
+  /** OF principal (premier rattachement). */
   bomCode: string
+  /** Tous les OF rattachés à ce lot. */
+  bomCodes: string[]
   productName: string
   emoji: string
   qty: number

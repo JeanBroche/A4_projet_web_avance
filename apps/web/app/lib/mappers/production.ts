@@ -27,6 +27,7 @@ type BackendBatch = {
   batch_code: string
   bom_id?: string
   bom_code?: string
+  bom_codes?: string[]
   command_id?: string
   status?: string
   progress?: number
@@ -131,11 +132,18 @@ export function mapBomToUi(bom: BackendBom) {
 }
 
 export function mapBatchToUi(batch: BackendBatch) {
+  const primary = batch.bom_code ?? batch.bom?.bom_code ?? ''
+  const bomCodes = batch.bom_codes?.length
+    ? [...batch.bom_codes]
+    : primary
+      ? [primary]
+      : []
   return {
     id: toNumericId(batch.batch_id),
     lotNumber: batch.batch_code,
-    ofNumber: batch.command_id ?? batch.batch_code,
-    bomCode: batch.bom_code ?? batch.bom?.bom_code ?? '',
+    ofNumber: batch.command_id ?? primary ?? batch.batch_code,
+    bomCode: primary,
+    bomCodes,
     productName: batch.bom?.description ?? batch.batch_code,
     emoji: bomEmoji(batch.bom_code ?? batch.bom?.bom_code ?? ''),
     qty: 1,

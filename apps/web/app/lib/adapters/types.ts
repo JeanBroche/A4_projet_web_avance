@@ -77,8 +77,10 @@ export interface ProductionAdapter {
   updateBomOrderStatus(id: number, status: ManufacturingOrder['status']): Promise<ManufacturingOrder>
   updateBomOrderPriority(id: number, priority: ManufacturingOrder['priority']): Promise<ManufacturingOrder>
   updateBomOrderQuantity(id: number, qty: number): Promise<ManufacturingOrder>
+  deleteBomOrder(id: number): Promise<void>
   listBatches(): Promise<Batch[]>
   createBatch(input: CreateBatchInput): Promise<Batch>
+  assignBatchToOf(lotNumber: string, ofNumber: string): Promise<Batch>
   updateBatchStatus(id: number, status: BatchStatus): Promise<Batch>
   reportAnomaly(input: ReportAnomalyInput): Promise<Batch>
   clearAnomaly(batchId: number): Promise<Batch>

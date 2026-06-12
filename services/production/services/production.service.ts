@@ -15,6 +15,9 @@ import {
   loadBomByCode,
   loadBomLines,
   replaceBomLines,
+  assertSingleBatchPerBom,
+  linkBatchToBom,
+  collectBatchBomCodes,
   loadBatchByCode,
   loadBatchById,
   loadActiveProduct,
@@ -108,7 +111,15 @@ const ProductionService: ServiceSchema = {
         const primaryLine = lines[0];
 
         const bom = await prisma.$transaction(async (tx) => {
-          const bom_code = await generateBOMCode(tx);
+          let bom_code = params.bom_code?.trim();
+          if (bom_code) {
+            const existing = await tx.bOMProduct.findFirst({ where: { bom_code } });
+            if (existing) {
+              throw createError("CONFLICT", `BOM code ${bom_code} already exists`);
+            }
+          } else {
+            bom_code = await generateBOMCode(tx);
+          }
           const created = await tx.bOMProduct.create({
             data: {
               bom_code,
@@ -288,6 +299,7 @@ const ProductionService: ServiceSchema = {
 
         const batch = await prisma.$transaction(async (tx) => {
           const bom = await loadBomByCode(tx, params.bom_code);
+          await assertSingleBatchPerBom(tx, bom.id);
           const created = await tx.batchProduct.create({
             data: {
               batch_code,
@@ -299,6 +311,7 @@ const ProductionService: ServiceSchema = {
               plannedEndAt: params.plannedEndAt
             }
           });
+          await linkBatchToBom(tx, created.batch_id, bom.id);
           await createDefaultSteps(tx, created.batch_id);
           await recordBatchHistory(
             tx,
@@ -351,19 +364,40 @@ const ProductionService: ServiceSchema = {
         const where = {
           deletedAt: null,
           ...(params.status ? { status: params.status } : {}),
-          ...(bom_id ? { bom_id } : {}),
+          ...(bom_id
+            ? {
+                OR: [{ bom_id }, { bomLinks: { some: { bom_id } } }]
+              }
+            : {}),
           ...(effectiveSite ? { siteCode: effectiveSite } : {})
         };
 
-        const [items, total] = await Promise.all([
+        const batchInclude = {
+          bom: { select: { bom_code: true } },
+          bomLinks: { include: { bom: { select: { bom_code: true } } } }
+        } as const;
+
+        const [rows, total] = await Promise.all([
           prisma.batchProduct.findMany({
             where,
+            include: batchInclude,
             orderBy: { createdAt: "desc" },
             take: params.limit ?? 50,
             skip: params.offset ?? 0
           }),
           prisma.batchProduct.count({ where })
         ]);
+
+        const items = rows.map((batch) => {
+          const bom_codes = collectBatchBomCodes(batch);
+          const { bom, bomLinks, ...rest } = batch;
+          return {
+            ...rest,
+            bom_code: bom.bom_code,
+            bom_codes,
+            bom: { bom_code: bom.bom_code }
+          };
+        });
 
         return { total, limit: params.limit ?? 50, offset: params.offset ?? 0, items };
       }
@@ -374,13 +408,29 @@ const ProductionService: ServiceSchema = {
         const params = parseParams(getBatchSchema, ctx.params);
         const auth = await requireProduction(ctx, params.accessToken);
 
-        const batch = await loadBatchByCode(prisma, params.batch_code);
+        const batch = await prisma.batchProduct.findFirst({
+          where: { batch_code: params.batch_code, deletedAt: null },
+          include: {
+            bom: { select: { bom_code: true } },
+            bomLinks: { include: { bom: { select: { bom_code: true } } } }
+          }
+        });
+        if (!batch) {
+          throw createError("NOT_FOUND", "Batch not found");
+        }
         assertSiteAccess(auth, batch.siteCode);
+        const bom_codes = collectBatchBomCodes(batch);
+        const { bom, bomLinks, ...rest } = batch;
         this.logger.info("Batch retrieved", {
           correlationId: ctx.meta.correlationId,
           batch_code: params.batch_code
         });
-        return batch;
+        return {
+          ...rest,
+          bom_code: bom.bom_code,
+          bom_codes,
+          bom: { bom_code: bom.bom_code }
+        };
       }
     },
 
@@ -395,15 +445,29 @@ const ProductionService: ServiceSchema = {
           if (params.status) {
             assertStatusTransition(existingBatch.status, params.status);
           }
+          const targetBom = params.bom_code
+            ? await loadBomByCode(tx, params.bom_code)
+            : null;
+          if (targetBom) {
+            await assertSingleBatchPerBom(tx, targetBom.id, existingBatch.batch_id);
+            await linkBatchToBom(tx, existingBatch.batch_id, targetBom.id);
+          }
           const updated = await tx.batchProduct.update({
             where: { batch_id: existingBatch.batch_id },
             data: {
-              bom_id: params.bom_code
-                ? (await loadBomByCode(tx, params.bom_code)).id
-                : undefined,
-              status: params.status
+              ...(params.command_id ? { command_id: params.command_id } : {}),
+              ...(params.status ? { status: params.status } : {})
             }
           });
+          if (params.bom_code) {
+            await recordBatchHistory(
+              tx,
+              existingBatch.batch_id,
+              "batch.of_assigned",
+              `Lot rattaché à l'OF ${params.bom_code}`,
+              authEmail(auth)
+            );
+          }
           if (params.status) {
             await recordBatchHistory(
               tx,
@@ -429,7 +493,22 @@ const ProductionService: ServiceSchema = {
           metadata: { batch_code: params.batch_code, status: params.status }
         });
 
-        return updatedBatch;
+        const enriched = await prisma.batchProduct.findFirst({
+          where: { batch_id: updatedBatch.batch_id },
+          include: {
+            bom: { select: { bom_code: true } },
+            bomLinks: { include: { bom: { select: { bom_code: true } } } }
+          }
+        });
+        if (!enriched) return updatedBatch;
+        const bom_codes = collectBatchBomCodes(enriched);
+        const { bom, bomLinks, ...rest } = enriched;
+        return {
+          ...rest,
+          bom_code: bom.bom_code,
+          bom_codes,
+          bom: { bom_code: bom.bom_code }
+        };
       }
     },
 

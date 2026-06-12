@@ -37,6 +37,7 @@ export const createBatchSchema = accessTokenSchema.extend({
 export const updateBatchSchema = accessTokenSchema.extend({
   batch_code: z.string().min(1),
   bom_code: z.string().min(1).optional(),
+  command_id: z.string().min(1).optional(),
   status: z.string().min(1).optional()
 });
 
@@ -97,6 +98,7 @@ export const bomPrioritySchema = z.enum(["low", "normal", "high", "critical"]);
 
 export const createBomSchema = accessTokenSchema
   .extend({
+    bom_code: z.string().min(1).optional(),
     material_id: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
     quantity: z.number().int().positive().default(1),

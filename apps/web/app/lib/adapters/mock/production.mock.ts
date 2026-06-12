@@ -148,6 +148,21 @@ export function createMockProductionAdapter(): ProductionAdapter {
       return order
     },
 
+    async deleteBomOrder(id: number) {
+      await simulateDelay()
+      const idx = bomStore.findIndex(o => o.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'OF introuvable')
+      const order = bomStore[idx]!
+      bomStore.splice(idx, 1)
+      appendMockActivity({
+        type: 'bom_validated',
+        title: 'OF supprimé',
+        description: `Suppression de l'ordre de fabrication ${order.ofNumber}.`,
+        user: getMockActorName(),
+        meta: order.ofNumber
+      })
+    },
+
     async listBatches() {
       await simulateDelay()
       return [...batchStore]
@@ -157,12 +172,17 @@ export function createMockProductionAdapter(): ProductionAdapter {
       await simulateDelay()
       const ofOrder = bomStore.find(o => o.ofNumber === input.ofNumber)
       if (!ofOrder) throw new ApiClientError('NOT_FOUND', `OF introuvable : ${input.ofNumber}`)
+      const existingLot = batchStore.find(b => b.bomCodes.includes(input.ofNumber))
+      if (existingLot) {
+        throw new ApiClientError('CONFLICT', `Un lot est déjà assigné à cet OF (${existingLot.lotNumber})`)
+      }
       const bom = syncBomStock(ofOrder.bom.map(item => ({ ...item })), ofOrder.qty)
       const batch: Batch = {
         id: nextBatchId++,
         lotNumber: `LOT-24-${String(nextLotNum++).padStart(3, '0')}`,
         ofNumber: input.ofNumber,
         bomCode: ofOrder.ofNumber,
+        bomCodes: [ofOrder.ofNumber],
         productName: input.productName,
         emoji: input.emoji,
         qty: input.qty,
@@ -182,6 +202,44 @@ export function createMockProductionAdapter(): ProductionAdapter {
         meta: batch.lotNumber
       })
       return batch
+    },
+
+    async assignBatchToOf(lotNumber: string, ofNumber: string) {
+      await simulateDelay()
+      const idx = batchStore.findIndex(b => b.lotNumber === lotNumber)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Lot introuvable')
+      const ofOrder = bomStore.find(o => o.ofNumber === ofNumber)
+      if (!ofOrder) throw new ApiClientError('NOT_FOUND', `OF introuvable : ${ofNumber}`)
+      const existingLot = batchStore.find(
+        b => b.bomCodes.includes(ofNumber) && b.lotNumber !== lotNumber
+      )
+      if (existingLot) {
+        throw new ApiClientError('CONFLICT', `Un lot est déjà assigné à cet OF (${existingLot.lotNumber})`)
+      }
+      const current = batchStore[idx]!
+      const bomCodes = current.bomCodes.includes(ofNumber)
+        ? current.bomCodes
+        : [...current.bomCodes, ofNumber]
+      const bom = syncBomStock(ofOrder.bom.map(item => ({ ...item })), ofOrder.qty)
+      batchStore[idx] = {
+        ...current,
+        bomCodes,
+        bomCode: current.bomCode || ofNumber,
+        ofNumber,
+        productName: ofOrder.name,
+        emoji: ofOrder.emoji,
+        qty: ofOrder.qty,
+        priority: ofOrder.priority,
+        bom
+      }
+      appendMockActivity({
+        type: 'of_started',
+        title: 'Lot assigné à un OF',
+        description: `${batchStore[idx]!.lotNumber} rattaché à ${ofNumber}.`,
+        user: getMockActorName(),
+        meta: batchStore[idx]!.lotNumber
+      })
+      return batchStore[idx]!
     },
 
     async updateBatchStatus(id: number, status: BatchStatus) {

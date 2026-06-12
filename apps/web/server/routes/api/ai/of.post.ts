@@ -5,6 +5,7 @@ import {
   filterBomByKnownMaterials,
   parseAiOfResponse
 } from '~/lib/validation/ai-of'
+import { formatOllamaError, resolveOllamaModel } from '../../../utils/ollama'
 
 interface OllamaGenerateResponse {
   response: string
@@ -23,6 +24,8 @@ export default defineEventHandler(async (event) => {
   const materials = materialsParsed.success ? materialsParsed.data : []
 
   const system = buildOfAssistantSystemPrompt(materials)
+  const preferredModel = config.ollamaModel as string
+  const model = await resolveOllamaModel(config.ollamaBaseUrl as string, preferredModel)
 
   try {
     const ollamaResponse = await $fetch<OllamaGenerateResponse>(
@@ -30,12 +33,13 @@ export default defineEventHandler(async (event) => {
       {
         method: 'POST',
         body: {
-          model: config.ollamaModel,
+          model,
           prompt,
           system,
           stream: false,
           format: 'json'
-        }
+        },
+        timeout: 120_000
       }
     )
 
@@ -44,18 +48,10 @@ export default defineEventHandler(async (event) => {
       materials
     )
 
-    return { proposal }
+    return { proposal, model }
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    if (message.includes('JSON') || message.includes('parse')) {
-      throw createError({
-        statusCode: 502,
-        message: 'Réponse IA invalide. Réessayez avec une description plus précise.'
-      })
-    }
-    throw createError({
-      statusCode: 500,
-      message: 'Ollama/Mistral n\'est pas démarré.'
-    })
+    const message = formatOllamaError(e, preferredModel)
+    const statusCode = message.includes('pas démarré') || message.includes('introuvable') ? 503 : 502
+    throw createError({ statusCode, message })
   }
 })
