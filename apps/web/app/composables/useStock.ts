@@ -182,6 +182,21 @@ export function useStock() {
     }
   }
 
+  async function updateReservation(id: number, qty: number) {
+    isMutating.value = true
+    error.value = null
+    try {
+      await adapters.stock.updateReservation(id, qty)
+      await Promise.all([refreshLevels(), refreshReservations()])
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      error.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function reportSupplierDelay(input: SupplierDelayInput) {
     isMutating.value = true
     error.value = null
@@ -217,6 +232,7 @@ export function useStock() {
     updateLevel,
     deleteLevel,
     createReservation,
+    updateReservation,
     releaseReservation,
     cancelReservation,
     ruptureForecast,

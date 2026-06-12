@@ -181,6 +181,17 @@ export function createMoleculerStockAdapter(
       return mapped
     },
 
+    async updateReservation(id, qty) {
+      const cuid = reservationCuidByNumeric.get(Number(id)) ?? String(id)
+      const raw = await request<Parameters<typeof mapReservationToUi>[0]>(
+        `/stock/reservations/${encodeURIComponent(cuid)}`,
+        { method: 'PATCH', body: { qty } }
+      )
+      const mapped = mapReservationToUi(raw)
+      trackReservationCuids([mapped], [raw])
+      return mapped
+    },
+
     async releaseReservation(id) {
       const cuid = reservationCuidByNumeric.get(Number(id)) ?? String(id)
       const result = await request<{ reservation?: Parameters<typeof mapReservationToUi>[0] }>(

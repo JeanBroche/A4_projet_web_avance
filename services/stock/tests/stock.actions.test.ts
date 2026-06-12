@@ -237,6 +237,25 @@ describe("stock.reservation", () => {
       (error) => getErrorCode(error) === "INSUFFICIENT_STOCK"
     );
   });
+
+  it("reservation.create rejects duplicate active reservation for same OF and material", async (t) => {
+    if (skipIfNoDb(t)) return;
+    const ofId = `OF-TEST-DUP-${Date.now()}`;
+    await broker.call("stock.reservation.create", {
+      accessToken: tokens.logistique,
+      ofId,
+      lines: [{ materialId: materialAcierId, qty: 1 }]
+    });
+    await assert.rejects(
+      () =>
+        broker.call("stock.reservation.create", {
+          accessToken: tokens.logistique,
+          ofId,
+          lines: [{ materialId: materialAcierId, qty: 1 }]
+        }),
+      (error) => getErrorCode(error) === "RESERVATION_ALREADY_ACTIVE"
+    );
+  });
   it("reservation.cancel transitions an active reservation", async (t) => {
     if (skipIfNoDb(t)) return;
     const created = (await broker.call("stock.reservation.create", {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { createBomOrderSchema, createReservationSchema, firstZodError } from '~/lib/validation/schemas'
 import { buildMaterialReferenceOptions } from '~/lib/material-catalog'
+import { toFailureResult } from '~/lib/api/envelope'
 import type { AiOfProposal } from '~/lib/validation/ai-of'
 import type { BomItem, BomStatus, ManufacturingOrder, Priority } from '~/types'
 
@@ -13,7 +14,6 @@ interface ReserveLine {
   name: string
   qtyNeeded: number
   qtyAvailable: number
-  qty: number
   unit: string
   selected: boolean
   alreadyReserved: boolean
@@ -24,16 +24,16 @@ const route = useRoute()
 const { bomOrders, batches, status, error, isMutating, refreshBom, refreshBatches, createBomOrder, updateBomOrder, updateBomOrderStatus } = useProduction()
 const {
   levels,
+  reservations,
   error: stockError,
   isMutating: isStockMutating,
   refresh: refreshStock,
-  refreshReservations,
   fetchReservationsForOf,
   activeReservationsFor,
   hasActiveReservations,
   levelByReference,
   createReservation,
-  releaseReservation,
+  updateReservation,
   cancelReservation
 } = useStock()
 const { canManageBatches, canManageBomOrders, canReserveMaterials, pageSubtitle } = useRoleCapabilities()
@@ -91,6 +91,7 @@ const isDetailOpen  = ref(false)
 const isCreateOpen  = ref(false)
 const isReserveOpen = ref(false)
 const reserveError  = ref<string | null>(null)
+const reservationActionError = ref<string | null>(null)
 const reserveLines  = ref<ReserveLine[]>([])
 const ofReservations = ref<import('~/types').StockReservation[]>([])
 const isEditingBom = ref(false)
@@ -210,12 +211,22 @@ function stockReserved(reference: string) {
   return levelByReference(reference)?.reserved ?? 0
 }
 
-function enrichedBom(bom: BomItem[]) {
+function reservationQtyFor(ofNumber: string, reference: string): number {
+  return ofReservations.value.find(
+    r => r.ofId === ofNumber && r.materialId === reference && r.status === 'ACTIVE'
+  )?.quantity
+    ?? reservations.value.find(
+      r => r.ofId === ofNumber && r.materialId === reference && r.status === 'ACTIVE'
+    )?.quantity
+    ?? 0
+}
+
+function enrichedBom(bom: BomItem[], ofNumber?: string) {
   return bom.map(item => ({
     ...item,
     name: levelByReference(item.reference)?.name ?? item.name,
     qtyStock: stockAvailable(item.reference),
-    qtyReserved: stockReserved(item.reference)
+    qtyReserved: ofNumber ? reservationQtyFor(ofNumber, item.reference) : stockReserved(item.reference)
   }))
 }
 
@@ -229,7 +240,7 @@ interface MaterialReadiness {
 }
 
 function getMaterialReadiness(order: ManufacturingOrder): MaterialReadiness {
-  const lines = enrichedBom(order.bom)
+  const lines = enrichedBom(order.bom, order.ofNumber)
   let ok = 0
   let low = 0
   let out = 0
@@ -267,8 +278,38 @@ function openModal(order: ManufacturingOrder) {
   selected.value = order
   isEditingBom.value = false
   bomEditError.value = null
+  reservationActionError.value = null
   isDetailOpen.value = true
   loadOfReservations(order.ofNumber)
+}
+
+function bomQtyNeeded(materialId: string): number | null {
+  return selected.value?.bom.find(b => b.reference === materialId)?.qtyNeeded ?? null
+}
+
+function isReservationComplete(res: import('~/types').StockReservation): boolean {
+  const need = bomQtyNeeded(res.materialId)
+  return need !== null && res.quantity === need
+}
+
+function reservationNeedsAlign(res: import('~/types').StockReservation): boolean {
+  const need = bomQtyNeeded(res.materialId)
+  if (need === null) return false
+  return res.quantity !== need && stockAvailable(res.materialId) + res.quantity >= need
+}
+
+async function alignReservationToNeed(res: import('~/types').StockReservation) {
+  if (!selected.value) return
+  reservationActionError.value = null
+  const need = bomQtyNeeded(res.materialId)
+  if (need === null || need === res.quantity) return
+  try {
+    await updateReservation(res.id, need)
+    await refreshStock()
+    await loadOfReservations(selected.value.ofNumber)
+  } catch (e) {
+    reservationActionError.value = stockError.value ?? toFailureResult(e).message
+  }
 }
 
 function bomItemFromStock(item: BomItem): BomItem {
@@ -362,58 +403,40 @@ function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
   return 'ok'
 }
 
-function reservedMaterialIds(ofNumber: string): Set<string> {
-  return new Set(
-    ofReservations.value
-      .filter(r => r.ofId === ofNumber && r.status === 'ACTIVE')
-      .map(r => r.materialId)
-  )
+function activeReservationForMaterial(materialId: string) {
+  return ofReservations.value.find(r => r.materialId === materialId && r.status === 'ACTIVE')
 }
 
 const canReserveMoreForSelected = computed(() => {
   if (!selected.value) return false
-  const reserved = reservedMaterialIds(selected.value.ofNumber)
-  return selected.value.bom.some(
-    item => !reserved.has(item.reference) && stockAvailable(item.reference) > 0
-  )
+  return selected.value.bom.some((item) => {
+    const available = stockAvailable(item.reference)
+    const existing = activeReservationForMaterial(item.reference)
+    if (existing && existing.quantity === item.qtyNeeded) return false
+    return available >= item.qtyNeeded && !existing
+  })
 })
 
 async function openReserveModal() {
   if (!selected.value) return
   reserveError.value = null
   await loadOfReservations(selected.value.ofNumber)
-  const reserved = reservedMaterialIds(selected.value.ofNumber)
 
   reserveLines.value = selected.value.bom.map((item) => {
     const available = stockAvailable(item.reference)
-    const existing = ofReservations.value.find(r => r.materialId === item.reference)
-    const alreadyReserved = reserved.has(item.reference)
+    const existing = activeReservationForMaterial(item.reference)
+    const fullyReserved = existing !== undefined && existing.quantity === item.qtyNeeded
+    const canReserve = available >= item.qtyNeeded && !existing
 
-    if (alreadyReserved && existing) {
-      return {
-        materialId: item.reference,
-        name: item.name,
-        qtyNeeded: item.qtyNeeded,
-        qtyAvailable: available,
-        qty: existing.quantity,
-        unit: item.unit,
-        selected: false,
-        alreadyReserved: true,
-        reservedQty: existing.quantity
-      }
-    }
-
-    const canReserve = available > 0
     return {
       materialId: item.reference,
       name: item.name,
       qtyNeeded: item.qtyNeeded,
       qtyAvailable: available,
-      qty: canReserve ? Math.min(item.qtyNeeded, available) : 0,
       unit: item.unit,
-      selected: canReserve && available >= item.qtyNeeded,
-      alreadyReserved: false,
-      reservedQty: 0
+      selected: canReserve,
+      alreadyReserved: fullyReserved,
+      reservedQty: existing?.quantity ?? 0
     }
   })
   isReserveOpen.value = true
@@ -424,8 +447,8 @@ async function confirmReserve() {
   reserveError.value = null
 
   const lines = reserveLines.value
-    .filter(l => l.selected && l.qty > 0)
-    .map(l => ({ materialId: l.materialId, qty: l.qty }))
+    .filter(l => l.selected && !l.alreadyReserved)
+    .map(l => ({ materialId: l.materialId, qty: l.qtyNeeded }))
 
   const payload = { ofId: selected.value.ofNumber, lines }
   const parsed = createReservationSchema.safeParse(payload)
@@ -443,34 +466,32 @@ async function confirmReserve() {
       reserveError.value = `${line.materialId} : déjà réservé pour cet OF`
       return
     }
-    if (line.qty > line.qtyAvailable) {
-      reserveError.value = `${line.materialId} : quantité supérieure au disponible (${line.qtyAvailable})`
+    if (line.qtyAvailable < line.qtyNeeded) {
+      reserveError.value = `${line.materialId} : stock insuffisant (besoin ${line.qtyNeeded}, dispo ${line.qtyAvailable})`
       return
     }
   }
 
   try {
     await createReservation(parsed.data)
-    await refreshReservations()
+    await refreshStock()
     await loadOfReservations(selected.value.ofNumber)
     isReserveOpen.value = false
-  } catch {
-    reserveError.value = stockError.value
+  } catch (e) {
+    reserveError.value = stockError.value ?? toFailureResult(e).message
   }
-}
-
-async function onReleaseReservation(id: number) {
-  if (!selected.value) return
-  await releaseReservation(id)
-  await refreshReservations()
-  await loadOfReservations(selected.value.ofNumber)
 }
 
 async function onCancelReservation(id: number) {
   if (!selected.value) return
-  await cancelReservation(id)
-  await refreshReservations()
-  await loadOfReservations(selected.value.ofNumber)
+  reservationActionError.value = null
+  try {
+    await cancelReservation(id)
+    await refreshStock()
+    await loadOfReservations(selected.value.ofNumber)
+  } catch (e) {
+    reservationActionError.value = stockError.value ?? toFailureResult(e).message
+  }
 }
 
 async function updateStatus(newStatus: Status) {
@@ -597,7 +618,7 @@ async function updateStatus(newStatus: Status) {
               </div>
               <div v-if="order.bom.length > 0" class="space-y-1">
                 <div
-                  v-for="item in enrichedBom(order.bom).slice(0, 3)"
+                  v-for="item in enrichedBom(order.bom, order.ofNumber).slice(0, 3)"
                   :key="item.reference"
                   class="flex items-center gap-2 text-[11px] text-gray-500"
                 >
@@ -800,7 +821,7 @@ async function updateStatus(newStatus: Status) {
               />
             </div>
             <div
-              v-for="item in enrichedBom(selected.bom)"
+              v-for="item in enrichedBom(selected.bom, selected.ofNumber)"
               v-else
               :key="item.reference"
               class="flex items-center gap-3 p-3 rounded-xl border"
@@ -816,8 +837,8 @@ async function updateStatus(newStatus: Status) {
                 <p class="text-xs" :class="{ 'text-green-600': bomStatus(item)==='ok', 'text-orange-500': bomStatus(item)==='low', 'text-red-500': bomStatus(item)==='out' }">
                   Dispo : <span class="font-semibold">{{ item.qtyStock }} {{ item.unit }}</span>
                 </p>
-                <p v-if="item.qtyReserved > 0" class="text-xs text-indigo-500">
-                  Réservé : <span class="font-semibold">{{ item.qtyReserved }} {{ item.unit }}</span>
+                <p v-if="reservationQtyFor(selected.ofNumber, item.reference) > 0" class="text-xs text-indigo-500">
+                  Réservé pour cet OF : <span class="font-semibold">{{ reservationQtyFor(selected.ofNumber, item.reference) }} {{ item.unit }}</span>
                 </p>
               </div>
               <UBadge :color="bomStatus(item)==='ok' ? 'success' : bomStatus(item)==='low' ? 'warning' : 'error'" variant="subtle" class="text-[11px] hidden sm:inline-flex">
@@ -831,20 +852,44 @@ async function updateStatus(newStatus: Status) {
               <UIcon name="i-lucide-bookmark" class="text-indigo-500" />
               Réservations actives
             </h3>
+            <UAlert v-if="reservationActionError" color="error" variant="soft" :title="reservationActionError" class="mb-3" />
             <div class="space-y-2">
               <div
                 v-for="res in ofReservations"
                 :key="res.id"
                 class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl border border-indigo-100 bg-indigo-50/40"
               >
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                   <p class="text-sm font-medium text-gray-800">{{ res.materialName }}</p>
-                  <p class="text-xs font-mono text-gray-400">{{ res.materialId }} — {{ res.quantity }} {{ res.unit }}</p>
+                  <p class="text-xs font-mono text-gray-400">{{ res.materialId }}</p>
+                  <p class="text-xs text-gray-500 mt-0.5">
+                    Réservé {{ res.quantity }} / besoin {{ bomQtyNeeded(res.materialId) ?? '—' }} {{ res.unit }}
+                  </p>
                 </div>
-                <div v-if="canReserveMaterials" class="flex gap-2">
-                  <UButton size="xs" variant="outline" color="neutral" @click="onReleaseReservation(res.id)">Libérer</UButton>
-                  <UButton size="xs" variant="outline" color="error" @click="onCancelReservation(res.id)">Annuler</UButton>
+                <div v-if="canReserveMaterials" class="flex flex-wrap items-center gap-2">
+                  <UBadge
+                    v-if="!isReservationComplete(res)"
+                    color="warning"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    Quantité incorrecte
+                  </UBadge>
+                  <UButton
+                    v-if="reservationNeedsAlign(res)"
+                    size="xs"
+                    icon="i-lucide-refresh-cw"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    :loading="isStockMutating"
+                    @click="alignReservationToNeed(res)"
+                  >
+                    Aligner sur le besoin
+                  </UButton>
+                  <UButton size="xs" variant="outline" color="error" :loading="isStockMutating" @click="onCancelReservation(res.id)">
+                    Annuler la réservation
+                  </UButton>
                 </div>
+                <p v-else class="text-xs text-gray-500">{{ res.quantity }} {{ res.unit }}</p>
               </div>
             </div>
           </div>
@@ -893,7 +938,7 @@ async function updateStatus(newStatus: Status) {
             </div>
             <div>
               <h3 class="text-base font-semibold text-gray-800">Réserver les matières</h3>
-              <p class="text-xs text-gray-400 mt-0.5">{{ selected.ofNumber }} — lignes pré-remplies depuis la BOM</p>
+              <p class="text-xs text-gray-400 mt-0.5">{{ selected.ofNumber }} — réservation au besoin exact de la BOM</p>
             </div>
           </div>
 
@@ -904,11 +949,11 @@ async function updateStatus(newStatus: Status) {
               v-for="line in reserveLines"
               :key="line.materialId"
               class="flex flex-col gap-2 sm:flex-row sm:items-center p-3 rounded-xl border"
-              :class="line.alreadyReserved ? 'border-indigo-100 bg-indigo-50/50 opacity-80' : line.qtyAvailable === 0 ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-gray-100 bg-white'"
+              :class="line.alreadyReserved ? 'border-indigo-100 bg-indigo-50/50 opacity-80' : line.qtyAvailable < line.qtyNeeded ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-gray-100 bg-white'"
             >
               <UCheckbox
                 v-model="line.selected"
-                :disabled="line.alreadyReserved || line.qtyAvailable === 0"
+                :disabled="line.alreadyReserved || line.qtyAvailable < line.qtyNeeded"
                 class="shrink-0"
               />
               <div class="flex-1 min-w-0">
@@ -917,20 +962,18 @@ async function updateStatus(newStatus: Status) {
                   <UBadge v-if="line.alreadyReserved" color="primary" variant="subtle" size="xs">
                     Déjà réservé ({{ line.reservedQty }} {{ line.unit }})
                   </UBadge>
+                  <UBadge v-else-if="line.qtyAvailable < line.qtyNeeded" color="error" variant="subtle" size="xs">
+                    Stock insuffisant
+                  </UBadge>
                 </div>
                 <p class="text-xs font-mono text-gray-400">{{ line.materialId }}</p>
                 <p class="text-xs text-gray-500 mt-0.5">
                   Besoin {{ line.qtyNeeded }} {{ line.unit }} — dispo {{ line.qtyAvailable }} {{ line.unit }}
                 </p>
               </div>
-              <UInput
-                v-model.number="line.qty"
-                type="number"
-                min="0"
-                :max="line.qtyAvailable"
-                class="w-full sm:w-24"
-                :disabled="line.alreadyReserved || !line.selected || line.qtyAvailable === 0"
-              />
+              <p class="text-sm font-medium text-indigo-700 tabular-nums shrink-0">
+                {{ line.qtyNeeded }} {{ line.unit }}
+              </p>
             </div>
           </div>
 
@@ -940,7 +983,7 @@ async function updateStatus(newStatus: Status) {
               icon="i-lucide-bookmark"
               class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white"
               :loading="isStockMutating"
-              :disabled="!reserveLines.some(l => l.selected && !l.alreadyReserved && l.qty > 0)"
+              :disabled="!reserveLines.some(l => l.selected && !l.alreadyReserved)"
               @click="confirmReserve"
             >
               Confirmer la réservation

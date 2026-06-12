@@ -62,6 +62,7 @@ export interface StockAdapter {
   deleteLevel(id: number): Promise<void>
   listReservations(ofId?: string): Promise<StockReservation[]>
   createReservation(input: CreateReservationInput): Promise<StockReservation[]>
+  updateReservation(id: number, qty: number): Promise<StockReservation>
   releaseReservation(id: number): Promise<StockReservation>
   cancelReservation(id: number): Promise<StockReservation>
   getRuptureForecast(): Promise<RuptureForecast[]>

@@ -78,6 +78,34 @@ export function createMockReservations(
   return created
 }
 
+export function updateMockReservationQuantity(
+  id: number,
+  qty: number,
+  deps: ReservationStoreDeps
+): StockReservation {
+  const idx = reservationsStore.findIndex(r => r.id === id)
+  if (idx === -1) throw new Error('Réservation introuvable')
+  const reservation = reservationsStore[idx]!
+  if (reservation.status !== 'ACTIVE') {
+    throw new Error('Cette réservation n\'est plus active')
+  }
+  if (qty <= 0) throw new Error('La quantité doit être supérieure à 0')
+
+  const part = deps.getParts().find(p => p.reference === reservation.materialId)
+  if (!part) throw new Error(`Matière introuvable : ${reservation.materialId}`)
+
+  const delta = qty - reservation.quantity
+  if (delta > 0 && delta > part.available) {
+    throw new Error(
+      `${part.reference} : quantité demandée (${qty}) supérieure au disponible (${part.available + reservation.quantity} ${part.unit})`
+    )
+  }
+
+  deps.setPartReserved(part.reference, delta)
+  reservationsStore[idx] = { ...reservation, quantity: qty }
+  return { ...reservationsStore[idx]!, createdAt: new Date(reservation.createdAt) }
+}
+
 export function transitionMockReservation(
   id: number,
   status: 'RELEASED' | 'CANCELLED',

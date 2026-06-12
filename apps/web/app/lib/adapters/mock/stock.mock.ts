@@ -5,7 +5,8 @@ import {
   createMockReservations,
   listMockReservations,
   seedMockReservations,
-  transitionMockReservation
+  transitionMockReservation,
+  updateMockReservationQuantity
 } from '~/lib/adapters/mock/reservation-store'
 import { CATEGORY_EMOJI, createInitialParts } from '~/fixtures/stock/parts'
 import { createInitialReservations } from '~/fixtures/stock/reservations'
@@ -123,6 +124,15 @@ export function createMockStockAdapter(): StockAdapter {
           meta: input.ofId
         })
         return created
+      } catch (e) {
+        toApiError(e)
+      }
+    },
+
+    async updateReservation(id: number, qty: number) {
+      await simulateDelay()
+      try {
+        return updateMockReservationQuantity(id, qty, reservationDeps)
       } catch (e) {
         toApiError(e)
       }

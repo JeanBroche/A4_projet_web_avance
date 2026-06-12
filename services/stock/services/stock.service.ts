@@ -24,6 +24,7 @@ import {
   reservationByIdSchema,
   reservationCreateSchema,
   reservationListSchema,
+  reservationUpdateSchema,
   supplierDelayListSchema,
   supplierDelayNotifySchema,
   thresholdUpsertSchema,
@@ -48,7 +49,11 @@ async function releaseOrCancel(
   finalStatus: "RELEASED" | "CANCELLED"
 ) {
   const params = parseParams(reservationByIdSchema, ctx.params);
-  const auth = await requireLogistique(ctx, params.accessToken);
+  const auth = await requireAnyRole(ctx, params.accessToken, [
+    "logistique",
+    "operateur",
+    "commercial"
+  ]);
   const reservation = await prisma.stockReservation.findUnique({
     where: { id: params.id }
   });
@@ -268,6 +273,15 @@ const StockService: ServiceSchema = {
           "commercial"
         ]);
         const materialIds = params.lines.map((line) => line.materialId);
+        const duplicateLineIds = materialIds.filter(
+          (id, index) => materialIds.indexOf(id) !== index
+        );
+        if (duplicateLineIds.length > 0) {
+          throw createError(
+            "VALIDATION_ERROR",
+            "Duplicate material lines in reservation request"
+          );
+        }
         const reservations = await withMaterialLocks(
           materialIds,
           () =>
@@ -276,6 +290,19 @@ const StockService: ServiceSchema = {
               for (const line of params.lines) {
                 const material = await loadActiveMaterial(tx, line.materialId);
                 assertSiteAccess(auth, material.siteCode);
+                const existing = await tx.stockReservation.findFirst({
+                  where: {
+                    ofId: params.ofId,
+                    materialId: material.id,
+                    status: "ACTIVE"
+                  }
+                });
+                if (existing) {
+                  throw createError(
+                    "RESERVATION_ALREADY_ACTIVE",
+                    `Material ${material.code} is already reserved for ${params.ofId}`
+                  );
+                }
                 const available = computeAvailable(material);
                 if (line.qty > available) {
                   throw createError(
@@ -337,6 +364,93 @@ const StockService: ServiceSchema = {
     "reservation.cancel": {
       async handler(ctx) {
         return releaseOrCancel.call(this, ctx, "CANCELLED");
+      }
+    },
+    "reservation.update": {
+      async handler(ctx) {
+        const params = parseParams(reservationUpdateSchema, ctx.params);
+        const auth = await requireAnyRole(ctx, params.accessToken, [
+          "logistique",
+          "operateur",
+          "commercial"
+        ]);
+
+        const reservation = await prisma.stockReservation.findUnique({
+          where: { id: params.id },
+          include: {
+            material: { select: { code: true, description: true, unit: true, siteCode: true } }
+          }
+        });
+        if (!reservation) {
+          throw createError("NOT_FOUND", `Reservation not found: ${params.id}`);
+        }
+        if (reservation.status !== "ACTIVE") {
+          throw createError("RESERVATION_INACTIVE");
+        }
+        assertSiteAccess(auth, reservation.siteCode);
+
+        if (params.qty === reservation.quantity) {
+          return reservation;
+        }
+
+        const updated = await withMaterialLocks(
+          [reservation.materialId],
+          () =>
+            prisma.$transaction(async (tx: DbClient) => {
+              const current = await tx.stockReservation.findUnique({
+                where: { id: params.id }
+              });
+              if (!current || current.status !== "ACTIVE") {
+                throw createError("RESERVATION_INACTIVE");
+              }
+              const material = await loadActiveMaterial(tx, current.materialId);
+              const delta = params.qty - current.quantity;
+              if (delta > 0) {
+                const available = computeAvailable(material);
+                if (delta > available) {
+                  throw createError(
+                    "INSUFFICIENT_STOCK",
+                    `Material ${material.code}: requested ${params.qty}, available ${available + current.quantity}`
+                  );
+                }
+              }
+              const nextReservation = await tx.stockReservation.update({
+                where: { id: current.id },
+                data: { quantity: params.qty },
+                include: {
+                  material: { select: { code: true, description: true, unit: true, siteCode: true } }
+                }
+              });
+              await tx.material.update({
+                where: { id: material.id },
+                data: { reservedStock: Math.max(0, material.reservedStock + delta) }
+              });
+              await evaluateThreshold(tx, material.id);
+              return nextReservation;
+            }),
+          this.logger
+        );
+
+        await logStockAudit({
+          action: "stock.reservation.update",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "StockReservation",
+          entityId: updated.id,
+          siteCode: reservation.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          diff: {
+            before: { quantity: reservation.quantity },
+            after: { quantity: params.qty }
+          }
+        });
+        this.logger.info("Reservation updated", {
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          reservationId: updated.id,
+          quantity: params.qty
+        });
+        return updated;
       }
     },
     "reservation.list": {

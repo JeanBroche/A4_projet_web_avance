@@ -21,6 +21,7 @@ export const ErrorCodes = {
   // Stock
   INSUFFICIENT_STOCK: { status: 422, message: "Insufficient stock available" },
   RESERVATION_INACTIVE: { status: 409, message: "Reservation is not active" },
+  RESERVATION_ALREADY_ACTIVE: { status: 409, message: "Material already reserved for this manufacturing order" },
 
   // Production
   PRODUCTION_INVALID_STATUS_TRANSITION: { status: 409, message: "Invalid production status transition" },

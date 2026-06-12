@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { platform } from "node:os";
 
 const MICROSERVICES = [
@@ -60,6 +60,16 @@ async function main() {
   console.log(
     "Tip: run pnpm dev:backend:stop before restarting to avoid Moleculer nodeID conflicts."
   );
+
+  console.log("\n>> Ensuring Prisma clients are generated (src/generated/prisma is gitignored)...");
+  const generate = spawnSync("pnpm", ["--filter", "@aeronexis/db", "run", "generate:all"], {
+    stdio: "inherit",
+    shell: true,
+    env: process.env
+  });
+  if (generate.status !== 0) {
+    process.exit(generate.status ?? 1);
+  }
 
   await startInBatches(MICROSERVICES);
   await new Promise((resolve) => setTimeout(resolve, GATEWAY_DELAY_MS));

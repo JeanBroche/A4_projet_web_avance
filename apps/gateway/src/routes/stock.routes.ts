@@ -10,6 +10,7 @@ export const restStockRoutes: RouteDefinition[] = [
   { method: "GET", path: "stock/reservations", action: "stock.reservation.list", layer: "REST" },
   { method: "POST", path: "stock/reservations/:id/release", action: "stock.reservation.release", layer: "REST" },
   { method: "POST", path: "stock/reservations/:id/cancel", action: "stock.reservation.cancel", layer: "REST" },
+  { method: "PATCH", path: "stock/reservations/:id", action: "stock.reservation.update", layer: "REST" },
   { method: "GET", path: "stock/alerts", action: "stock.alert.list", layer: "REST" },
   { method: "PUT", path: "stock/thresholds", action: "stock.threshold.upsert", layer: "REST" },
   { method: "GET", path: "stock/forecast/rupture", action: "stock.forecast.rupture", layer: "REST" },

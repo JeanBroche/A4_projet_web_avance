@@ -71,11 +71,12 @@ export function mapMaterialToStockLevel(material: BackendLevel) {
 }
 
 export function mapReservationToUi(reservation: BackendReservation) {
+  const materialCode = reservation.material?.code ?? reservation.materialId
   return {
     id: toNumericId(reservation.id),
     ofId: reservation.ofId,
-    materialId: reservation.materialId,
-    materialName: reservation.material?.description ?? reservation.material?.code ?? reservation.materialId,
+    materialId: materialCode,
+    materialName: reservation.material?.description ?? materialCode,
     quantity: reservation.quantity,
     unit: (reservation.material?.unit ?? 'pcs') as 'pcs',
     status: reservation.status as 'ACTIVE' | 'RELEASED' | 'CANCELLED',

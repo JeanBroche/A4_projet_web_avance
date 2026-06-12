@@ -35,6 +35,10 @@ export const reservationByIdSchema = accessTokenSchema.extend({
   id: cuidLikeSchema
 });
 
+export const reservationUpdateSchema = reservationByIdSchema.extend({
+  qty: z.number().int().positive()
+});
+
 export const reservationListSchema = accessTokenSchema.extend({
   ofId: z.string().min(1).optional(),
   siteCode: siteCodeSchema.optional(),

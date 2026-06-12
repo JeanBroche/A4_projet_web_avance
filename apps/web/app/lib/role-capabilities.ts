@@ -11,7 +11,7 @@ export function canManageBomOrders(role: UserRole | null): boolean {
 }
 
 export function canReserveMaterials(role: UserRole | null): boolean {
-  return role === 'logistique' || role === 'admin'
+  return role === 'operateur' || role === 'logistique' || role === 'admin'
 }
 
 export function canViewBomAndStock(role: UserRole | null): boolean {
