@@ -188,11 +188,11 @@ export const SEED_BOM_CATALOG = [
 
     lines: [
 
-      { material_id: SEED_MATERIALS.ACIER, quantity: 2 },
+      { material_id: SEED_MATERIALS.ACIER, quantity: 1 },
 
-      { material_id: SEED_MATERIALS.TITANE, quantity: 4 },
+      { material_id: SEED_MATERIALS.TITANE, quantity: 1 },
 
-      { material_id: SEED_MATERIALS.JOINT, quantity: 8 }
+      { material_id: SEED_MATERIALS.JOINT, quantity: 2 }
 
     ]
 
@@ -228,9 +228,9 @@ export const SEED_BOM_CATALOG = [
 
     lines: [
 
-      { material_id: SEED_MATERIALS.ACIER, quantity: 36 },
+      { material_id: SEED_MATERIALS.ACIER, quantity: 3 },
 
-      { material_id: SEED_MATERIALS.JOINT, quantity: 12 }
+      { material_id: SEED_MATERIALS.JOINT, quantity: 1 }
 
     ]
 
@@ -266,11 +266,11 @@ export const SEED_BOM_CATALOG = [
 
     lines: [
 
-      { material_id: SEED_MATERIALS.ACIER, quantity: 3 },
+      { material_id: SEED_MATERIALS.ACIER, quantity: 1 },
 
-      { material_id: SEED_MATERIALS.TITANE, quantity: 10 },
+      { material_id: SEED_MATERIALS.TITANE, quantity: 3 },
 
-      { material_id: SEED_MATERIALS.GRAISSE, quantity: 2 }
+      { material_id: SEED_MATERIALS.GRAISSE, quantity: 1 }
 
     ]
 
@@ -294,7 +294,7 @@ export const SEED_BOM_CATALOG = [
 
     priority: "critical" satisfies SeedBomPriority,
 
-    quantity: 6,
+    quantity: 10,
 
     siteCode: SEED_SITES.LYO,
 
@@ -306,9 +306,9 @@ export const SEED_BOM_CATALOG = [
 
     lines: [
 
-      { material_id: SEED_MATERIALS.ACIER, quantity: 8 },
+      { material_id: SEED_MATERIALS.ACIER, quantity: 1 },
 
-      { material_id: SEED_MATERIALS.JOINT, quantity: 16 }
+      { material_id: SEED_MATERIALS.JOINT, quantity: 2 }
 
     ]
 

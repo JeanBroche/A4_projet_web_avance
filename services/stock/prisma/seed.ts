@@ -232,7 +232,7 @@ async function main() {
           palier.bomCode,
           material,
           SEED_SITES.LYO,
-          line.quantity
+          line.quantity * palier.quantity
         );
       }
     }

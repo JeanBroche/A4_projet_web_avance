@@ -12,18 +12,34 @@ function generateCorrelationId(): string {
   return crypto.randomUUID()
 }
 
-function extractApiClientError(error: unknown): ApiClientError | null {
-  if (error instanceof ApiClientError) {
-    return error
-  }
-  if (error && typeof error === 'object' && 'data' in error) {
-    const data = (error as { data: unknown }).data
-    if (data && typeof data === 'object' && 'error' in data) {
-      const err = (data as { error: { code: string, message: string } }).error
-      return new ApiClientError(err.code, err.message)
-    }
-  }
+function errorPayload(error: unknown): unknown {
+  if (!error || typeof error !== 'object') return null
+  if ('data' in error) return (error as { data: unknown }).data
+  const response = (error as { response?: { _data?: unknown } }).response
+  if (response?._data !== undefined) return response._data
   return null
+}
+
+function parseEnvelopeError(payload: unknown): ApiClientError | null {
+  if (!payload || typeof payload !== 'object' || !('error' in payload)) return null
+  const err = (payload as { error: { code?: string; message?: string } }).error
+  if (typeof err?.code !== 'string') return null
+  return new ApiClientError(err.code, err.message ?? err.code)
+}
+
+function extractApiClientError(error: unknown): ApiClientError | null {
+  if (error instanceof ApiClientError) return error
+  return parseEnvelopeError(errorPayload(error))
+}
+
+async function clearSessionOnAuthFailure(code: string): Promise<void> {
+  if (!import.meta.client || !AUTH_RETRY_CODES.has(code)) return
+  try {
+    const { useSessionState } = await import('~/composables/useSessionState')
+    useSessionState().clear()
+  } catch {
+    // ignore — session cookie may already be cleared server-side
+  }
 }
 
 function shouldRetryAuth(path: string, code: string): boolean {
@@ -88,8 +104,10 @@ export function useApiClient() {
             await refreshAuthCookies()
             return request<T>(path, options, true)
           } catch {
-            // refresh failed — surface original auth error
+            await clearSessionOnAuthFailure(apiError.code)
           }
+        } else if (retried || shouldRetryAuth(path, apiError.code)) {
+          await clearSessionOnAuthFailure(apiError.code)
         }
         throw apiError
       }

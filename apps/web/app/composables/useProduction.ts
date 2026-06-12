@@ -92,6 +92,26 @@ export function useProduction() {
     }
   }
 
+  async function updateBomOrderPriority(id: number, priority: ManufacturingOrder['priority']) {
+    isMutating.value = true
+    try {
+      await adapters.production.updateBomOrderPriority(id, priority)
+      await refreshBom()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function updateBomOrderQuantity(id: number, qty: number) {
+    isMutating.value = true
+    try {
+      await adapters.production.updateBomOrderQuantity(id, qty)
+      await refreshBom()
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function createBatch(input: CreateBatchInput) {
     isMutating.value = true
     try {
@@ -179,6 +199,8 @@ export function useProduction() {
     createBomOrder,
     updateBomOrder,
     updateBomOrderStatus,
+    updateBomOrderPriority,
+    updateBomOrderQuantity,
     createBatch,
     updateBatchStatus,
     reportAnomaly,

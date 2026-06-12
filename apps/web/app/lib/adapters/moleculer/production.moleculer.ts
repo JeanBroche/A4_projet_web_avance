@@ -106,10 +106,11 @@ export function createMoleculerProductionAdapter(
         body: {
           description: input.name,
           quantity: input.qty,
+          priority: input.priority,
           siteCode: siteCode(),
           lines: input.bom.map(line => ({
             material_id: line.reference,
-            quantity: line.qtyNeeded
+            quantity: line.qtyPerUnit
           }))
         }
       })
@@ -142,6 +143,32 @@ export function createMoleculerProductionAdapter(
         {
           method: 'PATCH',
           body: { status: mapUiBomStatus(status) }
+        }
+      )
+      return mapBomToUi(bom)
+    },
+
+    async updateBomOrderPriority(id, priority) {
+      const bomCode = await resolveBomCode(id)
+      if (!bomCode) throw new Error('NOT_FOUND')
+      const bom = await request<Parameters<typeof mapBomToUi>[0]>(
+        `/production/bom/${encodeURIComponent(bomCode)}`,
+        {
+          method: 'PATCH',
+          body: { priority }
+        }
+      )
+      return mapBomToUi(bom)
+    },
+
+    async updateBomOrderQuantity(id, qty) {
+      const bomCode = await resolveBomCode(id)
+      if (!bomCode) throw new Error('NOT_FOUND')
+      const bom = await request<Parameters<typeof mapBomToUi>[0]>(
+        `/production/bom/${encodeURIComponent(bomCode)}`,
+        {
+          method: 'PATCH',
+          body: { quantity: qty }
         }
       )
       return mapBomToUi(bom)

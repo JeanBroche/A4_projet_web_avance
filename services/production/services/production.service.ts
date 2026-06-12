@@ -114,8 +114,9 @@ const ProductionService: ServiceSchema = {
               bom_code,
               material_id: primaryLine.material_id,
               description: params.description,
-              quantity: primaryLine.quantity,
+              quantity: params.quantity ?? 1,
               status: PROD_STATUSES.PENDING,
+              priority: params.priority ?? "normal",
               siteCode
             }
           });
@@ -211,7 +212,8 @@ const ProductionService: ServiceSchema = {
               material_id: primaryLine?.material_id ?? params.material_id,
               description: params.description,
               quantity: primaryLine?.quantity ?? params.quantity,
-              status: params.status
+              status: params.status,
+              priority: params.priority
             }
           });
           if (nextLines) {
@@ -279,6 +281,7 @@ const ProductionService: ServiceSchema = {
           batchCode: batch_code,
           orderNumber: params.command_id,
           siteCode,
+          productQty: existingBom.quantity,
           lines: bomLines,
           accessToken: params.accessToken
         });

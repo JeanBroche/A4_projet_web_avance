@@ -53,10 +53,10 @@ Couvre les combinaisons affichées sur `/bom` :
 
 | OF | Besoins unitaires |
 |----|-------------------|
-| Palier PN-100 | Acier 316L ×2 kg, Titane ×4 kg, Joint ×8 pcs |
+| Palier PN-100 | Acier 316L ×4 kg, Titane ×4 kg, Joint ×8 pcs |
 | Plaque LP-200 | Acier ×36 kg, Joint ×12 pcs |
-| Vérin VH-450 | Acier ×3 kg, Titane ×10 kg (stock insuffisant), Graisse ×2 kg (rupture) |
-| Bras BA-320 | Acier ×8 kg, Joint ×16 pcs |
+| Vérin VH-450 | Acier ×3 kg, Titane ×9 kg (stock insuffisant), Graisse ×3 kg (rupture) |
+| Bras BA-320 | Acier ×10 kg, Joint ×20 pcs |
 
 ## Production — Lots (`SEED_BATCH_SPECS`)
 

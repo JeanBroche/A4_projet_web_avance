@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { createBomOrderSchema, createReservationSchema, firstZodError } from '~/lib/validation/schemas'
 import { buildMaterialReferenceOptions } from '~/lib/material-catalog'
+import { computeBomNeed, formatBomQty, toStockReservationQty } from '~/lib/bom-utils'
 import { toFailureResult } from '~/lib/api/envelope'
 import type { AiOfProposal } from '~/lib/validation/ai-of'
 import type { BomItem, BomStatus, ManufacturingOrder, Priority } from '~/types'
@@ -13,6 +14,7 @@ interface ReserveLine {
   materialId: string
   name: string
   qtyNeeded: number
+  qtyToReserve: number
   qtyAvailable: number
   unit: string
   selected: boolean
@@ -21,7 +23,7 @@ interface ReserveLine {
 }
 
 const route = useRoute()
-const { bomOrders, batches, status, error, isMutating, refreshBom, refreshBatches, createBomOrder, updateBomOrder, updateBomOrderStatus } = useProduction()
+const { bomOrders, batches, status, error, isMutating, refreshBom, refreshBatches, createBomOrder, updateBomOrder, updateBomOrderStatus, updateBomOrderPriority, updateBomOrderQuantity } = useProduction()
 const {
   levels,
   reservations,
@@ -96,13 +98,18 @@ const reserveLines  = ref<ReserveLine[]>([])
 const ofReservations = ref<import('~/types').StockReservation[]>([])
 const isEditingBom = ref(false)
 const editBom = ref<BomItem[]>([])
-const editBomRow = ref({ reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' })
+const editBomRow = ref(emptyBomRow())
 const bomEditError = ref<string | null>(null)
+const detailQtyDraft = ref(1)
+
+function emptyBomRow() {
+  return { reference: '', name: '', qtyPerUnit: 1, qtyNeeded: 1, qtyStock: 0, unit: 'pcs' }
+}
 
 const stockReferenceOptions = computed(() => buildMaterialReferenceOptions(levels.value))
 
 // ── État modal création ───────────────────────────────────────────────────────
-const emojis = ['✈️','🔧','⚙️','🛩️','🔩','📦','🚀','🛠️','🔗','🪛']
+const emojis = ['✈️', '🔧', '⚙️', '🛩️', '🔩', '📦', '🚀', '🛠️', '🔗', '🔨']
 
 const newOf = ref({
   name: '', ofNumber: '', qty: 1,
@@ -111,7 +118,7 @@ const newOf = ref({
 })
 
 // BOM temporaire dans la modal création
-const newBomRow = ref({ reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' })
+const newBomRow = ref(emptyBomRow())
 const tempBom   = ref<BomItem[]>([])
 
 const unitOptions  = ['pcs','m','cm','mm','kg','g','ml','L']
@@ -121,15 +128,15 @@ const statusOptions = [
   { label: 'Terminée', value: 'done', icon: 'i-lucide-check-circle' },
 ]
 const priorityOptions = [
-  { label: 'Basse',    value: 'low'      },
-  { label: 'Normale',  value: 'normal'   },
-  { label: 'Haute',    value: 'high'     },
-  { label: 'Critique', value: 'critical' },
+  { label: 'Basse',    value: 'low',      icon: 'i-lucide-arrow-down' },
+  { label: 'Normale',  value: 'normal',   icon: 'i-lucide-minus' },
+  { label: 'Haute',    value: 'high',     icon: 'i-lucide-arrow-up' },
+  { label: 'Critique', value: 'critical', icon: 'i-lucide-alert-triangle' },
 ]
 
 function openCreate() {
   newOf.value = { name: '', ofNumber: '', qty: 1, status: 'pending', priority: 'normal', emoji: '✈️' }
-  newBomRow.value = { reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' }
+  newBomRow.value = emptyBomRow()
   tempBom.value = []
   createModalTab.value = 'form'
   resetAssistant()
@@ -149,8 +156,11 @@ function onApplyProposal(proposal: AiOfProposal) {
 
 function addBomRow() {
   if (!newBomRow.value.reference || !newBomRow.value.name) return
-  tempBom.value.push({ ...newBomRow.value })
-  newBomRow.value = { reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' }
+  tempBom.value.push({
+    ...newBomRow.value,
+    qtyNeeded: computeBomNeed(newBomRow.value.qtyPerUnit, newOf.value.qty)
+  })
+  newBomRow.value = emptyBomRow()
 }
 
 function removeBomRow(idx: number) {
@@ -221,9 +231,10 @@ function reservationQtyFor(ofNumber: string, reference: string): number {
     ?? 0
 }
 
-function enrichedBom(bom: BomItem[], ofNumber?: string) {
+function enrichedBom(bom: BomItem[], orderQty: number, ofNumber?: string) {
   return bom.map(item => ({
     ...item,
+    qtyNeeded: computeBomNeed(item.qtyPerUnit, orderQty),
     name: levelByReference(item.reference)?.name ?? item.name,
     qtyStock: stockAvailable(item.reference),
     qtyReserved: ofNumber ? reservationQtyFor(ofNumber, item.reference) : stockReserved(item.reference)
@@ -240,13 +251,13 @@ interface MaterialReadiness {
 }
 
 function getMaterialReadiness(order: ManufacturingOrder): MaterialReadiness {
-  const lines = enrichedBom(order.bom, order.ofNumber)
+  const lines = enrichedBom(order.bom, order.qty, order.ofNumber)
   let ok = 0
   let low = 0
   let out = 0
   for (const item of lines) {
-    const state = bomStatus(item)
-    if (state === 'ok') ok++
+    const state = bomLineStatus(item, order.ofNumber)
+    if (state === 'ok' || state === 'reserved') ok++
     else if (state === 'low') low++
     else out++
   }
@@ -279,32 +290,42 @@ function openModal(order: ManufacturingOrder) {
   isEditingBom.value = false
   bomEditError.value = null
   reservationActionError.value = null
+  detailQtyDraft.value = order.qty
   isDetailOpen.value = true
   loadOfReservations(order.ofNumber)
 }
 
 function bomQtyNeeded(materialId: string): number | null {
-  return selected.value?.bom.find(b => b.reference === materialId)?.qtyNeeded ?? null
+  const item = selected.value?.bom.find(b => b.reference === materialId)
+  if (!item || !selected.value) return null
+  return computeBomNeed(item.qtyPerUnit, selected.value.qty)
+}
+
+function stockQtyForBomNeed(bomNeed: number): number {
+  return toStockReservationQty(bomNeed)
 }
 
 function isReservationComplete(res: import('~/types').StockReservation): boolean {
   const need = bomQtyNeeded(res.materialId)
-  return need !== null && res.quantity === need
+  return need !== null && res.quantity >= stockQtyForBomNeed(need)
 }
 
 function reservationNeedsAlign(res: import('~/types').StockReservation): boolean {
   const need = bomQtyNeeded(res.materialId)
   if (need === null) return false
-  return res.quantity !== need && stockAvailable(res.materialId) + res.quantity >= need
+  const target = stockQtyForBomNeed(need)
+  return res.quantity !== target && stockAvailable(res.materialId) + res.quantity >= target
 }
 
 async function alignReservationToNeed(res: import('~/types').StockReservation) {
   if (!selected.value) return
   reservationActionError.value = null
   const need = bomQtyNeeded(res.materialId)
-  if (need === null || need === res.quantity) return
+  if (need === null) return
+  const target = stockQtyForBomNeed(need)
+  if (target === res.quantity) return
   try {
-    await updateReservation(res.id, need)
+    await updateReservation(res.id, target)
     await refreshStock()
     await loadOfReservations(selected.value.ofNumber)
   } catch (e) {
@@ -312,12 +333,13 @@ async function alignReservationToNeed(res: import('~/types').StockReservation) {
   }
 }
 
-function bomItemFromStock(item: BomItem): BomItem {
+function bomItemFromStock(item: BomItem, orderQty: number): BomItem {
   const level = levelByReference(item.reference)
   return {
     reference: item.reference,
     name: level?.name ?? item.name,
-    qtyNeeded: item.qtyNeeded,
+    qtyPerUnit: item.qtyPerUnit,
+    qtyNeeded: computeBomNeed(item.qtyPerUnit, orderQty),
     qtyStock: stockAvailable(item.reference),
     unit: level?.unit ?? item.unit
   }
@@ -326,8 +348,8 @@ function bomItemFromStock(item: BomItem): BomItem {
 function startEditBom() {
   if (!selected.value) return
   bomEditError.value = null
-  editBom.value = selected.value.bom.map(bomItemFromStock)
-  editBomRow.value = { reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' }
+  editBom.value = selected.value.bom.map(item => bomItemFromStock(item, selected.value!.qty))
+  editBomRow.value = emptyBomRow()
   isEditingBom.value = true
 }
 
@@ -355,14 +377,17 @@ function onPickNewBomReference(ref: string) {
 }
 
 function addEditBomRow() {
-  if (!editBomRow.value.reference || !editBomRow.value.name) return
+  if (!editBomRow.value.reference || !editBomRow.value.name || !selected.value) return
   if (editBom.value.some(l => l.reference === editBomRow.value.reference)) {
     bomEditError.value = `La référence ${editBomRow.value.reference} est déjà dans la BOM`
     return
   }
   bomEditError.value = null
-  editBom.value.push({ ...editBomRow.value })
-  editBomRow.value = { reference: '', name: '', qtyNeeded: 1, qtyStock: 0, unit: 'pcs' }
+  editBom.value.push({
+    ...editBomRow.value,
+    qtyNeeded: computeBomNeed(editBomRow.value.qtyPerUnit, selected.value.qty)
+  })
+  editBomRow.value = emptyBomRow()
 }
 
 function removeEditBomRow(idx: number) {
@@ -377,8 +402,8 @@ async function saveEditBom() {
     return
   }
   for (const line of editBom.value) {
-    if (!line.reference.trim() || !line.name.trim() || line.qtyNeeded <= 0) {
-      bomEditError.value = 'Chaque ligne doit avoir une référence, un nom et une quantité > 0'
+    if (!line.reference.trim() || !line.name.trim() || line.qtyPerUnit <= 0) {
+      bomEditError.value = 'Chaque ligne doit avoir une référence, un nom et un coefficient > 0'
       return
     }
   }
@@ -387,7 +412,8 @@ async function saveEditBom() {
     bom: editBom.value.map(line => ({
       reference: line.reference,
       name: line.name,
-      qtyNeeded: line.qtyNeeded,
+      qtyPerUnit: line.qtyPerUnit,
+      qtyNeeded: computeBomNeed(line.qtyPerUnit, selected.value!.qty),
       qtyStock: stockAvailable(line.reference),
       unit: line.unit
     }))
@@ -396,11 +422,22 @@ async function saveEditBom() {
   isEditingBom.value = false
 }
 
-function bomStatus(item: BomItem): 'ok' | 'low' | 'out' {
+function bomLineStatus(item: BomItem, ofNumber?: string): 'reserved' | 'ok' | 'low' | 'out' {
+  const need = item.qtyNeeded ?? computeBomNeed(item.qtyPerUnit, selected.value?.qty ?? 1)
+  const stockNeed = stockQtyForBomNeed(need)
+  if (ofNumber && reservationQtyFor(ofNumber, item.reference) >= stockNeed) return 'reserved'
   const available = stockAvailable(item.reference)
   if (available === 0) return 'out'
-  if (available < item.qtyNeeded) return 'low'
+  if (available < stockNeed) return 'low'
   return 'ok'
+}
+
+function bomLineStatusLabel(status: ReturnType<typeof bomLineStatus>) {
+  return ({ reserved: 'Réservé', ok: 'Réservable', low: 'Insuffisant', out: 'Rupture' } as const)[status]
+}
+
+function bomLineStatusColor(status: ReturnType<typeof bomLineStatus>) {
+  return ({ reserved: 'primary', ok: 'success', low: 'warning', out: 'error' } as const)[status]
 }
 
 function activeReservationForMaterial(materialId: string) {
@@ -409,11 +446,14 @@ function activeReservationForMaterial(materialId: string) {
 
 const canReserveMoreForSelected = computed(() => {
   if (!selected.value) return false
+  const orderQty = selected.value.qty
   return selected.value.bom.some((item) => {
+    const qtyNeeded = computeBomNeed(item.qtyPerUnit, orderQty)
+    const qtyToReserve = stockQtyForBomNeed(qtyNeeded)
     const available = stockAvailable(item.reference)
     const existing = activeReservationForMaterial(item.reference)
-    if (existing && existing.quantity === item.qtyNeeded) return false
-    return available >= item.qtyNeeded && !existing
+    if (existing && existing.quantity >= qtyToReserve) return false
+    return available >= qtyToReserve && !existing
   })
 })
 
@@ -423,15 +463,19 @@ async function openReserveModal() {
   await loadOfReservations(selected.value.ofNumber)
 
   reserveLines.value = selected.value.bom.map((item) => {
+    const orderQty = selected.value!.qty
+    const qtyNeeded = computeBomNeed(item.qtyPerUnit, orderQty)
     const available = stockAvailable(item.reference)
     const existing = activeReservationForMaterial(item.reference)
-    const fullyReserved = existing !== undefined && existing.quantity === item.qtyNeeded
-    const canReserve = available >= item.qtyNeeded && !existing
+    const qtyToReserve = stockQtyForBomNeed(qtyNeeded)
+    const fullyReserved = existing !== undefined && existing.quantity >= qtyToReserve
+    const canReserve = available >= qtyToReserve && !existing
 
     return {
       materialId: item.reference,
       name: item.name,
-      qtyNeeded: item.qtyNeeded,
+      qtyNeeded,
+      qtyToReserve,
       qtyAvailable: available,
       unit: item.unit,
       selected: canReserve,
@@ -448,7 +492,7 @@ async function confirmReserve() {
 
   const lines = reserveLines.value
     .filter(l => l.selected && !l.alreadyReserved)
-    .map(l => ({ materialId: l.materialId, qty: l.qtyNeeded }))
+    .map(l => ({ materialId: l.materialId, qty: l.qtyToReserve }))
 
   const payload = { ofId: selected.value.ofNumber, lines }
   const parsed = createReservationSchema.safeParse(payload)
@@ -466,8 +510,8 @@ async function confirmReserve() {
       reserveError.value = `${line.materialId} : déjà réservé pour cet OF`
       return
     }
-    if (line.qtyAvailable < line.qtyNeeded) {
-      reserveError.value = `${line.materialId} : stock insuffisant (besoin ${line.qtyNeeded}, dispo ${line.qtyAvailable})`
+    if (line.qtyAvailable < line.qtyToReserve) {
+      reserveError.value = `${line.materialId} : stock insuffisant (besoin ${line.qtyToReserve}, dispo ${line.qtyAvailable})`
       return
     }
   }
@@ -495,10 +539,31 @@ async function onCancelReservation(id: number) {
 }
 
 async function updateStatus(newStatus: Status) {
-  if (!selected.value) return
+  if (!selected.value || newStatus === selected.value.status) return
   await updateBomOrderStatus(selected.value.id, newStatus)
   selected.value = orders.value.find(o => o.id === selected.value!.id) ?? null
 }
+
+async function updatePriority(newPriority: Priority) {
+  if (!selected.value || newPriority === selected.value.priority) return
+  await updateBomOrderPriority(selected.value.id, newPriority)
+  selected.value = orders.value.find(o => o.id === selected.value!.id) ?? null
+}
+
+async function applyOrderQty() {
+  if (!selected.value || detailQtyDraft.value < 1) return
+  if (detailQtyDraft.value === selected.value.qty) return
+  await updateBomOrderQuantity(selected.value.id, detailQtyDraft.value)
+  selected.value = orders.value.find(o => o.id === selected.value!.id) ?? null
+}
+
+const detailQtyChanged = computed(() =>
+  selected.value !== null && detailQtyDraft.value !== selected.value.qty
+)
+
+const selectedEnrichedBom = computed(() =>
+  selected.value ? enrichedBom(selected.value.bom, selected.value.qty, selected.value.ofNumber) : []
+)
 
 </script>
 
@@ -618,20 +683,21 @@ async function updateStatus(newStatus: Status) {
               </div>
               <div v-if="order.bom.length > 0" class="space-y-1">
                 <div
-                  v-for="item in enrichedBom(order.bom, order.ofNumber).slice(0, 3)"
+                  v-for="item in enrichedBom(order.bom, order.qty, order.ofNumber).slice(0, 3)"
                   :key="item.reference"
                   class="flex items-center gap-2 text-[11px] text-gray-500"
                 >
                   <span
                     class="w-1.5 h-1.5 rounded-full shrink-0"
                     :class="{
-                      'bg-green-400': bomStatus(item) === 'ok',
-                      'bg-orange-400': bomStatus(item) === 'low',
-                      'bg-red-500': bomStatus(item) === 'out'
+                      'bg-indigo-400': bomLineStatus(item, order.ofNumber) === 'reserved',
+                      'bg-green-400': bomLineStatus(item, order.ofNumber) === 'ok',
+                      'bg-orange-400': bomLineStatus(item, order.ofNumber) === 'low',
+                      'bg-red-500': bomLineStatus(item, order.ofNumber) === 'out'
                     }"
                   />
                   <span class="truncate flex-1">{{ item.name }}</span>
-                  <span class="shrink-0 font-mono">{{ item.qtyStock }}/{{ item.qtyNeeded }}</span>
+                  <span class="shrink-0 font-medium text-gray-600 tabular-nums">{{ item.qtyNeeded }} {{ item.unit }}</span>
                 </div>
                 <p v-if="order.bom.length > 3" class="text-[10px] text-gray-400 pl-3.5">
                   +{{ order.bom.length - 3 }} autre{{ order.bom.length - 3 > 1 ? 's' : '' }} matière{{ order.bom.length - 3 > 1 ? 's' : '' }}
@@ -667,18 +733,55 @@ async function updateStatus(newStatus: Status) {
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
             <div class="bg-gray-50 rounded-xl p-3 text-center">
               <p class="text-[11px] text-gray-400 mb-1">Quantité</p>
-              <p class="text-lg font-semibold text-[#0F62BC]">{{ selected.qty }}</p>
+              <div v-if="canManageBomOrders" class="flex items-center justify-center gap-1.5">
+                <UInput
+                  v-model.number="detailQtyDraft"
+                  type="number"
+                  min="1"
+                  class="w-20 text-center"
+                />
+                <UButton
+                  v-if="detailQtyChanged"
+                  size="xs"
+                  icon="i-lucide-check"
+                  class="bg-[#0F62BC] hover:bg-[#0d56a8] text-white"
+                  :loading="isMutating"
+                  @click="applyOrderQty"
+                />
+              </div>
+              <p v-else class="text-lg font-semibold text-[#0F62BC]">{{ selected.qty }}</p>
+              <p v-if="canManageBomOrders" class="text-[10px] text-gray-400 mt-1">unités à produire</p>
             </div>
             <div class="bg-gray-50 rounded-xl p-3 text-center">
               <p class="text-[11px] text-gray-400 mb-1">Priorité</p>
-              <span :class="['text-xs font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1', priorityConfig[selected.priority].class]">
+              <USelect
+                v-if="canManageBomOrders"
+                :model-value="selected.priority"
+                :items="priorityOptions"
+                value-key="value"
+                size="sm"
+                class="w-full"
+                :loading="isMutating"
+                @update:model-value="updatePriority"
+              />
+              <span v-else :class="['text-xs font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1', priorityConfig[selected.priority].class]">
                 <span :class="['w-1.5 h-1.5 rounded-full', priorityConfig[selected.priority].dot]" />
                 {{ priorityConfig[selected.priority].label }}
               </span>
             </div>
             <div class="bg-gray-50 rounded-xl p-3 text-center">
               <p class="text-[11px] text-gray-400 mb-1">Statut</p>
-              <div :class="['text-xs font-medium inline-flex items-center gap-1 px-2 py-0.5 rounded-full', statusConfig[selected.status].class]">
+              <USelect
+                v-if="canManageBomOrders"
+                :model-value="selected.status"
+                :items="statusOptions"
+                value-key="value"
+                size="sm"
+                class="w-full"
+                :loading="isMutating"
+                @update:model-value="updateStatus"
+              />
+              <div v-else :class="['text-xs font-medium inline-flex items-center gap-1 px-2 py-0.5 rounded-full', statusConfig[selected.status].class]">
                 <UIcon :name="statusConfig[selected.status].icon" class="text-sm" />
                 {{ statusConfig[selected.status].label }}
               </div>
@@ -751,13 +854,13 @@ async function updateStatus(newStatus: Status) {
                 <div class="flex-1 min-w-0">
                   <p class="text-xs font-medium text-gray-800 truncate">{{ row.name }}</p>
                   <p class="text-[11px] font-mono text-gray-400">{{ row.reference }}</p>
-                  <p class="text-[11px] text-gray-500 mt-0.5">
-                    Dispo stock : <span class="font-semibold">{{ stockAvailable(row.reference) }} {{ row.unit }}</span>
-                  </p>
                 </div>
                 <div class="text-right shrink-0">
-                  <p class="text-[10px] text-gray-400 mb-0.5">Besoin</p>
-                  <UInput v-model.number="row.qtyNeeded" type="number" min="1" class="w-20" />
+                  <p class="text-[10px] text-gray-400 mb-0.5">Par unité</p>
+                  <UInput v-model.number="row.qtyPerUnit" type="number" min="0.01" step="0.01" class="w-20" />
+                  <p class="text-[10px] text-gray-500 mt-0.5">
+                    = {{ computeBomNeed(row.qtyPerUnit, selected!.qty) }} {{ row.unit }}
+                  </p>
                 </div>
                 <UButton icon="i-lucide-x" variant="ghost" color="error" size="xs" @click="removeEditBomRow(idx)" />
               </div>
@@ -774,7 +877,7 @@ async function updateStatus(newStatus: Status) {
                 @update:model-value="onPickStockReference($event as string)"
               />
               <UInput v-model="editBomRow.name" placeholder="Désignation" class="text-xs" />
-              <UInput v-model.number="editBomRow.qtyNeeded" type="number" min="1" placeholder="Qté besoin" class="text-xs" />
+              <UInput v-model.number="editBomRow.qtyPerUnit" type="number" min="0.01" step="0.01" placeholder="Qté / unité" class="text-xs" />
               <USelect v-model="editBomRow.unit" :items="unitOptions.map(u => ({ label: u, value: u }))" value-key="value" class="text-xs" />
               <UButton
                 icon="i-lucide-plus"
@@ -821,28 +924,40 @@ async function updateStatus(newStatus: Status) {
               />
             </div>
             <div
-              v-for="item in enrichedBom(selected.bom, selected.ofNumber)"
+              v-for="item in selectedEnrichedBom"
               v-else
               :key="item.reference"
               class="flex items-center gap-3 p-3 rounded-xl border"
-              :class="{ 'border-gray-100 bg-white': bomStatus(item)==='ok', 'border-orange-100 bg-orange-50/50': bomStatus(item)==='low', 'border-red-100 bg-red-50/50': bomStatus(item)==='out' }"
+              :class="{
+                'border-indigo-100 bg-indigo-50/40': bomLineStatus(item, selected.ofNumber) === 'reserved',
+                'border-gray-100 bg-white': bomLineStatus(item, selected.ofNumber) === 'ok',
+                'border-orange-100 bg-orange-50/50': bomLineStatus(item, selected.ofNumber) === 'low',
+                'border-red-100 bg-red-50/50': bomLineStatus(item, selected.ofNumber) === 'out'
+              }"
             >
-              <div class="w-2 h-2 rounded-full flex-shrink-0" :class="{ 'bg-green-400': bomStatus(item)==='ok', 'bg-orange-400': bomStatus(item)==='low', 'bg-red-500': bomStatus(item)==='out' }" />
+              <div
+                class="w-2 h-2 rounded-full flex-shrink-0"
+                :class="{
+                  'bg-indigo-400': bomLineStatus(item, selected.ofNumber) === 'reserved',
+                  'bg-green-400': bomLineStatus(item, selected.ofNumber) === 'ok',
+                  'bg-orange-400': bomLineStatus(item, selected.ofNumber) === 'low',
+                  'bg-red-500': bomLineStatus(item, selected.ofNumber) === 'out'
+                }"
+              />
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-800 truncate">{{ item.name }}</p>
                 <p class="text-xs font-mono text-gray-400">{{ item.reference }}</p>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <p class="text-xs text-gray-400">Besoin : <span class="font-semibold text-gray-700">{{ item.qtyNeeded }} {{ item.unit }}</span></p>
-                <p class="text-xs" :class="{ 'text-green-600': bomStatus(item)==='ok', 'text-orange-500': bomStatus(item)==='low', 'text-red-500': bomStatus(item)==='out' }">
-                  Dispo : <span class="font-semibold">{{ item.qtyStock }} {{ item.unit }}</span>
-                </p>
-                <p v-if="reservationQtyFor(selected.ofNumber, item.reference) > 0" class="text-xs text-indigo-500">
-                  Réservé pour cet OF : <span class="font-semibold">{{ reservationQtyFor(selected.ofNumber, item.reference) }} {{ item.unit }}</span>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  {{ formatBomQty(item.qtyPerUnit) }} {{ item.unit }} × {{ selected.qty }} =
+                  <span class="font-semibold text-gray-700">{{ formatBomQty(item.qtyNeeded) }} {{ item.unit }}</span>
                 </p>
               </div>
-              <UBadge :color="bomStatus(item)==='ok' ? 'success' : bomStatus(item)==='low' ? 'warning' : 'error'" variant="subtle" class="text-[11px] hidden sm:inline-flex">
-                {{ bomStatus(item)==='ok' ? 'OK' : bomStatus(item)==='low' ? 'Insuffisant' : 'Rupture' }}
+              <UBadge
+                :color="bomLineStatusColor(bomLineStatus(item, selected.ofNumber))"
+                variant="subtle"
+                class="text-[11px] shrink-0"
+              >
+                {{ bomLineStatusLabel(bomLineStatus(item, selected.ofNumber)) }}
               </UBadge>
             </div>
           </div>
@@ -857,16 +972,23 @@ async function updateStatus(newStatus: Status) {
               <div
                 v-for="res in ofReservations"
                 :key="res.id"
-                class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-3 rounded-xl border border-indigo-100 bg-indigo-50/40"
+                class="p-3 rounded-xl border border-indigo-100 bg-indigo-50/40"
               >
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium text-gray-800">{{ res.materialName }}</p>
-                  <p class="text-xs font-mono text-gray-400">{{ res.materialId }}</p>
-                  <p class="text-xs text-gray-500 mt-0.5">
-                    Réservé {{ res.quantity }} / besoin {{ bomQtyNeeded(res.materialId) ?? '—' }} {{ res.unit }}
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-800">{{ res.materialName }}</p>
+                    <p class="text-xs font-mono text-gray-400">{{ res.materialId }}</p>
+                  </div>
+                  <p class="text-sm font-semibold text-indigo-700 tabular-nums shrink-0">
+                    <template v-if="isReservationComplete(res)">
+                      {{ res.quantity }} {{ res.unit }}
+                    </template>
+                    <template v-else>
+                      {{ res.quantity }} / {{ bomQtyNeeded(res.materialId) ?? '—' }} {{ res.unit }}
+                    </template>
                   </p>
                 </div>
-                <div v-if="canReserveMaterials" class="flex flex-wrap items-center gap-2">
+                <div v-if="canReserveMaterials" class="mt-2.5 flex flex-wrap items-center gap-2">
                   <UBadge
                     v-if="!isReservationComplete(res)"
                     color="warning"
@@ -875,54 +997,57 @@ async function updateStatus(newStatus: Status) {
                   >
                     Quantité incorrecte
                   </UBadge>
-                  <UButton
-                    v-if="reservationNeedsAlign(res)"
-                    size="xs"
-                    icon="i-lucide-refresh-cw"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    :loading="isStockMutating"
-                    @click="alignReservationToNeed(res)"
-                  >
-                    Aligner sur le besoin
-                  </UButton>
-                  <UButton size="xs" variant="outline" color="error" :loading="isStockMutating" @click="onCancelReservation(res.id)">
-                    Annuler la réservation
-                  </UButton>
+                  <div class="flex flex-wrap gap-2 ml-auto">
+                    <UButton
+                      v-if="reservationNeedsAlign(res)"
+                      size="xs"
+                      icon="i-lucide-refresh-cw"
+                      variant="outline"
+                      color="primary"
+                      :loading="isStockMutating"
+                      @click="alignReservationToNeed(res)"
+                    >
+                      Aligner
+                    </UButton>
+                    <UButton
+                      size="xs"
+                      variant="outline"
+                      color="error"
+                      :loading="isStockMutating"
+                      @click="onCancelReservation(res.id)"
+                    >
+                      Annuler
+                    </UButton>
+                  </div>
                 </div>
-                <p v-else class="text-xs text-gray-500">{{ res.quantity }} {{ res.unit }}</p>
+                <p v-else class="mt-1 text-xs text-gray-500">{{ res.quantity }} {{ res.unit }}</p>
               </div>
             </div>
           </div>
 
-          <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between sm:items-center mt-5 pt-4 border-t border-gray-100">
-            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isDetailOpen = false">Fermer</UButton>
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <NuxtLink v-if="canManageBatches && batchesForOrder(selected).length > 0" :to="lotLink(selected)">
-                <UButton
-                  icon="i-carbon:classic-batch"
-                  label="Avancement & anomalies"
-                  size="sm"
-                  variant="outline"
-                  class="w-full sm:w-auto justify-center"
-                />
-              </NuxtLink>
-              <UTooltip
-                v-if="canReserveMaterials"
-                :text="canReserveMoreForSelected ? 'Réserver les matières non encore réservées' : 'Toutes les pièces éligibles sont déjà réservées pour cet OF'"
-              >
-                <UButton
-                  icon="i-lucide-bookmark"
-                  label="Réserver les matières"
-                  size="sm"
-                  class="w-full sm:w-auto justify-center bg-indigo-600 hover:bg-indigo-700 text-white"
-                  :disabled="!canReserveMoreForSelected"
-                  @click="openReserveModal"
-                />
-              </UTooltip>
-            <UDropdownMenu v-if="canManageBomOrders" :items="[statusOptions.map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(s.value as Status) }))]">
-              <UButton label="Changer le statut" color="neutral" variant="outline" size="sm" trailing-icon="i-lucide-chevron-down" class="w-full sm:w-auto justify-center" />
-            </UDropdownMenu>
-            </div>
+          <div class="mt-5 pt-4 border-t border-gray-100 space-y-3">
+            <UTooltip
+              v-if="canReserveMaterials"
+              :text="canReserveMoreForSelected ? 'Réserver les matières non encore réservées' : 'Toutes les pièces éligibles sont déjà réservées pour cet OF'"
+            >
+              <UButton
+                icon="i-lucide-bookmark"
+                label="Réserver les matières"
+                size="sm"
+                class="w-full justify-center bg-indigo-600 hover:bg-indigo-700 text-white"
+                :disabled="!canReserveMoreForSelected"
+                @click="openReserveModal"
+              />
+            </UTooltip>
+
+            <UButton
+              variant="ghost"
+              color="neutral"
+              class="w-full sm:w-auto justify-center sm:justify-start"
+              @click="isDetailOpen = false"
+            >
+              Fermer
+            </UButton>
           </div>
         </div>
       </template>
@@ -949,11 +1074,11 @@ async function updateStatus(newStatus: Status) {
               v-for="line in reserveLines"
               :key="line.materialId"
               class="flex flex-col gap-2 sm:flex-row sm:items-center p-3 rounded-xl border"
-              :class="line.alreadyReserved ? 'border-indigo-100 bg-indigo-50/50 opacity-80' : line.qtyAvailable < line.qtyNeeded ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-gray-100 bg-white'"
+              :class="line.alreadyReserved ? 'border-indigo-100 bg-indigo-50/50 opacity-80' : line.qtyAvailable < line.qtyToReserve ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-gray-100 bg-white'"
             >
               <UCheckbox
                 v-model="line.selected"
-                :disabled="line.alreadyReserved || line.qtyAvailable < line.qtyNeeded"
+                :disabled="line.alreadyReserved || line.qtyAvailable < line.qtyToReserve"
                 class="shrink-0"
               />
               <div class="flex-1 min-w-0">
@@ -962,17 +1087,21 @@ async function updateStatus(newStatus: Status) {
                   <UBadge v-if="line.alreadyReserved" color="primary" variant="subtle" size="xs">
                     Déjà réservé ({{ line.reservedQty }} {{ line.unit }})
                   </UBadge>
-                  <UBadge v-else-if="line.qtyAvailable < line.qtyNeeded" color="error" variant="subtle" size="xs">
+                  <UBadge v-else-if="line.qtyAvailable < line.qtyToReserve" color="error" variant="subtle" size="xs">
                     Stock insuffisant
                   </UBadge>
                 </div>
                 <p class="text-xs font-mono text-gray-400">{{ line.materialId }}</p>
                 <p class="text-xs text-gray-500 mt-0.5">
-                  Besoin {{ line.qtyNeeded }} {{ line.unit }} — dispo {{ line.qtyAvailable }} {{ line.unit }}
+                  Besoin BOM {{ formatBomQty(line.qtyNeeded) }} {{ line.unit }}
+                  <template v-if="line.qtyToReserve !== line.qtyNeeded">
+                    — réservation {{ line.qtyToReserve }} {{ line.unit }}
+                  </template>
+                  — dispo {{ line.qtyAvailable }} {{ line.unit }}
                 </p>
               </div>
               <p class="text-sm font-medium text-indigo-700 tabular-nums shrink-0">
-                {{ line.qtyNeeded }} {{ line.unit }}
+                {{ line.qtyToReserve }} {{ line.unit }}
               </p>
             </div>
           </div>
@@ -1074,7 +1203,7 @@ async function updateStatus(newStatus: Status) {
                   <p class="text-xs font-medium text-gray-800 truncate">{{ row.name }}</p>
                   <p class="text-[11px] font-mono text-gray-400">{{ row.reference }}</p>
                 </div>
-                <span class="text-xs text-gray-500 flex-shrink-0">{{ row.qtyNeeded }} {{ row.unit }}</span>
+                <span class="text-xs text-gray-500 flex-shrink-0">{{ row.qtyPerUnit }} {{ row.unit }}/u</span>
                 <UButton icon="i-lucide-x" variant="ghost" color="error" size="xs" @click="removeBomRow(idx)" />
               </div>
             </div>
@@ -1090,7 +1219,7 @@ async function updateStatus(newStatus: Status) {
                 @update:model-value="onPickNewBomReference($event as string)"
               />
               <UInput v-model="newBomRow.name" placeholder="Désignation" class="text-xs" />
-              <UInput v-model.number="newBomRow.qtyNeeded" type="number" min="1" placeholder="Qté besoin" class="text-xs" />
+              <UInput v-model.number="newBomRow.qtyPerUnit" type="number" min="0.01" step="0.01" placeholder="Qté / unité" class="text-xs" />
               <USelect v-model="newBomRow.unit" :items="unitOptions.map(u => ({ label: u, value: u }))" value-key="value" class="text-xs" />
               <UButton
                 icon="i-lucide-plus"

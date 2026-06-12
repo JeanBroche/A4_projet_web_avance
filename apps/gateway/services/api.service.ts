@@ -3,6 +3,7 @@ import ApiGateway from "moleculer-web";
 import { authorizeRequest } from "../src/authorize.js";
 import { applyHttpMeta } from "../src/http.js";
 import { formatHttpError } from "../src/errors.js";
+import { isPublicAuthRoute } from "../src/public-auth-routes.js";
 import { publicApiAliases, protectedApiAliases, apiRouteWhitelist } from "../src/routes.js";
 import { authFacadeActions } from "../src/facades/auth.facade.js";
 import { checkGatewayHealth } from "../src/health.js";
@@ -21,7 +22,7 @@ function createRouteHooks(requireAuth: boolean) {
     onBeforeCall(
       ctx: Context,
       _route: unknown,
-      req: { headers?: Record<string, string | string[] | undefined> },
+      req: { headers?: Record<string, string | string[] | undefined>; url?: string; originalUrl?: string; $url?: string },
       _res: unknown
     ) {
       const meta = ctx.meta as Record<string, unknown>;
@@ -32,10 +33,10 @@ function createRouteHooks(requireAuth: boolean) {
       this: { broker: { logger: { warn: (msg: string) => void } } },
       ctx: Context,
       _route: unknown,
-      req: { headers?: Record<string, string | string[] | undefined> },
+      req: { headers?: Record<string, string | string[] | undefined>; url?: string; originalUrl?: string; $url?: string },
       _res: unknown
     ) {
-      if (!requireAuth) return null;
+      if (!requireAuth || isPublicAuthRoute(req)) return null;
       try {
         return await authorizeRequest(ctx, req);
       } catch (error) {

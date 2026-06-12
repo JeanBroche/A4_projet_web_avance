@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { toStockReservationQty } from '~/lib/bom-utils'
 
 export const loginSchema = z.object({
   email: z.string().min(1, 'Email requis').email('Email invalide'),
@@ -26,7 +27,10 @@ export const createStockLevelSchema = z.object({
 
 export const createReservationLineSchema = z.object({
   materialId: z.string().trim().min(1, 'Référence matière requise'),
-  qty: z.coerce.number().positive('Quantité positive requise')
+  qty: z.coerce
+    .number()
+    .positive('Quantité positive requise')
+    .transform(toStockReservationQty)
 })
 
 export const createReservationSchema = z.object({

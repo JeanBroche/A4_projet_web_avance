@@ -10,6 +10,7 @@ export async function reserveMaterialsForBatch(
     batchCode: string;
     orderNumber: string;
     siteCode: string;
+    productQty: number;
     lines: BomLineInput[];
     accessToken?: string;
   }
@@ -44,7 +45,10 @@ export async function reserveMaterialsForBatch(
       continue;
     }
 
-    reservationLines.push({ materialId: material.materialId, qty: line.quantity });
+    reservationLines.push({
+      materialId: material.materialId,
+      qty: Math.ceil(line.quantity * params.productQty - 1e-9)
+    });
   }
 
   if (reservationLines.length === 0) {

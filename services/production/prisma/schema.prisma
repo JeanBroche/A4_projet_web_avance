@@ -33,6 +33,7 @@ model BOMProduct {
   description String?
   quantity    Int       @default(1)
   status      String    @default("PENDING")
+  priority    String    @default("normal")
   siteCode    String
   deletedAt   DateTime?
   createdAt   DateTime  @default(now())
@@ -52,7 +53,7 @@ model BOMLine {
   id          String     @id @default(cuid())
   bom_id      String
   material_id String
-  quantity    Int        @default(1)
+  quantity    Float      @default(1)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   bom         BOMProduct @relation(fields: [bom_id], references: [id])

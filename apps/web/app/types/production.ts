@@ -5,6 +5,9 @@ export type Priority = 'low' | 'normal' | 'high' | 'critical'
 export interface BomItem {
   reference: string
   name: string
+  /** Coefficient matière par unité de produit fini. */
+  qtyPerUnit: number
+  /** Besoin total (qtyPerUnit × quantité OF) — recalculé à l'affichage. */
   qtyNeeded: number
   qtyStock: number
   unit: string
@@ -58,6 +61,7 @@ export interface CreateManufacturingOrderInput {
 
 export interface UpdateBomOrderInput {
   id: number
+  qty?: number
   bom: BomItem[]
 }
 

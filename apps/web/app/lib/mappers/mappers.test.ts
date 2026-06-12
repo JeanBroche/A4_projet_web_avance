@@ -52,16 +52,21 @@ describe('front mappers', () => {
     expect(ui.ofId).toBe('BOM-SEED-001')
   })
 
-  it('does not copy BOM line quantity into qtyStock', () => {
+  it('computes BOM need from per-unit coefficient × order qty', () => {
     const ui = mapBomToUi({
       id: 'bom-1',
-      bom_code: 'BOM-SEED-001',
-      description: 'Palier',
-      quantity: 1,
+      bom_code: 'BOM-SEED-004',
+      description: 'Bras',
+      quantity: 10,
       status: 'PENDING',
-      lines: [{ material_id: 'MAT-001', quantity: 8 }]
+      lines: [
+        { material_id: 'MAT-001', quantity: 1 },
+        { material_id: 'MAT-004', quantity: 2 }
+      ]
     })
-    expect(ui.bom[0]?.qtyNeeded).toBe(8)
+    expect(ui.bom[0]?.qtyPerUnit).toBe(1)
+    expect(ui.bom[0]?.qtyNeeded).toBe(10)
+    expect(ui.bom[1]?.qtyNeeded).toBe(20)
     expect(ui.bom[0]?.qtyStock).toBe(0)
   })
 })

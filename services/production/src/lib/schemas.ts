@@ -73,7 +73,7 @@ export const batchStepUpdateSchema = accessTokenSchema.extend({
 
 const bomLineSchema = z.object({
   material_id: z.string().min(1),
-  quantity: z.number().int().positive()
+  quantity: z.number().positive()
 });
 
 export const addBatchAnomalySchema = accessTokenSchema.extend({
@@ -93,6 +93,8 @@ export const getBomSchema = accessTokenSchema.extend({
   bom_code: z.string().min(1)
 });
 
+export const bomPrioritySchema = z.enum(["low", "normal", "high", "critical"]);
+
 export const createBomSchema = accessTokenSchema
   .extend({
     material_id: z.string().min(1).optional(),
@@ -100,7 +102,8 @@ export const createBomSchema = accessTokenSchema
     quantity: z.number().int().positive().default(1),
     lines: z.array(bomLineSchema).min(1).optional(),
     siteCode: z.string().min(1).optional(),
-    siteId: z.string().min(1).optional()
+    siteId: z.string().min(1).optional(),
+    priority: bomPrioritySchema.optional()
   })
   .superRefine((value, ctx) => {
     if (!value.lines?.length && !value.material_id) {
@@ -118,7 +121,8 @@ export const updateBomSchema = accessTokenSchema.extend({
   description: z.string().optional(),
   quantity: z.number().int().positive().default(1).optional(),
   lines: z.array(bomLineSchema).min(1).optional(),
-  status: z.string().min(1).optional()
+  status: z.string().min(1).optional(),
+  priority: bomPrioritySchema.optional()
 });
 
 export const deleteBomSchema = accessTokenSchema.extend({

@@ -1,4 +1,5 @@
 import { SEED_BOM_UI, SEED_MATERIAL_LABELS } from '@aeronexis/shared'
+import { computeBomNeed, normalizeQtyPerUnit } from '~/lib/bom-utils'
 import { toNumericId } from '~/lib/mappers/id'
 import type { Priority } from '~/types'
 
@@ -8,6 +9,7 @@ type BackendBom = {
   description?: string | null
   quantity?: number
   status?: string
+  priority?: string
   lines?: Array<{ material_id: string; quantity: number }>
 }
 
@@ -87,17 +89,22 @@ function bomEmoji(bomCode: string) {
   return bomUiMeta(bomCode)?.emoji ?? '🏭'
 }
 
-function bomPriority(bomCode: string): Priority {
+function bomPriority(bomCode: string, stored?: string | null): Priority {
+  const fromDb = stored as Priority | undefined
+  if (fromDb && ['low', 'normal', 'high', 'critical'].includes(fromDb)) return fromDb
   return bomUiMeta(bomCode)?.priority ?? 'normal'
 }
 
 export function mapBomToUi(bom: BackendBom) {
+  const orderQty = bom.quantity ?? 1
   const lines = (bom.lines ?? []).map((line) => {
     const label = materialLabel(line.material_id)
+    const qtyPerUnit = normalizeQtyPerUnit(line.quantity)
     return {
       reference: line.material_id,
       name: label?.name ?? line.material_id,
-      qtyNeeded: line.quantity,
+      qtyPerUnit,
+      qtyNeeded: computeBomNeed(qtyPerUnit, orderQty),
       qtyStock: 0,
       unit: label?.unit ?? 'pcs'
     }
@@ -107,12 +114,19 @@ export function mapBomToUi(bom: BackendBom) {
     name: bom.description ?? bom.bom_code,
     emoji: bomEmoji(bom.bom_code),
     ofNumber: bom.bom_code,
-    qty: bom.quantity ?? 1,
+    qty: orderQty,
     status: mapBomStatusToUi(bom.status),
-    priority: bomPriority(bom.bom_code),
+    priority: bomPriority(bom.bom_code, bom.priority),
     bom: lines.length
       ? lines
-      : [{ reference: bom.bom_code, name: bom.description ?? bom.bom_code, qtyNeeded: bom.quantity ?? 1, qtyStock: 0, unit: 'pcs' }]
+      : [{
+          reference: bom.bom_code,
+          name: bom.description ?? bom.bom_code,
+          qtyPerUnit: 1,
+          qtyNeeded: orderQty,
+          qtyStock: 0,
+          unit: 'pcs'
+        }]
   }
 }
 

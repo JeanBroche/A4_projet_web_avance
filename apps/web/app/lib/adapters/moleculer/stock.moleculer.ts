@@ -7,7 +7,7 @@ import {
   mapSupplierDelayToUi
 } from '~/lib/mappers/stock'
 import { isCuidLike, resolveStringIdByNumeric } from '~/lib/mappers/resolve-id'
-import type { StockReservation } from '~/types'
+import { toNumericId } from '~/lib/mappers/id'
 
 type LevelRow = {
   materialId: string
@@ -18,10 +18,9 @@ type LevelRow = {
 
 const reservationCuidByNumeric = new Map<number, string>()
 
-function trackReservationCuids(reservations: StockReservation[], raw: Array<{ id: string }>) {
-  for (let i = 0; i < reservations.length; i++) {
-    const rawId = raw[i]?.id
-    if (rawId) reservationCuidByNumeric.set(reservations[i]!.id, rawId)
+function trackReservationCuids(raw: Array<{ id: string }>) {
+  for (const row of raw) {
+    if (row.id) reservationCuidByNumeric.set(toNumericId(row.id), row.id)
   }
 }
 
@@ -42,6 +41,27 @@ export function createMoleculerStockAdapter(
     const levels = await listRawLevels()
     const match = levels.find(l => l.code === referenceOrId || l.materialId === referenceOrId)
     return match?.materialId ?? null
+  }
+
+  async function resolveReservationCuid(id: number | string): Promise<string> {
+    if (isCuidLike(String(id))) return String(id)
+    const numeric = Number(id)
+    const cached = reservationCuidByNumeric.get(numeric)
+    if (cached) return cached
+
+    const result = await request<{ reservations: Array<{ id: string }> }>(
+      '/stock/reservations',
+      { params: { siteCode: siteCode(), status: 'ACTIVE' } }
+    )
+    const raw = result.reservations ?? []
+    trackReservationCuids(raw)
+
+    const resolved =
+      reservationCuidByNumeric.get(numeric) ??
+      resolveStringIdByNumeric(raw, numeric, 'id')
+    if (!resolved) throw new Error('NOT_FOUND')
+    reservationCuidByNumeric.set(numeric, resolved)
+    return resolved
   }
 
   return {
@@ -154,9 +174,8 @@ export function createMoleculerStockAdapter(
         }
       )
       const raw = result.reservations ?? []
-      const mapped = raw.map(mapReservationToUi)
-      trackReservationCuids(mapped, raw)
-      return mapped
+      trackReservationCuids(raw)
+      return raw.map(mapReservationToUi)
     },
 
     async createReservation(input) {
@@ -176,24 +195,23 @@ export function createMoleculerStockAdapter(
         }
       )
       const raw = result.reservations ?? []
-      const mapped = raw.map(mapReservationToUi)
-      trackReservationCuids(mapped, raw)
-      return mapped
+      trackReservationCuids(raw)
+      return raw.map(mapReservationToUi)
     },
 
     async updateReservation(id, qty) {
-      const cuid = reservationCuidByNumeric.get(Number(id)) ?? String(id)
+      const cuid = await resolveReservationCuid(id)
       const raw = await request<Parameters<typeof mapReservationToUi>[0]>(
         `/stock/reservations/${encodeURIComponent(cuid)}`,
         { method: 'PATCH', body: { qty } }
       )
       const mapped = mapReservationToUi(raw)
-      trackReservationCuids([mapped], [raw])
+      trackReservationCuids([raw])
       return mapped
     },
 
     async releaseReservation(id) {
-      const cuid = reservationCuidByNumeric.get(Number(id)) ?? String(id)
+      const cuid = await resolveReservationCuid(id)
       const result = await request<{ reservation?: Parameters<typeof mapReservationToUi>[0] }>(
         `/stock/reservations/${encodeURIComponent(cuid)}/release`,
         { method: 'POST' }
@@ -203,7 +221,7 @@ export function createMoleculerStockAdapter(
     },
 
     async cancelReservation(id) {
-      const cuid = reservationCuidByNumeric.get(Number(id)) ?? String(id)
+      const cuid = await resolveReservationCuid(id)
       const result = await request<{ reservation?: Parameters<typeof mapReservationToUi>[0] }>(
         `/stock/reservations/${encodeURIComponent(cuid)}/cancel`,
         { method: 'POST' }

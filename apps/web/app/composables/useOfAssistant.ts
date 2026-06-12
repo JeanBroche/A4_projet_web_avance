@@ -1,4 +1,4 @@
-import type { AiOfProposal } from '~/lib/validation/ai-of'
+import { computeBomNeed, deriveQtyPerUnit } from '~/lib/bom-utils'
 import type { BomItem, BomStatus, Priority, StockLevel } from '~/types'
 
 export interface OfAssistantMessage {
@@ -82,10 +82,12 @@ export function useOfAssistant() {
       },
       bom: proposal.bom.map((line) => {
         const level = levelByReference(line.reference)
+        const qtyPerUnit = deriveQtyPerUnit(line.qtyNeeded, proposal.qty)
         return {
           reference: line.reference,
           name: line.name,
-          qtyNeeded: line.qtyNeeded,
+          qtyPerUnit,
+          qtyNeeded: computeBomNeed(qtyPerUnit, proposal.qty),
           qtyStock: level?.available ?? 0,
           unit: line.unit
         }

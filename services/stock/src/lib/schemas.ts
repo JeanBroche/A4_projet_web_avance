@@ -8,9 +8,14 @@ const siteCodeSchema = z.string().min(1);
 const materialIdSchema = z.string().min(1);
 const cuidLikeSchema = z.string().min(1);
 
+const reservationQtySchema = z
+  .number()
+  .positive()
+  .transform((qty) => (Number.isInteger(qty) ? qty : Math.ceil(qty)));
+
 const reservationLineSchema = z.object({
   materialId: materialIdSchema,
-  qty: z.number().int().positive()
+  qty: reservationQtySchema
 });
 
 export const levelListSchema = accessTokenSchema.extend({
@@ -36,7 +41,7 @@ export const reservationByIdSchema = accessTokenSchema.extend({
 });
 
 export const reservationUpdateSchema = reservationByIdSchema.extend({
-  qty: z.number().int().positive()
+  qty: reservationQtySchema
 });
 
 export const reservationListSchema = accessTokenSchema.extend({

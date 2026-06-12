@@ -1,4 +1,5 @@
 import { simulateDelay } from '~/lib/api/client'
+import { computeBomNeed, deriveQtyPerUnit } from '~/lib/bom-utils'
 import { appendMockActivity } from '~/lib/adapters/mock/audit-store'
 import { getMockActorName } from '~/lib/adapters/mock/mock-actor'
 import { createInitialBatches } from '~/fixtures/production/batches'
@@ -21,9 +22,22 @@ function stockAvailable(reference: string, fallback: number): number {
   return level?.available ?? fallback
 }
 
-function syncBomStock(bom: BomItem[]): BomItem[] {
+function normalizeOrder(order: ManufacturingOrder): ManufacturingOrder {
+  const bom = order.bom.map((line) => {
+    const qtyPerUnit = line.qtyPerUnit ?? deriveQtyPerUnit(line.qtyNeeded, order.qty)
+    return {
+      ...line,
+      qtyPerUnit,
+      qtyNeeded: computeBomNeed(qtyPerUnit, order.qty)
+    }
+  })
+  return { ...order, bom }
+}
+
+function syncBomStock(bom: BomItem[], orderQty: number): BomItem[] {
   return bom.map(item => ({
     ...item,
+    qtyNeeded: computeBomNeed(item.qtyPerUnit, orderQty),
     qtyStock: stockAvailable(item.reference, item.qtyStock)
   }))
 }
@@ -44,12 +58,12 @@ export function createMockProductionAdapter(): ProductionAdapter {
   return {
     async listBomOrders() {
       await simulateDelay()
-      return [...bomStore]
+      return bomStore.map(normalizeOrder)
     },
 
     async createBomOrder(input: CreateManufacturingOrderInput) {
       await simulateDelay()
-      const bom = syncBomStock(input.bom)
+      const bom = syncBomStock(input.bom, input.qty)
       const order: ManufacturingOrder = {
         id: nextBomId++,
         ...input,
@@ -70,8 +84,9 @@ export function createMockProductionAdapter(): ProductionAdapter {
       await simulateDelay()
       const idx = bomStore.findIndex(o => o.id === input.id)
       if (idx === -1) throw new ApiClientError('NOT_FOUND', 'OF introuvable')
-      const bom = syncBomStock(input.bom)
-      bomStore[idx] = { ...bomStore[idx]!, bom }
+      const orderQty = input.qty ?? bomStore[idx]!.qty
+      const bom = syncBomStock(input.bom, orderQty)
+      bomStore[idx] = { ...bomStore[idx]!, qty: orderQty, bom }
       const order = bomStore[idx]!
       appendMockActivity({
         type: 'bom_validated',
@@ -100,6 +115,39 @@ export function createMockProductionAdapter(): ProductionAdapter {
       return order
     },
 
+    async updateBomOrderPriority(id: number, priority: ManufacturingOrder['priority']) {
+      await simulateDelay()
+      const idx = bomStore.findIndex(o => o.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'OF introuvable')
+      bomStore[idx] = { ...bomStore[idx]!, priority }
+      const order = bomStore[idx]!
+      appendMockActivity({
+        type: 'bom_validated',
+        title: 'Priorité OF modifiée',
+        description: `${order.ofNumber} : priorité ${priority}.`,
+        user: getMockActorName(),
+        meta: order.ofNumber
+      })
+      return order
+    },
+
+    async updateBomOrderQuantity(id: number, qty: number) {
+      await simulateDelay()
+      const idx = bomStore.findIndex(o => o.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'OF introuvable')
+      const bom = syncBomStock(bomStore[idx]!.bom, qty)
+      bomStore[idx] = { ...bomStore[idx]!, qty, bom }
+      const order = bomStore[idx]!
+      appendMockActivity({
+        type: 'bom_validated',
+        title: 'Quantité OF modifiée',
+        description: `${order.ofNumber} : ${qty} unité(s) à produire.`,
+        user: getMockActorName(),
+        meta: order.ofNumber
+      })
+      return order
+    },
+
     async listBatches() {
       await simulateDelay()
       return [...batchStore]
@@ -109,7 +157,7 @@ export function createMockProductionAdapter(): ProductionAdapter {
       await simulateDelay()
       const ofOrder = bomStore.find(o => o.ofNumber === input.ofNumber)
       if (!ofOrder) throw new ApiClientError('NOT_FOUND', `OF introuvable : ${input.ofNumber}`)
-      const bom = syncBomStock(ofOrder.bom.map(item => ({ ...item })))
+      const bom = syncBomStock(ofOrder.bom.map(item => ({ ...item })), ofOrder.qty)
       const batch: Batch = {
         id: nextBatchId++,
         lotNumber: `LOT-24-${String(nextLotNum++).padStart(3, '0')}`,
