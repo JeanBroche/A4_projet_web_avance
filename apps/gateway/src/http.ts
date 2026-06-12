@@ -26,6 +26,8 @@ export function normalizeMsParams(params: Record<string, unknown>) {
   if (out.anomalyCode != null && out.anomaly_code == null) out.anomaly_code = out.anomalyCode;
   if (out.stepCode != null && out.step_code == null) out.step_code = out.stepCode;
   if (out.lotNumber != null && out.lot_number == null) out.lot_number = out.lotNumber;
+  if (out.lotNumber != null && out.lotId == null) out.lotId = out.lotNumber;
+  if (out.lot_number != null && out.lotId == null) out.lotId = out.lot_number;
   if (out.userId != null && out.id == null) out.id = out.userId;
   return out;
 }

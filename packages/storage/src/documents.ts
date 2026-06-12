@@ -59,6 +59,18 @@ export async function getDocumentDownloadUrl(objectKey: string, expiresSec = 360
   return client.presignedGetObject(config.bucket, objectKey, expiresSec);
 }
 
+export async function getDocumentObject(objectKey: string): Promise<{ body: Buffer; sizeBytes: number }> {
+  const config = getStorageConfig();
+  const client = getMinioClient();
+  const stream = await client.getObject(config.bucket, objectKey);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream as AsyncIterable<Buffer>) {
+    chunks.push(chunk);
+  }
+  const body = Buffer.concat(chunks);
+  return { body, sizeBytes: body.length };
+}
+
 export async function deleteDocumentObject(objectKey: string) {
   const config = getStorageConfig();
   const client = getMinioClient();

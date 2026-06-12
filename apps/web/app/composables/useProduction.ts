@@ -137,9 +137,13 @@ export function useProduction() {
     isMutating.value = true
     error.value = null
     try {
-      await adapters.production.createBatch(input)
+      const batch = await adapters.production.createBatch(input)
+      for (const ofNumber of input.additionalOfNumbers ?? []) {
+        await adapters.production.assignBatchToOf(batch.lotNumber, ofNumber)
+      }
       await refreshBatches()
       await syncNotificationsAfterMutation()
+      return batches.value.find(b => b.lotNumber === batch.lotNumber) ?? batch
     } catch (e) {
       const failure = toFailureResult(e)
       error.value = failure.message
@@ -198,6 +202,22 @@ export function useProduction() {
     }
   }
 
+  async function deleteBatch(id: number) {
+    isMutating.value = true
+    error.value = null
+    try {
+      await adapters.production.deleteBatch(id)
+      await refreshBatches()
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function createProduct(input: CreateProductInput) {
     isMutating.value = true
     try {
@@ -249,6 +269,7 @@ export function useProduction() {
     updateBatchStatus,
     reportAnomaly,
     clearAnomaly,
+    deleteBatch,
     createProduct,
     updateProduct,
     deleteProduct

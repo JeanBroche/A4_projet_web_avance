@@ -40,3 +40,13 @@ export interface LotTraceTimeline {
   productName: string
   events: LotTraceEvent[]
 }
+
+export interface LotDocument {
+  id: string
+  lotId: string
+  filename: string
+  contentType: string
+  sizeBytes: number
+  uploadedBy: string
+  uploadedAt: string
+}

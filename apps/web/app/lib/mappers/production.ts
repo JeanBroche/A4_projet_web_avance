@@ -22,6 +22,19 @@ type BackendProduct = {
   siteCode: string
 }
 
+type BackendBomLine = {
+  material_id: string
+  quantity: number
+}
+
+type BackendBatchBom = {
+  description?: string | null
+  bom_code?: string
+  quantity?: number
+  priority?: string
+  lines?: BackendBomLine[]
+}
+
 type BackendBatch = {
   batch_id: string
   batch_code: string
@@ -33,7 +46,7 @@ type BackendBatch = {
   progress?: number
   hasAnomaly?: boolean
   createdAt?: string | Date
-  bom?: { description?: string | null; bom_code?: string }
+  bom?: BackendBatchBom
 }
 
 const BOM_STATUS: Record<string, 'pending' | 'in_progress' | 'done'> = {
@@ -96,9 +109,12 @@ function bomPriority(bomCode: string, stored?: string | null): Priority {
   return bomUiMeta(bomCode)?.priority ?? 'normal'
 }
 
-export function mapBomToUi(bom: BackendBom) {
-  const orderQty = bom.quantity ?? 1
-  const lines = (bom.lines ?? []).map((line) => {
+function mapBomLinesToUi(
+  lines: BackendBomLine[],
+  orderQty: number,
+  fallback?: { reference: string; name: string }
+) {
+  const mapped = lines.map((line) => {
     const label = materialLabel(line.material_id)
     const qtyPerUnit = normalizeQtyPerUnit(line.quantity)
     return {
@@ -110,6 +126,20 @@ export function mapBomToUi(bom: BackendBom) {
       unit: label?.unit ?? 'pcs'
     }
   })
+  if (mapped.length) return mapped
+  if (!fallback) return []
+  return [{
+    reference: fallback.reference,
+    name: fallback.name,
+    qtyPerUnit: 1,
+    qtyNeeded: orderQty,
+    qtyStock: 0,
+    unit: 'pcs'
+  }]
+}
+
+export function mapBomToUi(bom: BackendBom) {
+  const orderQty = bom.quantity ?? 1
   return {
     id: toNumericId(bom.id),
     name: bom.description ?? bom.bom_code,
@@ -118,16 +148,10 @@ export function mapBomToUi(bom: BackendBom) {
     qty: orderQty,
     status: mapBomStatusToUi(bom.status),
     priority: bomPriority(bom.bom_code, bom.priority),
-    bom: lines.length
-      ? lines
-      : [{
-          reference: bom.bom_code,
-          name: bom.description ?? bom.bom_code,
-          qtyPerUnit: 1,
-          qtyNeeded: orderQty,
-          qtyStock: 0,
-          unit: 'pcs'
-        }]
+    bom: mapBomLinesToUi(bom.lines ?? [], orderQty, {
+      reference: bom.bom_code,
+      name: bom.description ?? bom.bom_code
+    })
   }
 }
 
@@ -138,6 +162,8 @@ export function mapBatchToUi(batch: BackendBatch) {
     : primary
       ? [primary]
       : []
+  const orderQty = batch.bom?.quantity ?? 1
+  const bomCode = batch.bom_code ?? batch.bom?.bom_code ?? ''
   return {
     id: toNumericId(batch.batch_id),
     lotNumber: batch.batch_code,
@@ -145,10 +171,10 @@ export function mapBatchToUi(batch: BackendBatch) {
     bomCode: primary,
     bomCodes,
     productName: batch.bom?.description ?? batch.batch_code,
-    emoji: bomEmoji(batch.bom_code ?? batch.bom?.bom_code ?? ''),
-    qty: 1,
+    emoji: bomEmoji(bomCode),
+    qty: orderQty,
     status: mapBatchStatusToUi(batch.status),
-    priority: bomPriority(batch.bom_code ?? batch.bom?.bom_code ?? ''),
+    priority: bomPriority(bomCode, batch.bom?.priority),
     hasAnomaly: batch.hasAnomaly ?? false,
     progress: batch.progress ?? 0,
     createdAt: batch.createdAt

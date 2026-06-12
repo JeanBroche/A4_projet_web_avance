@@ -2,6 +2,7 @@ import type {
   Activity,
   ActivityType,
   Batch,
+  BatchHistoryEntry,
   BatchStatus,
   ClientStats,
   CreateBatchInput,
@@ -13,6 +14,7 @@ import type {
   KpiDashboard,
   LoginCredentials,
   LoginResult,
+  LotDocument,
   LotTraceTimeline,
   ManufacturingOrder,
   Order,
@@ -84,6 +86,8 @@ export interface ProductionAdapter {
   updateBatchStatus(id: number, status: BatchStatus): Promise<Batch>
   reportAnomaly(input: ReportAnomalyInput): Promise<Batch>
   clearAnomaly(batchId: number): Promise<Batch>
+  deleteBatch(id: number): Promise<void>
+  listBatchHistory(lotNumber: string): Promise<BatchHistoryEntry[]>
   listProducts(): Promise<Product[]>
   getProduct(productCode: string): Promise<Product>
   createProduct(input: CreateProductInput): Promise<Product>
@@ -130,6 +134,15 @@ export interface AuditAdapter {
   append(input: AppendActivityInput): Promise<Activity>
   traceLot(lotNumber: string): Promise<LotTraceTimeline>
   exportLot(lotNumber: string): Promise<string>
+  uploadLotDocument(
+    lotId: string,
+    file: { filename: string, contentType: string, contentBase64: string }
+  ): Promise<LotDocument>
+  listLotDocuments(lotId: string): Promise<LotDocument[]>
+  getLotDocumentUrl(documentId: string): Promise<string>
+  downloadLotDocument(
+    documentId: string
+  ): Promise<{ filename: string, contentType: string, contentBase64: string, sizeBytes: number }>
 }
 
 export interface ReportingAdapter {

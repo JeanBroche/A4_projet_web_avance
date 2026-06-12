@@ -5,8 +5,8 @@ const accessTokenSchema = z
   .partial();
 
 const paginationSchema = {
-  limit: z.number().int().positive().max(500).optional(),
-  offset: z.number().int().nonnegative().optional()
+  limit: z.coerce.number().int().positive().max(500).optional(),
+  offset: z.coerce.number().int().nonnegative().optional()
 };
 
 export const changeListSchema = accessTokenSchema.extend({
@@ -36,24 +36,30 @@ export const eventListCriticalSchema = accessTokenSchema.extend({
   ...paginationSchema
 });
 
+const LOT_ID_PATTERN = /^(LOT-\d{4}-\d{5}|BATCH-[A-Z0-9-]+)$/i;
+
 export const lotTraceSchema = accessTokenSchema.extend({
-  lotId: z.string().regex(/^LOT-\d{4}-\d{5}$/, "lotId must match LOT-YYYY-NNNNN")
+  lotId: z.string().regex(LOT_ID_PATTERN, "lotId must match LOT-YYYY-NNNNN or BATCH-*")
 });
 
 export const lotExportSchema = lotTraceSchema;
 
 export const documentUploadSchema = accessTokenSchema.extend({
-  lotId: z.string().regex(/^LOT-\d{4}-\d{5}$/, "lotId must match LOT-YYYY-NNNNN"),
+  lotId: z.string().regex(LOT_ID_PATTERN, "lotId must match LOT-YYYY-NNNNN or BATCH-*"),
   filename: z.string().min(1).max(255),
   contentType: z.string().min(1).max(128),
   contentBase64: z.string().min(1)
 });
 
 export const documentListSchema = accessTokenSchema.extend({
-  lotId: z.string().regex(/^LOT-\d{4}-\d{5}$/, "lotId must match LOT-YYYY-NNNNN")
+  lotId: z.string().regex(LOT_ID_PATTERN, "lotId must match LOT-YYYY-NNNNN or BATCH-*")
 });
 
 export const documentUrlSchema = accessTokenSchema.extend({
   documentId: z.string().uuid(),
   expiresSec: z.number().int().positive().max(86_400).optional()
+});
+
+export const documentDownloadSchema = accessTokenSchema.extend({
+  documentId: z.string().uuid()
 });

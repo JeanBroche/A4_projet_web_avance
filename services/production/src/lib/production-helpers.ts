@@ -154,6 +154,62 @@ export function collectBatchBomCodes(batch: {
   return [...new Set([batch.bom.bom_code, ...batch.bomLinks.map((link) => link.bom.bom_code)])];
 }
 
+export const BATCH_BOM_INCLUDE = {
+  bom: {
+    select: {
+      id: true,
+      bom_code: true,
+      description: true,
+      quantity: true,
+      priority: true
+    }
+  },
+  bomLinks: {
+    include: {
+      bom: { select: { bom_code: true } }
+    }
+  }
+} as const;
+
+type BatchWithBomRelations = {
+  bom: {
+    id: string;
+    bom_code: string;
+    description: string | null;
+    quantity: number;
+    priority: string;
+  };
+  bomLinks: Array<{ bom: { bom_code: string } }>;
+};
+
+function buildBatchBomPayload(batch: BatchWithBomRelations) {
+  const bom_codes = collectBatchBomCodes(batch);
+  const { bom, bomLinks, ...rest } = batch;
+  return {
+    ...rest,
+    bom_code: bom.bom_code,
+    bom_codes,
+    bom: {
+      bom_code: bom.bom_code,
+      description: bom.description,
+      quantity: bom.quantity,
+      priority: bom.priority
+    }
+  };
+}
+
+export function serializeBatchResponse(
+  batch: BatchWithBomRelations & Record<string, unknown>
+) {
+  return buildBatchBomPayload(batch);
+}
+
+export function serializeBatchResponses(
+  batches: Array<BatchWithBomRelations & Record<string, unknown>>
+) {
+  return batches.map((batch) => buildBatchBomPayload(batch));
+}
+
 export async function loadBomLines(db: DbClient, bom_id: string): Promise<BomLineInput[]> {
   const lines = await db.bOMLine.findMany({
     where: { bom_id },
@@ -269,12 +325,96 @@ export async function syncBatchProgressFromSteps(db: DbClient, batch_id: string)
     orderBy: { order_index: "asc" }
   });
   const progress = computeProgressFromSteps(steps);
-  const status = resolveStatusFromSteps(steps);
 
   return db.batchProduct.update({
     where: { batch_id },
-    data: { progress, status }
+    data: { progress }
   });
+}
+
+export function resolveBatchStatusFromBoms(bomStatuses: string[]): string {
+  if (bomStatuses.length === 0) {
+    return PROD_STATUSES.PENDING;
+  }
+
+  const normalized = bomStatuses.map((status) => {
+    if (status === PROD_STATUSES.CANCELLED) {
+      return PROD_STATUSES.PENDING;
+    }
+    return status;
+  });
+
+  if (normalized.every((status) => status === PROD_STATUSES.COMPLETED)) {
+    return PROD_STATUSES.COMPLETED;
+  }
+  if (normalized.some((status) => status === PROD_STATUSES.IN_PROGRESS)) {
+    return PROD_STATUSES.IN_PROGRESS;
+  }
+  if (
+    normalized.some((status) => status === PROD_STATUSES.COMPLETED) &&
+    normalized.some((status) => status === PROD_STATUSES.PENDING)
+  ) {
+    return PROD_STATUSES.IN_PROGRESS;
+  }
+  return PROD_STATUSES.PENDING;
+}
+
+async function loadLinkedBomStatuses(db: DbClient, batch_id: string) {
+  const batch = await db.batchProduct.findFirst({
+    where: { batch_id, deletedAt: null },
+    include: {
+      bom: { select: { status: true } },
+      bomLinks: { include: { bom: { select: { status: true } } } }
+    }
+  });
+  if (!batch) {
+    throw createError("NOT_FOUND", "Batch not found");
+  }
+
+  const statuses = [
+    batch.bom.status,
+    ...batch.bomLinks.map((link) => link.bom.status)
+  ];
+  return { batch, statuses: [...new Set(statuses)] };
+}
+
+export async function syncBatchStatusFromLinkedBoms(
+  db: DbClient,
+  batch_id: string,
+  performedBy?: string
+) {
+  const { batch, statuses } = await loadLinkedBomStatuses(db, batch_id);
+  const nextStatus = resolveBatchStatusFromBoms(statuses);
+  if (nextStatus === batch.status) {
+    return batch;
+  }
+
+  const updated = await db.batchProduct.update({
+    where: { batch_id },
+    data: { status: nextStatus }
+  });
+  await recordBatchHistory(
+    db,
+    batch_id,
+    "batch.status_changed",
+    `${batch.status} -> ${nextStatus} (OF)`,
+    performedBy
+  );
+  return updated;
+}
+
+export async function findBatchIdsForBom(db: DbClient, bom_id: string) {
+  const [primary, linked] = await Promise.all([
+    db.batchProduct.findMany({
+      where: { bom_id, deletedAt: null },
+      select: { batch_id: true }
+    }),
+    db.batchBomLink.findMany({
+      where: { bom_id, batch: { deletedAt: null } },
+      select: { batch_id: true }
+    })
+  ]);
+  return [...new Set([...primary.map((row) => row.batch_id), ...linked.map((row) => row.batch_id)])];
 }
 
 export async function recordBatchHistory(

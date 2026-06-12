@@ -14,6 +14,13 @@ describe('normalizeMsParams', () => {
     assert.equal(params.bom_code, 'BOM-SEED-001')
     assert.equal(params.id, 'user-1')
   })
+
+  it('maps lotNumber REST param to lotId', () => {
+    const params = normalizeMsParams({
+      lotNumber: 'BATCH-SEED-001'
+    })
+    assert.equal(params.lotId, 'BATCH-SEED-001')
+  })
 })
 
 describe('applyHttpMeta', () => {

@@ -258,6 +258,62 @@ export function createMockProductionAdapter(): ProductionAdapter {
       return batch
     },
 
+    async deleteBatch(id: number) {
+      await simulateDelay()
+      const idx = batchStore.findIndex(b => b.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Lot introuvable')
+      const batch = batchStore[idx]!
+      batchStore.splice(idx, 1)
+      appendMockActivity({
+        type: 'bom_validated',
+        title: 'Lot supprimé',
+        description: `Suppression du lot ${batch.lotNumber}.`,
+        user: getMockActorName(),
+        meta: batch.lotNumber
+      })
+    },
+
+    async listBatchHistory(lotNumber: string) {
+      await simulateDelay(60)
+      const batch = batchStore.find(b => b.lotNumber === lotNumber)
+      if (!batch) return []
+      const baseDate = Date.now()
+      const entries = [
+        {
+          action: 'batch.created',
+          details: `${batch.bomCode} — ${batch.productName}`,
+          performedBy: getMockActorName(),
+          createdAt: new Date(baseDate - 1000 * 60 * 60 * 24 * 3).toISOString()
+        },
+        ...batch.bomCodes.slice(1).map((code, idx) => ({
+          action: 'batch.of_assigned',
+          details: code,
+          performedBy: getMockActorName(),
+          createdAt: new Date(baseDate - 1000 * 60 * 60 * 24 * (2 - idx)).toISOString()
+        })),
+        ...(batch.progress > 0
+          ? [{
+              action: 'batch.progress',
+              details: `${batch.progress}%`,
+              performedBy: getMockActorName(),
+              createdAt: new Date(baseDate - 1000 * 60 * 60 * 12).toISOString()
+            }]
+          : []),
+        ...(batch.status !== 'pending'
+          ? [{
+              action: 'batch.status_changed',
+              details: `pending -> ${batch.status}`,
+              performedBy: getMockActorName(),
+              createdAt: new Date(baseDate - 1000 * 60 * 60 * 6).toISOString()
+            }]
+          : [])
+      ]
+      return entries.map((entry, index) => ({
+        id: `mock-history-${batch.id}-${index}`,
+        ...entry
+      }))
+    },
+
     async reportAnomaly(input) {
       await simulateDelay()
       const idx = batchStore.findIndex(b => b.id === input.batchId)

@@ -4,6 +4,7 @@ export {
   buildDocumentObjectKey,
   deleteDocumentObject,
   getDocumentDownloadUrl,
+  getDocumentObject,
   uploadDocument,
   type StoredDocumentMeta,
   type UploadDocumentInput

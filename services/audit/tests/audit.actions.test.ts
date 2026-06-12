@@ -258,6 +258,53 @@ describe("audit lot trace events", () => {
   });
 });
 
+});
+
+describe("audit.document.list", () => {
+  it("accepts BATCH batch codes", async (t) => {
+    if (skipIfNoMongo(t)) return;
+
+    const result = await callAction<{ lotId: string; total: number }>(
+      "audit.document.list",
+      {
+        accessToken: adminToken,
+        lotId: "BATCH-SEED-001"
+      }
+    );
+
+    assert.equal(result.lotId, "BATCH-SEED-001");
+    assert.ok(result.total >= 0);
+  });
+});
+
+describe("audit.document.download", () => {
+  it("returns NOT_FOUND for an unknown document id", async (t) => {
+    if (skipIfNoMongo(t)) return;
+
+    await assert.rejects(
+      () =>
+        callAction("audit.document.download", {
+          accessToken: adminToken,
+          documentId: "00000000-0000-0000-0000-000000000000"
+        }),
+      (error: unknown) => getErrorCode(error) === "NOT_FOUND"
+    );
+  });
+
+  it("validates the documentId format", async (t) => {
+    if (skipIfNoMongo(t)) return;
+
+    await assert.rejects(
+      () =>
+        callAction("audit.document.download", {
+          accessToken: adminToken,
+          documentId: "not-a-uuid"
+        }),
+      (error: unknown) => getErrorCode(error) === "VALIDATION_ERROR"
+    );
+  });
+});
+
 describe("audit.lot.export", () => {
   it("exports CSV for demo lot", async (t) => {
     if (skipIfNoMongo(t)) return;

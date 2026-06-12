@@ -70,6 +70,8 @@ export interface UpdateBomOrderInput {
 
 export interface CreateBatchInput {
   ofNumber: string
+  /** OF supplémentaires rattachés après création du lot. */
+  additionalOfNumbers?: string[]
   productName: string
   qty: number
   priority: Priority
@@ -93,4 +95,12 @@ export interface UpdateProductInput {
 export interface ReportAnomalyInput {
   batchId: number
   description: string
+}
+
+export interface BatchHistoryEntry {
+  id: string
+  action: string
+  details?: string | null
+  performedBy?: string | null
+  createdAt: string
 }

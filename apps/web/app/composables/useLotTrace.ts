@@ -1,5 +1,6 @@
 import { toFailureResult } from '~/lib/api/envelope'
-import type { AsyncStatus, LotTraceTimeline } from '~/types'
+import { mapBatchHistoryToTraceEvents } from '~/lib/mappers/audit'
+import type { AsyncStatus, LotTraceEvent, LotTraceTimeline } from '~/types'
 
 export function useLotTrace() {
   const adapters = useAdapters()
@@ -13,7 +14,42 @@ export function useLotTrace() {
     error.value = null
     timeline.value = null
     try {
-      timeline.value = await adapters.audit.traceLot(lotNumber)
+      const [historyResult, auditResult] = await Promise.allSettled([
+        adapters.production.listBatchHistory(lotNumber),
+        adapters.audit.traceLot(lotNumber)
+      ])
+
+      const productionEvents: LotTraceEvent[] =
+        historyResult.status === 'fulfilled'
+          ? mapBatchHistoryToTraceEvents(historyResult.value)
+          : []
+
+      const auditTimeline =
+        auditResult.status === 'fulfilled' ? auditResult.value : null
+
+      const auditEvents = (auditTimeline?.events ?? []).filter(
+        (event) => event.source !== 'production'
+      )
+
+      const merged = [...productionEvents, ...auditEvents].sort(
+        (a, b) => b.at.getTime() - a.at.getTime()
+      )
+
+      timeline.value = {
+        lotId: auditTimeline?.lotId ?? lotNumber,
+        lotNumber: auditTimeline?.lotNumber ?? lotNumber,
+        ofNumber: auditTimeline?.ofNumber ?? '—',
+        productName: auditTimeline?.productName ?? '—',
+        events: merged
+      }
+
+      if (merged.length === 0 && historyResult.status === 'rejected' && auditResult.status === 'rejected') {
+        const failure = toFailureResult(historyResult.reason ?? auditResult.reason)
+        status.value = 'failure'
+        error.value = failure.message
+        return
+      }
+
       status.value = 'success'
     } catch (e) {
       const failure = toFailureResult(e)
@@ -28,17 +64,5 @@ export function useLotTrace() {
     error.value = null
   }
 
-  async function exportTrace(lotNumber: string) {
-    const content = await adapters.audit.exportLot(lotNumber)
-    if (!import.meta.client) return
-    const blob = new Blob([content], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `trace-${lotNumber}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  return { timeline, status, error, trace, reset, exportTrace }
+  return { timeline, status, error, trace, reset }
 }

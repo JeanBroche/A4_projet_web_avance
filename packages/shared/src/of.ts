@@ -23,7 +23,8 @@ export function isBatchOfId(ofId: string): boolean {
   return ofId.startsWith("BATCH-");
 }
 
-export function orderNumberFromOfId(ofId: string): string | null {
+export function orderNumberFromOfId(ofId: string | null | undefined): string | null {
+  if (!ofId) return null;
   if (ofId.startsWith("OF-")) {
     return ofId.slice(3);
   }
@@ -38,11 +39,15 @@ export type LotTraceIdentity = {
 
 /** Normalise une clé de recherche (BATCH-*, OF-*, ou legacy LOT-*). */
 export function parseLotTraceKey(key: string): LotTraceIdentity {
-  if (key.startsWith("BATCH-") || key.startsWith("OF-")) {
-    const orderNumber = orderNumberFromOfId(key) ?? undefined;
-    return { lotId: key, ofId: key, orderNumber };
+  const normalized = key?.trim() ?? "";
+  if (!normalized) {
+    return { lotId: "", ofId: "" };
   }
-  return { lotId: key, ofId: key };
+  if (normalized.startsWith("BATCH-") || normalized.startsWith("OF-")) {
+    const orderNumber = orderNumberFromOfId(normalized) ?? undefined;
+    return { lotId: normalized, ofId: normalized, orderNumber };
+  }
+  return { lotId: normalized, ofId: normalized };
 }
 
 export function resolveLotIdentity(params: {

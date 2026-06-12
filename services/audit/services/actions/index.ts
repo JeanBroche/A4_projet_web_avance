@@ -1,4 +1,5 @@
 import { changeListAction } from "./change-list.js";
+import { documentDownloadAction } from "./document-download.js";
 import { documentListAction } from "./document-list.js";
 import { documentUploadAction } from "./document-upload.js";
 import { documentUrlAction } from "./document-url.js";
@@ -17,5 +18,6 @@ export const auditActions = {
   "lot.export": lotExportAction,
   "document.upload": documentUploadAction,
   "document.list": documentListAction,
-  "document.url": documentUrlAction
+  "document.url": documentUrlAction,
+  "document.download": documentDownloadAction
 };

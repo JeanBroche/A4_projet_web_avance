@@ -7,7 +7,8 @@ export const loginSchema = z.object({
 })
 
 export const createBatchSchema = z.object({
-  ofNumber: z.string().trim().min(1, 'OF parent requis'),
+  ofNumber: z.string().trim().min(1, 'OF principal requis'),
+  additionalOfNumbers: z.array(z.string().trim().min(1)).default([]),
   productName: z.string().trim().min(1, 'Désignation requise'),
   qty: z.coerce.number().int().min(1, 'Quantité minimale : 1'),
   priority: z.enum(['low', 'normal', 'high', 'critical']),

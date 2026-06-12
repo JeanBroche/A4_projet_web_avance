@@ -281,6 +281,36 @@ export function createMoleculerProductionAdapter(
       return mapBatchToUi({ ...batch, hasAnomaly: true })
     },
 
+    async deleteBatch(id) {
+      const batchCode = await resolveBatchCode(id)
+      if (!batchCode) throw new Error('NOT_FOUND')
+      await request(`/production/batches/${encodeURIComponent(batchCode)}`, {
+        method: 'DELETE'
+      })
+    },
+
+    async listBatchHistory(lotNumber) {
+      const result = await request<{
+        items?: Array<{
+          id?: string
+          action?: string
+          details?: string | null
+          performedBy?: string | null
+          createdAt?: string
+        }>
+      }>(`/production/batches/${encodeURIComponent(lotNumber)}/history`, {
+        params: { limit: 100 }
+      })
+      const items = result.items ?? []
+      return items.map((item, index) => ({
+        id: item.id ?? `history-${index}`,
+        action: item.action ?? 'batch.unknown',
+        details: item.details ?? null,
+        performedBy: item.performedBy ?? null,
+        createdAt: item.createdAt ?? new Date().toISOString()
+      }))
+    },
+
     async clearAnomaly(batchId) {
       const batchIdCuid = await resolveBatchId(batchId)
       const batchCode = await resolveBatchCode(batchId)

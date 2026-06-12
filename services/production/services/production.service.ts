@@ -17,16 +17,19 @@ import {
   replaceBomLines,
   assertSingleBatchPerBom,
   linkBatchToBom,
-  collectBatchBomCodes,
+  BATCH_BOM_INCLUDE,
+  serializeBatchResponse,
+  serializeBatchResponses,
   loadBatchByCode,
   loadBatchById,
   loadActiveProduct,
   generateAnomalyCode,
   assertStatusTransition,
-  resolveStatusFromProgress,
   recordBatchHistory,
   createDefaultSteps,
   syncBatchProgressFromSteps,
+  syncBatchStatusFromLinkedBoms,
+  findBatchIdsForBom,
   type BomLineInput
 } from "../src/lib/production-helpers.js";
 import {
@@ -245,6 +248,13 @@ const ProductionService: ServiceSchema = {
           metadata: { bom_code: params.bom_code }
         });
 
+        if (params.status) {
+          const batchIds = await findBatchIdsForBom(prisma, updatedBom.id);
+          for (const batch_id of batchIds) {
+            await syncBatchStatusFromLinkedBoms(prisma, batch_id, authEmail(auth));
+          }
+        }
+
         return updatedBom;
       }
     },
@@ -323,6 +333,8 @@ const ProductionService: ServiceSchema = {
           return created;
         });
 
+        await syncBatchStatusFromLinkedBoms(prisma, batch.batch_id, authEmail(auth));
+
         publishProductionEvent(this, DomainEvents.production.batchCreated, {
           batch_id: batch.batch_id,
           batch_code: batch.batch_code,
@@ -372,15 +384,10 @@ const ProductionService: ServiceSchema = {
           ...(effectiveSite ? { siteCode: effectiveSite } : {})
         };
 
-        const batchInclude = {
-          bom: { select: { bom_code: true } },
-          bomLinks: { include: { bom: { select: { bom_code: true } } } }
-        } as const;
-
         const [rows, total] = await Promise.all([
           prisma.batchProduct.findMany({
             where,
-            include: batchInclude,
+            include: BATCH_BOM_INCLUDE,
             orderBy: { createdAt: "desc" },
             take: params.limit ?? 50,
             skip: params.offset ?? 0
@@ -388,16 +395,7 @@ const ProductionService: ServiceSchema = {
           prisma.batchProduct.count({ where })
         ]);
 
-        const items = rows.map((batch) => {
-          const bom_codes = collectBatchBomCodes(batch);
-          const { bom, bomLinks, ...rest } = batch;
-          return {
-            ...rest,
-            bom_code: bom.bom_code,
-            bom_codes,
-            bom: { bom_code: bom.bom_code }
-          };
-        });
+        const items = serializeBatchResponses(rows);
 
         return { total, limit: params.limit ?? 50, offset: params.offset ?? 0, items };
       }
@@ -410,27 +408,17 @@ const ProductionService: ServiceSchema = {
 
         const batch = await prisma.batchProduct.findFirst({
           where: { batch_code: params.batch_code, deletedAt: null },
-          include: {
-            bom: { select: { bom_code: true } },
-            bomLinks: { include: { bom: { select: { bom_code: true } } } }
-          }
+          include: BATCH_BOM_INCLUDE
         });
         if (!batch) {
           throw createError("NOT_FOUND", "Batch not found");
         }
         assertSiteAccess(auth, batch.siteCode);
-        const bom_codes = collectBatchBomCodes(batch);
-        const { bom, bomLinks, ...rest } = batch;
         this.logger.info("Batch retrieved", {
           correlationId: ctx.meta.correlationId,
           batch_code: params.batch_code
         });
-        return {
-          ...rest,
-          bom_code: bom.bom_code,
-          bom_codes,
-          bom: { bom_code: bom.bom_code }
-        };
+        return serializeBatchResponse(batch);
       }
     },
 
@@ -442,9 +430,6 @@ const ProductionService: ServiceSchema = {
         const updatedBatch = await prisma.$transaction(async (tx) => {
           const existingBatch = await loadBatchByCode(tx, params.batch_code);
           assertSiteAccess(auth, existingBatch.siteCode);
-          if (params.status) {
-            assertStatusTransition(existingBatch.status, params.status);
-          }
           const targetBom = params.bom_code
             ? await loadBomByCode(tx, params.bom_code)
             : null;
@@ -455,8 +440,7 @@ const ProductionService: ServiceSchema = {
           const updated = await tx.batchProduct.update({
             where: { batch_id: existingBatch.batch_id },
             data: {
-              ...(params.command_id ? { command_id: params.command_id } : {}),
-              ...(params.status ? { status: params.status } : {})
+              ...(params.command_id ? { command_id: params.command_id } : {})
             }
           });
           if (params.bom_code) {
@@ -468,17 +452,14 @@ const ProductionService: ServiceSchema = {
               authEmail(auth)
             );
           }
-          if (params.status) {
-            await recordBatchHistory(
-              tx,
-              existingBatch.batch_id,
-              "batch.status_changed",
-              `${existingBatch.status} -> ${params.status}`,
-              authEmail(auth)
-            );
-          }
           return updated;
         });
+
+        await syncBatchStatusFromLinkedBoms(
+          prisma,
+          updatedBatch.batch_id,
+          authEmail(auth)
+        );
 
         this.logger.info("Batch updated", {
           correlationId: ctx.meta.correlationId,
@@ -495,20 +476,10 @@ const ProductionService: ServiceSchema = {
 
         const enriched = await prisma.batchProduct.findFirst({
           where: { batch_id: updatedBatch.batch_id },
-          include: {
-            bom: { select: { bom_code: true } },
-            bomLinks: { include: { bom: { select: { bom_code: true } } } }
-          }
+          include: BATCH_BOM_INCLUDE
         });
         if (!enriched) return updatedBatch;
-        const bom_codes = collectBatchBomCodes(enriched);
-        const { bom, bomLinks, ...rest } = enriched;
-        return {
-          ...rest,
-          bom_code: bom.bom_code,
-          bom_codes,
-          bom: { bom_code: bom.bom_code }
-        };
+        return serializeBatchResponse(enriched);
       }
     },
 
@@ -551,15 +522,10 @@ const ProductionService: ServiceSchema = {
         const updated = await prisma.$transaction(async (tx) => {
           const existing = await loadBatchByCode(tx, params.batch_code);
           assertSiteAccess(auth, existing.siteCode);
-          const nextStatus = resolveStatusFromProgress(params.percent, existing.status);
-          if (nextStatus !== existing.status) {
-            assertStatusTransition(existing.status, nextStatus);
-          }
           const batch = await tx.batchProduct.update({
             where: { batch_id: existing.batch_id },
             data: {
-              progress: params.percent,
-              status: nextStatus
+              progress: params.percent
             }
           });
           await recordBatchHistory(
@@ -581,7 +547,7 @@ const ProductionService: ServiceSchema = {
           status: updated.status
         });
 
-        if (updated.status === PROD_STATUSES.COMPLETED) {
+        if (updated.status === PROD_STATUSES.COMPLETED && updated.progress >= 100) {
           publishProductionEvent(
             this,
             DomainEvents.production.manuOrderFinished,
@@ -728,7 +694,7 @@ const ProductionService: ServiceSchema = {
           status: step.batch.status
         });
 
-        if (step.batch.status === PROD_STATUSES.COMPLETED) {
+        if (step.batch.progress >= 100 && step.batch.status === PROD_STATUSES.COMPLETED) {
           publishProductionEvent(
             this,
             DomainEvents.production.manuOrderFinished,

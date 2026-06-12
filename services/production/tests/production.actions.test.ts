@@ -187,10 +187,29 @@ describe("production.batch.list", () => {
   });
 });
 
+describe("production batch status from OF", () => {
+  it("syncs linked batch status when OF status changes", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    await callAction("production.bom.update", {
+      accessToken: tokens.operateur,
+      bom_code: seedBomCode,
+      status: "IN_PROGRESS"
+    });
+
+    const batch = await callAction<{ status: string }>("production.batch.get", {
+      accessToken: tokens.operateur,
+      batch_code: seedBatchCode
+    });
+
+    assert.equal(batch.status, "IN_PROGRESS");
+  });
+});
+
 describe("production.batch.progress", () => {
   it("updates batch progress and records history", async (t) => {
     if (skipIfNoDb(t)) return;
-    const updated = await callAction<{ progress: number; status: string }>(
+    const updated = await callAction<{ progress: number }>(
       "production.batch.progress",
       {
         accessToken: tokens.operateur,
@@ -199,7 +218,6 @@ describe("production.batch.progress", () => {
       }
     );
     assert.equal(updated.progress, 50);
-    assert.equal(updated.status, "IN_PROGRESS");
 
     const history = await callAction<{ total: number; items: { action: string }[] }>(
       "production.batch.history",

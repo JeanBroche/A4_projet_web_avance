@@ -203,13 +203,52 @@ function mapEventHistory(events: EventHistoryDocument[]): TimelineEntry[] {
   }));
 }
 
-async function resolveLotRecord(db: Db, key: string): Promise<LotProgressDocument> {
+async function resolveLotRecord(
+  db: Db,
+  ctx: Context,
+  key: string,
+  accessToken?: string
+): Promise<LotProgressDocument> {
   const existing = await findLotProgress(db, key);
   if (existing) {
-    return existing;
+    const lotId = existing.lotId ?? key;
+    return {
+      ...existing,
+      lotId,
+      ofId: existing.ofId ?? lotId
+    };
   }
 
   const identity = parseLotTraceKey(key);
+
+  if (identity.lotId.startsWith("BATCH-")) {
+    try {
+      const batch = (await ctx.call("production.batch.get", {
+        batch_code: identity.lotId,
+        accessToken
+      })) as {
+        batch_code: string;
+        siteCode: string;
+        status: string;
+        bom_code?: string;
+        createdAt?: string | Date;
+        updatedAt?: string | Date;
+      };
+      const now = new Date();
+      return {
+        lotId: batch.batch_code,
+        ofId: batch.bom_code ?? batch.batch_code,
+        siteCode: batch.siteCode,
+        status: batch.status,
+        productCode: undefined,
+        createdAt: batch.createdAt ? new Date(batch.createdAt) : now,
+        updatedAt: batch.updatedAt ? new Date(batch.updatedAt) : now
+      };
+    } catch {
+      // fall through to NOT_FOUND
+    }
+  }
+
   throw createError("NOT_FOUND", `Lot trace not found: ${identity.lotId}`);
 }
 
@@ -219,36 +258,42 @@ export async function buildLotTrace(
   lotId: string,
   accessToken?: string
 ) {
-  const lot = await resolveLotRecord(db, lotId);
+  const lot = await resolveLotRecord(db, ctx, lotId, accessToken);
+  const resolvedLotId = lot.lotId ?? lotId;
+  const resolvedOfId = lot.ofId ?? resolvedLotId;
+
+  const eventQuery = lot.ofId
+    ? { $or: [{ lotId: resolvedLotId }, { ofId: resolvedOfId }] }
+    : { lotId: resolvedLotId };
 
   const events = await db
     .collection<EventHistoryDocument>(COLLECTIONS.eventHistory)
-    .find({ $or: [{ lotId: lot.lotId }, { ofId: lot.ofId }] })
+    .find(eventQuery)
     .sort({ timestamp: 1 })
     .toArray();
 
   const orderNumber =
-    orderNumberFromOfId(lot.ofId) ??
+    orderNumberFromOfId(resolvedOfId) ??
     (events.find((e) => typeof e.payload?.orderNumber === "string")?.payload
       ?.orderNumber as string | undefined);
 
   const [stockEntries, shipmentEntries, productionEntries] = await Promise.all([
     fetchStockMovements(ctx, {
       siteCode: lot.siteCode,
-      lotId: lot.lotId,
-      ofId: lot.ofId,
+      lotId: resolvedLotId,
+      ofId: resolvedOfId,
       orderNumber: orderNumber,
       accessToken
     }),
     fetchShipmentHistory(ctx, {
       siteCode: lot.siteCode,
-      ofId: lot.ofId,
+      ofId: resolvedOfId,
       orderNumber: orderNumber,
       accessToken
     }),
     fetchProductionHistory(ctx, {
-      lotId: lot.lotId,
-      ofId: lot.ofId,
+      lotId: resolvedLotId,
+      ofId: resolvedOfId,
       accessToken
     })
   ]);
