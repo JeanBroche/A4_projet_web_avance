@@ -3,10 +3,19 @@ import { toFailureResult } from '~/lib/api/envelope'
 import type { StockAlert } from '~/lib/adapters/types'
 import type {
   AsyncStatus,
+  ConsolidatedStockLevel,
+  CreateMaterialLotInput,
+  CreatePurchaseOrderInput,
   CreateReservationInput,
   CreateStockLevelInput,
+  CreateTransferInput,
+  MaterialLot,
+  MaterialLotStatus,
+  PurchaseOrder,
+  PurchaseOrderStatus,
   RuptureForecast,
   StockLevel,
+  StockMovement,
   StockReservation,
   SupplierDelay,
   SupplierDelayInput
@@ -23,6 +32,8 @@ export function useStock() {
   const isMutating = ref(false)
   const ruptureForecast = ref<RuptureForecast[]>([])
   const supplierDelays = ref<SupplierDelay[]>([])
+  const consolidatedLevels = ref<ConsolidatedStockLevel[]>([])
+  const purchaseOrders = ref<PurchaseOrder[]>([])
 
   async function refreshRuptureForecast() {
     try {
@@ -197,6 +208,98 @@ export function useStock() {
     }
   }
 
+  async function fetchMovementsFor(reference: string, limit = 50): Promise<StockMovement[]> {
+    return adapters.stock.listMovements({ materialReference: reference, limit })
+  }
+
+  async function refreshConsolidated() {
+    try {
+      consolidatedLevels.value = await adapters.stock.listConsolidatedLevels()
+    } catch {
+      consolidatedLevels.value = []
+    }
+  }
+
+  async function fetchLotsFor(reference: string): Promise<MaterialLot[]> {
+    return adapters.stock.listLots({ materialReference: reference })
+  }
+
+  async function createLot(input: CreateMaterialLotInput) {
+    isMutating.value = true
+    error.value = null
+    try {
+      const lot = await adapters.stock.createLot(input)
+      await refreshLevels()
+      await syncNotificationsAfterMutation()
+      return lot
+    } catch (e) {
+      error.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function updateLotStatus(id: string, status: MaterialLotStatus) {
+    return adapters.stock.updateLotStatus(id, status)
+  }
+
+  async function refreshPurchaseOrders(status?: PurchaseOrderStatus) {
+    try {
+      purchaseOrders.value = await adapters.stock.listPurchaseOrders(status ? { status } : undefined)
+    } catch {
+      purchaseOrders.value = []
+    }
+  }
+
+  async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
+    isMutating.value = true
+    error.value = null
+    try {
+      const po = await adapters.stock.createPurchaseOrder(input)
+      await refreshPurchaseOrders()
+      await syncNotificationsAfterMutation()
+      return po
+    } catch (e) {
+      error.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function receivePurchaseOrder(id: string, receivedQty: number) {
+    isMutating.value = true
+    error.value = null
+    try {
+      const po = await adapters.stock.receivePurchaseOrder(id, receivedQty)
+      await Promise.all([refreshLevels(), refreshPurchaseOrders()])
+      await syncNotificationsAfterMutation()
+      return po
+    } catch (e) {
+      error.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function transferStock(input: CreateTransferInput) {
+    isMutating.value = true
+    error.value = null
+    try {
+      const result = await adapters.stock.transferStock(input)
+      await refreshLevels()
+      await syncNotificationsAfterMutation()
+      return result
+    } catch (e) {
+      error.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function reportSupplierDelay(input: SupplierDelayInput) {
     isMutating.value = true
     error.value = null
@@ -239,6 +342,17 @@ export function useStock() {
     supplierDelays,
     refreshRuptureForecast,
     refreshSupplierDelays,
-    reportSupplierDelay
+    reportSupplierDelay,
+    fetchMovementsFor,
+    consolidatedLevels,
+    refreshConsolidated,
+    fetchLotsFor,
+    createLot,
+    updateLotStatus,
+    transferStock,
+    purchaseOrders,
+    refreshPurchaseOrders,
+    createPurchaseOrder,
+    receivePurchaseOrder
   }
 }

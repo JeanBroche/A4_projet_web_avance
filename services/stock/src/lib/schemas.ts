@@ -135,3 +135,85 @@ export const materialUpsertSchema = accessTokenSchema.extend({
   minimumStock: z.number().int().nonnegative().optional(),
   supplier: z.string().min(1).optional()
 });
+
+export const lotCreateSchema = accessTokenSchema.extend({
+  materialId: materialIdSchema,
+  siteCode: siteCodeSchema,
+  lotNumber: z.string().min(1),
+  supplierLot: z.string().min(1).optional(),
+  supplier: z.string().min(1).optional(),
+  certificateRef: z.string().min(1).optional(),
+  certificateUrl: z.string().url().optional(),
+  manufacturedAt: z.coerce.date().optional(),
+  expiryAt: z.coerce.date().optional(),
+  receivedAt: z.coerce.date().optional(),
+  quantity: z.number().int().positive(),
+  location: z.string().min(1).optional(),
+  notes: z.string().min(1).optional()
+});
+
+export const lotListSchema = accessTokenSchema.extend({
+  siteId: siteCodeSchema.optional(),
+  siteCode: siteCodeSchema.optional(),
+  materialId: materialIdSchema.optional(),
+  status: z.enum(["ACTIVE", "EXHAUSTED", "QUARANTINE", "EXPIRED"]).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
+export const lotUpdateSchema = accessTokenSchema.extend({
+  id: cuidLikeSchema,
+  status: z.enum(["ACTIVE", "EXHAUSTED", "QUARANTINE", "EXPIRED"]).optional(),
+  location: z.string().min(1).optional(),
+  remainingQty: z.number().int().nonnegative().optional(),
+  notes: z.string().min(1).optional()
+});
+
+export const purchaseOrderCreateSchema = accessTokenSchema.extend({
+  materialId: materialIdSchema,
+  siteCode: siteCodeSchema,
+  supplier: z.string().min(1),
+  quantity: z.number().int().positive(),
+  unitPrice: z.number().nonnegative().optional(),
+  expectedDate: z.coerce.date().optional(),
+  notes: z.string().min(1).optional()
+});
+
+export const purchaseOrderListSchema = accessTokenSchema.extend({
+  siteId: siteCodeSchema.optional(),
+  siteCode: siteCodeSchema.optional(),
+  materialId: materialIdSchema.optional(),
+  status: z.enum(["DRAFT", "ORDERED", "PARTIAL", "RECEIVED", "CANCELLED"]).optional(),
+  supplier: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(500).optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
+export const purchaseOrderUpdateSchema = accessTokenSchema.extend({
+  id: cuidLikeSchema,
+  status: z.enum(["DRAFT", "ORDERED", "PARTIAL", "RECEIVED", "CANCELLED"]).optional(),
+  expectedDate: z.coerce.date().optional(),
+  notes: z.string().min(1).optional()
+});
+
+export const purchaseOrderReceiveSchema = accessTokenSchema.extend({
+  id: cuidLikeSchema,
+  receivedQty: z.number().int().positive()
+});
+
+export const transferCreateSchema = accessTokenSchema.extend({
+  materialId: materialIdSchema,
+  sourceSiteCode: siteCodeSchema,
+  destSiteCode: siteCodeSchema,
+  quantity: z.number().int().positive(),
+  reason: z.string().min(1).optional(),
+  notes: z.string().min(1).optional()
+}).superRefine((value, ctx) => {
+  if (value.sourceSiteCode === value.destSiteCode) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Source and destination sites must differ",
+      path: ["destSiteCode"]
+    });
+  }
+});

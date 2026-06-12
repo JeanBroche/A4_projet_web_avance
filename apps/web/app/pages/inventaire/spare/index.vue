@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import { createStockLevelSchema, firstZodError } from '~/lib/validation/schemas'
-import type { StockLevel, StockUnit } from '~/types'
+import type { MaterialLot, PurchaseOrder, PurchaseOrderStatus, StockLevel, StockMovement, StockUnit, SupplierDelay } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
 
@@ -13,15 +13,60 @@ const {
   levels, reservations, alerts, status, error, isMutating,
   refresh, reportSupplierDelay,
   ruptureForecast,
+  supplierDelays,
+  fetchMovementsFor,
+  consolidatedLevels, refreshConsolidated,
+  fetchLotsFor, createLot,
+  transferStock,
+  purchaseOrders, refreshPurchaseOrders, createPurchaseOrder, receivePurchaseOrder,
   createLevel, updateLevel, deleteLevel
 } = useStock()
-const { canManageStock, pageSubtitle } = useRoleCapabilities()
+const { canManageStock, canViewConsolidatedStock, pageSubtitle } = useRoleCapabilities()
 
 const activeReservations = computed(() =>
   reservations.value.filter(r => r.status === 'ACTIVE')
 )
 
-onMounted(() => refresh())
+const reservationsByOf = computed(() => {
+  const map = new Map<string, typeof activeReservations.value>()
+  for (const res of activeReservations.value) {
+    const list = map.get(res.ofId) ?? []
+    list.push(res)
+    map.set(res.ofId, list)
+  }
+  return [...map.entries()]
+    .map(([ofId, items]) => ({ ofId, items }))
+    .sort((a, b) => a.ofId.localeCompare(b.ofId))
+})
+
+const openReservationOfIds = ref<Set<string>>(new Set())
+
+function toggleReservationOf(ofId: string) {
+  const next = new Set(openReservationOfIds.value)
+  if (next.has(ofId)) next.delete(ofId)
+  else next.add(ofId)
+  openReservationOfIds.value = next
+}
+
+function isReservationOfOpen(ofId: string) {
+  return openReservationOfIds.value.has(ofId)
+}
+
+const viewMode = ref<'site' | 'consolidated'>('site')
+
+async function toggleConsolidated() {
+  viewMode.value = viewMode.value === 'site' ? 'consolidated' : 'site'
+  if (viewMode.value === 'consolidated' && consolidatedLevels.value.length === 0) {
+    await refreshConsolidated()
+  }
+}
+
+onMounted(async () => {
+  await refresh()
+  if (canManageStock.value) {
+    await refreshPurchaseOrders()
+  }
+})
 
 const topRuptureRisks = computed(() =>
   ruptureForecast.value.filter(f => f.score >= 30).slice(0, 5)
@@ -256,6 +301,284 @@ async function confirmDelete() {
   isDeleteModalOpen.value = false
   deleteTarget.value = null
 }
+
+const isHistoryModalOpen = ref(false)
+const historyTarget = ref<Part | null>(null)
+const historyItems = ref<StockMovement[]>([])
+const historyLoading = ref(false)
+const historyError = ref<string | null>(null)
+
+const movementLabels: Record<StockMovement['type'], { label: string, color: 'success' | 'warning' | 'error' | 'neutral', icon: string }> = {
+  IN:     { label: 'Entrée',    color: 'success', icon: 'i-lucide-arrow-down-circle' },
+  OUT:    { label: 'Sortie',    color: 'error',   icon: 'i-lucide-arrow-up-circle'   },
+  ADJUST: { label: 'Ajustement', color: 'neutral', icon: 'i-lucide-equal'             }
+}
+
+async function openHistory(p: Part) {
+  historyTarget.value = p
+  historyItems.value = []
+  historyError.value = null
+  historyLoading.value = true
+  isHistoryModalOpen.value = true
+  try {
+    historyItems.value = await fetchMovementsFor(p.reference, 50)
+  } catch (e) {
+    historyError.value = (e as Error)?.message || 'Erreur lors du chargement de l\'historique'
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function formatDateTime(d: Date) {
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  }).format(d)
+}
+
+const recentSupplierDelays = computed<SupplierDelay[]>(() =>
+  [...supplierDelays.value]
+    .sort((a, b) => b.reportedAt.getTime() - a.reportedAt.getTime())
+    .slice(0, 5)
+)
+
+const isLotsModalOpen = ref(false)
+const lotsTarget = ref<Part | null>(null)
+const lotsItems = ref<MaterialLot[]>([])
+const lotsLoading = ref(false)
+const lotsError = ref<string | null>(null)
+
+const isCreateLotModalOpen = ref(false)
+const createLotError = ref<string | null>(null)
+const newLot = ref({
+  lotNumber: '',
+  quantity: 1,
+  supplier: '',
+  supplierLot: '',
+  certificateRef: '',
+  expiryAt: '',
+  location: '',
+  notes: ''
+})
+
+const lotStatusConfig: Record<MaterialLot['status'], { label: string, color: 'success' | 'warning' | 'error' | 'neutral' }> = {
+  ACTIVE:     { label: 'Actif',       color: 'success' },
+  QUARANTINE: { label: 'Quarantaine', color: 'warning' },
+  EXHAUSTED:  { label: 'Épuisé',      color: 'neutral' },
+  EXPIRED:    { label: 'Périmé',      color: 'error'   }
+}
+
+async function refreshLotsList() {
+  if (!lotsTarget.value) return
+  lotsLoading.value = true
+  lotsError.value = null
+  try {
+    lotsItems.value = await fetchLotsFor(lotsTarget.value.reference)
+  } catch (e) {
+    lotsError.value = (e as Error)?.message || 'Erreur lors du chargement des lots'
+  } finally {
+    lotsLoading.value = false
+  }
+}
+
+async function openLots(p: Part) {
+  lotsTarget.value = p
+  lotsItems.value = []
+  isLotsModalOpen.value = true
+  await refreshLotsList()
+}
+
+function openCreateLot() {
+  newLot.value = {
+    lotNumber: '',
+    quantity: 1,
+    supplier: '',
+    supplierLot: '',
+    certificateRef: '',
+    expiryAt: '',
+    location: '',
+    notes: ''
+  }
+  createLotError.value = null
+  isCreateLotModalOpen.value = true
+}
+
+async function confirmCreateLot() {
+  if (!lotsTarget.value) return
+  createLotError.value = null
+  if (!newLot.value.lotNumber.trim() || newLot.value.quantity < 1) {
+    createLotError.value = 'Numéro de lot et quantité requis'
+    return
+  }
+  try {
+    await createLot({
+      materialReference: lotsTarget.value.reference,
+      lotNumber: newLot.value.lotNumber.trim(),
+      quantity: newLot.value.quantity,
+      supplier: newLot.value.supplier.trim() || undefined,
+      supplierLot: newLot.value.supplierLot.trim() || undefined,
+      certificateRef: newLot.value.certificateRef.trim() || undefined,
+      expiryAt: newLot.value.expiryAt ? new Date(newLot.value.expiryAt) : undefined,
+      location: newLot.value.location.trim() || undefined,
+      notes: newLot.value.notes.trim() || undefined
+    })
+    isCreateLotModalOpen.value = false
+    await refreshLotsList()
+  } catch (e) {
+    createLotError.value = (e as Error)?.message || 'Erreur lors de la création du lot'
+  }
+}
+
+function formatDate(d?: Date) {
+  if (!d) return '—'
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  }).format(d)
+}
+
+function daysUntilExpiry(lot: MaterialLot): number | null {
+  if (!lot.expiryAt) return null
+  const diffMs = lot.expiryAt.getTime() - Date.now()
+  return Math.floor(diffMs / 86400000)
+}
+
+const isTransferModalOpen = ref(false)
+const transferError = ref<string | null>(null)
+const transferDraft = ref({
+  materialReference: '',
+  sourceSiteCode: '',
+  destSiteCode: '',
+  quantity: 1,
+  reason: ''
+})
+
+function openTransferModal(row: { reference: string, sites: Array<{ siteCode: string, available: number }> }) {
+  const sortedSites = [...row.sites].sort((a, b) => b.available - a.available)
+  transferDraft.value = {
+    materialReference: row.reference,
+    sourceSiteCode: sortedSites[0]?.siteCode ?? '',
+    destSiteCode: sortedSites.find(s => s.siteCode !== sortedSites[0]?.siteCode)?.siteCode ?? '',
+    quantity: 1,
+    reason: ''
+  }
+  transferError.value = null
+  isTransferModalOpen.value = true
+}
+
+const isPoListModalOpen = ref(false)
+const isPoCreateModalOpen = ref(false)
+const isPoReceiveModalOpen = ref(false)
+const poError = ref<string | null>(null)
+const poDraft = ref({
+  materialReference: '',
+  supplier: '',
+  quantity: 1,
+  unitPrice: '',
+  expectedDate: '',
+  notes: ''
+})
+const poReceiveTarget = ref<PurchaseOrder | null>(null)
+const poReceiveQty = ref(1)
+
+const poStatusConfig: Record<PurchaseOrderStatus, { label: string, color: 'success' | 'warning' | 'error' | 'neutral' | 'primary' }> = {
+  DRAFT:     { label: 'Brouillon',  color: 'neutral' },
+  ORDERED:   { label: 'Commandée',  color: 'primary' },
+  PARTIAL:   { label: 'Partielle',  color: 'warning' },
+  RECEIVED:  { label: 'Reçue',      color: 'success' },
+  CANCELLED: { label: 'Annulée',    color: 'error'   }
+}
+
+const openPurchaseOrders = computed(() =>
+  purchaseOrders.value.filter(o => o.status === 'ORDERED' || o.status === 'PARTIAL')
+)
+
+function openPoList() {
+  isPoListModalOpen.value = true
+  refreshPurchaseOrders()
+}
+
+function openPoCreate(reference?: string) {
+  const part = reference ? parts.value.find(p => p.reference === reference) : null
+  poDraft.value = {
+    materialReference: reference ?? parts.value[0]?.reference ?? '',
+    supplier: part ? '' : '',
+    quantity: part ? Math.max(part.minQty, 10) : 10,
+    unitPrice: '',
+    expectedDate: '',
+    notes: ''
+  }
+  poError.value = null
+  isPoCreateModalOpen.value = true
+}
+
+async function confirmCreatePo() {
+  poError.value = null
+  if (!poDraft.value.materialReference || !poDraft.value.supplier.trim() || poDraft.value.quantity < 1) {
+    poError.value = 'Référence, fournisseur et quantité requis'
+    return
+  }
+  try {
+    await createPurchaseOrder({
+      materialReference: poDraft.value.materialReference,
+      supplier: poDraft.value.supplier.trim(),
+      quantity: poDraft.value.quantity,
+      unitPrice: poDraft.value.unitPrice ? Number(poDraft.value.unitPrice) : undefined,
+      expectedDate: poDraft.value.expectedDate ? new Date(poDraft.value.expectedDate) : undefined,
+      notes: poDraft.value.notes.trim() || undefined
+    })
+    isPoCreateModalOpen.value = false
+  } catch (e) {
+    poError.value = (e as Error)?.message || 'Erreur lors de la création de la commande'
+  }
+}
+
+function openPoReceive(order: PurchaseOrder) {
+  poReceiveTarget.value = order
+  poReceiveQty.value = order.quantity - order.receivedQty
+  poError.value = null
+  isPoReceiveModalOpen.value = true
+}
+
+async function confirmReceivePo() {
+  if (!poReceiveTarget.value) return
+  poError.value = null
+  try {
+    await receivePurchaseOrder(poReceiveTarget.value.id, poReceiveQty.value)
+    isPoReceiveModalOpen.value = false
+    poReceiveTarget.value = null
+  } catch (e) {
+    poError.value = (e as Error)?.message || 'Erreur lors de la réception'
+  }
+}
+
+async function confirmTransfer() {
+  transferError.value = null
+  if (!transferDraft.value.sourceSiteCode || !transferDraft.value.destSiteCode) {
+    transferError.value = 'Site source et destination requis'
+    return
+  }
+  if (transferDraft.value.sourceSiteCode === transferDraft.value.destSiteCode) {
+    transferError.value = 'Les sites source et destination doivent différer'
+    return
+  }
+  if (transferDraft.value.quantity < 1) {
+    transferError.value = 'Quantité doit être ≥ 1'
+    return
+  }
+  try {
+    await transferStock({
+      materialReference: transferDraft.value.materialReference,
+      sourceSiteCode: transferDraft.value.sourceSiteCode,
+      destSiteCode: transferDraft.value.destSiteCode,
+      quantity: transferDraft.value.quantity,
+      reason: transferDraft.value.reason.trim() || undefined
+    })
+    isTransferModalOpen.value = false
+    await refreshConsolidated()
+  } catch (e) {
+    transferError.value = (e as Error)?.message || 'Erreur lors du transfert'
+  }
+}
 </script>
 
 <template>
@@ -267,14 +590,26 @@ async function confirmDelete() {
           <h1 class="text-xl sm:text-2xl font-bold text-[#0F62BC]">Stock pièces & matières</h1>
           <p class="text-xs sm:text-sm text-gray-400 mt-0.5">{{ pageSubtitle || 'Composants, visserie, matières premières' }}</p>
         </div>
-        <div v-if="canManageStock" class="flex flex-col sm:flex-row gap-2 shrink-0">
-          <UButton icon="i-lucide-truck" size="sm" variant="outline" @click="openDelayModal">
-            Retard fournisseur
+        <div class="flex flex-col sm:flex-row gap-2 shrink-0">
+          <UButton
+            v-if="canViewConsolidatedStock"
+            :icon="viewMode === 'consolidated' ? 'i-lucide-layout-grid' : 'i-lucide-globe'"
+            size="sm"
+            :variant="viewMode === 'consolidated' ? 'solid' : 'outline'"
+            :class="viewMode === 'consolidated' ? 'bg-[#0F62BC] text-white border-[#0F62BC]' : ''"
+            @click="toggleConsolidated"
+          >
+            {{ viewMode === 'consolidated' ? 'Vue par site' : 'Vue consolidée' }}
           </UButton>
-          <UButton icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium" @click="openCreate">
-            <span class="hidden sm:inline">Ajouter une pièce</span>
-            <span class="sm:hidden">Ajouter</span>
-          </UButton>
+          <template v-if="canManageStock">
+            <UButton icon="i-lucide-truck" size="sm" variant="outline" @click="openDelayModal">
+              Retard fournisseur
+            </UButton>
+            <UButton icon="i-lucide-plus" size="sm" class="bg-[#F57C00] hover:bg-[#e06d00] text-white font-medium" @click="openCreate">
+              <span class="hidden sm:inline">Ajouter une pièce</span>
+              <span class="sm:hidden">Ajouter</span>
+            </UButton>
+          </template>
         </div>
       </div>
 
@@ -341,6 +676,16 @@ async function confirmDelete() {
             <div class="flex items-center gap-2">
               <UProgress :model-value="item.score" :max="100" :color="ruptureColor(item.score)" size="sm" class="flex-1" />
               <span class="text-xs font-bold w-8 text-right">{{ item.score }}</span>
+              <UButton
+                v-if="canManageStock"
+                size="xs"
+                variant="outline"
+                icon="i-lucide-shopping-cart"
+                color="primary"
+                @click="openPoCreate(item.reference)"
+              >
+                Commander
+              </UButton>
             </div>
             <p class="text-[11px] text-gray-400 mt-0.5">
               {{ item.available }} {{ item.unit }} dispo
@@ -350,33 +695,202 @@ async function confirmDelete() {
         </div>
       </UCard>
 
+      <UCard v-if="canManageStock && status !== 'pending' && openPurchaseOrders.length > 0" class="border-none shadow-sm mb-5">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <UIcon name="i-lucide-shopping-cart" class="text-[#0F62BC]" />
+            Commandes en cours ({{ openPurchaseOrders.length }})
+          </h2>
+          <UButton size="xs" variant="ghost" @click="openPoList">Voir tout</UButton>
+        </div>
+        <ul class="space-y-2">
+          <li
+            v-for="po in openPurchaseOrders.slice(0, 5)"
+            :key="po.id"
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm"
+          >
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <UBadge :color="poStatusConfig[po.status].color" variant="subtle" size="xs">
+                {{ poStatusConfig[po.status].label }}
+              </UBadge>
+              <span class="font-mono text-xs text-gray-500">{{ po.poNumber }}</span>
+              <span class="text-gray-700 truncate">{{ po.materialReference }}</span>
+              <span class="text-xs text-gray-400">— {{ po.supplier }}</span>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="text-xs tabular-nums text-gray-600">{{ po.receivedQty }} / {{ po.quantity }}</span>
+              <UButton
+                size="xs"
+                variant="outline"
+                color="success"
+                icon="i-lucide-package-check"
+                @click="openPoReceive(po)"
+              >
+                Réceptionner
+              </UButton>
+            </div>
+          </li>
+        </ul>
+      </UCard>
+
+      <UCard v-if="status !== 'pending' && recentSupplierDelays.length > 0" class="border-none shadow-sm mb-5">
+        <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+          <UIcon name="i-lucide-truck" class="text-[#F57C00]" />
+          Retards fournisseur ({{ recentSupplierDelays.length }})
+        </h2>
+        <ul class="space-y-2">
+          <li
+            v-for="d in recentSupplierDelays"
+            :key="d.id"
+            class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm"
+          >
+            <div class="flex items-center gap-2 min-w-0">
+              <UBadge color="warning" variant="soft" size="xs">{{ d.materialReference }}</UBadge>
+              <span class="text-gray-700 truncate">{{ d.materialName }}</span>
+              <span class="text-xs text-gray-400 truncate">— {{ d.supplier }}</span>
+            </div>
+            <div class="text-xs text-gray-500 shrink-0">
+              <span class="font-semibold text-orange-600">+{{ d.delayDays }} j</span>
+              <span class="mx-1.5">·</span>
+              <span>{{ formatDateTime(d.reportedAt) }}</span>
+            </div>
+          </li>
+        </ul>
+      </UCard>
+
       <div v-if="status !== 'pending' && activeReservations.length > 0" class="mb-5">
         <h2 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
           <UIcon name="i-lucide-bookmark" class="text-indigo-500" />
           Réservations actives ({{ activeReservations.length }})
         </h2>
         <div class="space-y-2">
-          <UCard
-            v-for="res in activeReservations"
-            :key="res.id"
-            class="border-none shadow-sm"
-            :ui="{ body: 'py-2.5 px-3' }"
+          <div
+            v-for="group in reservationsByOf"
+            :key="group.ofId"
+            class="bg-white/70 border rounded-xl overflow-hidden transition-colors duration-150"
+            :class="isReservationOfOpen(group.ofId) ? 'border-indigo-200' : 'border-gray-100 shadow-sm'"
           >
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm">
-              <div>
-                <span class="font-medium text-gray-800">{{ res.materialName }}</span>
-                <span class="text-xs font-mono text-gray-400 ml-2">{{ res.materialId }}</span>
+            <button
+              type="button"
+              class="w-full flex items-center gap-3 px-3 py-3 text-left"
+              @click="toggleReservationOf(group.ofId)"
+            >
+              <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                <UIcon name="i-lucide-clipboard-list" class="text-indigo-500 text-base" />
               </div>
-              <div class="text-xs text-gray-500">
-                {{ res.quantity }} {{ res.unit }} — OF <span class="font-mono text-indigo-600">{{ res.ofId }}</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-800 truncate">
+                  OF <span class="font-mono text-indigo-600">{{ group.ofId }}</span>
+                </p>
+                <p class="text-xs text-gray-400">
+                  {{ group.items.length }} matière{{ group.items.length > 1 ? 's' : '' }} réservée{{ group.items.length > 1 ? 's' : '' }}
+                </p>
               </div>
-            </div>
-          </UCard>
+              <UBadge color="primary" variant="subtle" size="xs" class="shrink-0">
+                {{ group.items.reduce((sum, r) => sum + r.quantity, 0) }} unités
+              </UBadge>
+              <UIcon
+                name="i-lucide-chevron-down"
+                class="flex-shrink-0 text-gray-400 text-base transition-transform duration-200"
+                :class="isReservationOfOpen(group.ofId) ? 'rotate-180' : ''"
+              />
+            </button>
+
+            <Transition
+              enter-active-class="transition-all duration-200 ease-out"
+              enter-from-class="opacity-0 max-h-0"
+              enter-to-class="opacity-100 max-h-96"
+              leave-active-class="transition-all duration-150 ease-in"
+              leave-from-class="opacity-100 max-h-96"
+              leave-to-class="opacity-0 max-h-0"
+            >
+              <ul v-if="isReservationOfOpen(group.ofId)" class="border-t border-gray-100 divide-y divide-gray-50">
+                <li
+                  v-for="res in group.items"
+                  :key="res.id"
+                  class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 px-3 py-2.5 text-sm bg-gray-50/40"
+                >
+                  <div class="min-w-0">
+                    <span class="font-medium text-gray-800">{{ res.materialName }}</span>
+                    <span class="text-xs font-mono text-gray-400 ml-2">{{ res.materialId }}</span>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs text-gray-500 shrink-0">
+                    <span class="font-semibold tabular-nums text-gray-700">{{ res.quantity }} {{ res.unit }}</span>
+                    <NuxtLink
+                      :to="`/bom?of=${encodeURIComponent(group.ofId)}`"
+                      class="text-indigo-600 hover:text-indigo-800 font-medium"
+                      @click.stop
+                    >
+                      Voir OF
+                    </NuxtLink>
+                  </div>
+                </li>
+              </ul>
+            </Transition>
+          </div>
         </div>
       </div>
 
+      <!-- Vue consolidée multi-sites -->
+      <div v-if="status !== 'pending' && viewMode === 'consolidated'" class="bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-hidden">
+        <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <UIcon name="i-lucide-globe" class="text-[#0F62BC]" />
+              Vision consolidée multi-sites
+            </h2>
+            <p class="text-xs text-gray-400 mt-0.5">Stock agrégé par référence sur tous les sites</p>
+          </div>
+          <UButton size="xs" variant="ghost" icon="i-lucide-refresh-cw" @click="refreshConsolidated">Actualiser</UButton>
+        </div>
+        <div v-if="consolidatedLevels.length === 0" class="text-center py-12 text-sm text-gray-400">
+          Aucune référence consolidée disponible.
+        </div>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="row in consolidatedLevels" :key="row.reference" class="p-4">
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-800 truncate">{{ row.name }}</p>
+                <p class="text-xs font-mono text-gray-400">{{ row.reference }}</p>
+              </div>
+              <div class="flex items-center gap-3 shrink-0">
+                <div class="text-right">
+                  <p class="text-sm font-semibold tabular-nums" :class="row.available === 0 ? 'text-red-500' : row.available < row.minimum ? 'text-orange-500' : 'text-[#0F62BC]'">
+                    {{ row.available }} {{ row.unit }}
+                  </p>
+                  <p class="text-xs text-gray-400">
+                    dispo · {{ row.current }} total · {{ row.reserved }} rés.
+                  </p>
+                </div>
+                <UButton
+                  v-if="canManageStock && row.sites.length >= 2"
+                  size="xs"
+                  variant="outline"
+                  icon="i-lucide-arrow-right-left"
+                  @click="openTransferModal(row)"
+                >
+                  Transférer
+                </UButton>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mt-2">
+              <div
+                v-for="site in row.sites"
+                :key="site.siteCode"
+                class="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/60 px-2.5 py-1.5"
+              >
+                <span class="text-xs font-mono text-gray-500">{{ site.siteCode }}</span>
+                <span class="text-xs font-semibold tabular-nums" :class="site.available === 0 ? 'text-red-500' : site.available < site.minimum ? 'text-orange-500' : 'text-gray-700'">
+                  {{ site.available }} / {{ site.current }}
+                </span>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Toolbar -->
-      <div v-if="status !== 'pending'" class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center">
+      <div v-if="status !== 'pending' && viewMode === 'site'" class="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center">
         <UInput v-model="search" icon="i-lucide-search" placeholder="Référence, désignation, catégorie…" class="w-full sm:flex-1" />
         <div class="flex gap-1 w-full sm:w-auto">
           <UButton
@@ -394,7 +908,7 @@ async function confirmDelete() {
       </div>
 
       <!-- MOBILE -->
-      <div v-if="status !== 'pending'" class="flex sm:hidden flex-col gap-2">
+      <div v-if="status !== 'pending' && viewMode === 'site'" class="flex sm:hidden flex-col gap-2">
         <div
           v-for="p in filteredParts" :key="p.id"
           class="bg-white/70 border rounded-xl overflow-hidden transition-colors duration-150"
@@ -440,7 +954,9 @@ async function confirmDelete() {
                   <p class="text-xs font-mono text-gray-700">{{ p.dimensions }}</p>
                 </div>
               </div>
-              <div class="flex gap-2">
+              <div class="flex gap-2 flex-wrap">
+                <UButton icon="i-lucide-history" variant="outline" color="neutral" size="xs" class="flex-1 justify-center" @click="openHistory(p)">Historique</UButton>
+                <UButton icon="i-lucide-package-2" variant="outline" color="primary" size="xs" class="flex-1 justify-center" @click="openLots(p)">Lots</UButton>
                 <template v-if="canManageStock">
                   <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="xs" class="flex-1 justify-center" @click="openEdit(p)">Modifier</UButton>
                   <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="xs" class="flex-1 justify-center" @click="askDelete(p)">Supprimer</UButton>
@@ -453,7 +969,7 @@ async function confirmDelete() {
       </div>
 
       <!-- DESKTOP -->
-      <div v-if="status !== 'pending'" class="hidden sm:block bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-x-auto">
+      <div v-if="status !== 'pending' && viewMode === 'site'" class="hidden sm:block bg-white/70 backdrop-blur-sm border border-gray-100 rounded-xl overflow-x-auto">
         <UTable v-model:expanded="expanded" :data="filteredParts" :columns="columns" class="w-full">
           <template #expanded="{ row }">
             <div class="px-6 py-4 bg-gray-50/60 border-t border-gray-100">
@@ -480,6 +996,8 @@ async function confirmDelete() {
                   </div>
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0">
+                  <UButton icon="i-lucide-history" variant="outline" color="neutral" size="sm" @click="openHistory(row.original)">Historique</UButton>
+                  <UButton icon="i-lucide-package-2" variant="outline" color="primary" size="sm" @click="openLots(row.original)">Lots</UButton>
                   <template v-if="canManageStock">
                     <UButton icon="i-lucide-pencil" variant="outline" color="neutral" size="sm" @click="openEdit(row.original)">Modifier</UButton>
                     <UButton icon="i-lucide-trash-2" variant="outline" color="error" size="sm" @click="askDelete(row.original)">Supprimer</UButton>
@@ -594,6 +1112,438 @@ async function confirmDelete() {
           <div class="flex justify-end gap-2">
             <UButton variant="ghost" color="neutral" @click="isDeleteModalOpen = false">Annuler</UButton>
             <UButton icon="i-lucide-trash-2" color="error" aria-label="Confirmer la suppression" @click="confirmDelete">Supprimer</UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- ═══ Modal : Liste des commandes d'achat ═══ -->
+    <UModal v-model:open="isPoListModalOpen" :ui="modalUi('2xl')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="po-list-title">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-[#0F62BC]/8 flex items-center justify-center flex-shrink-0">
+              <UIcon name="i-lucide-shopping-cart" class="text-[#0F62BC] text-lg" />
+            </div>
+            <div class="flex-1">
+              <h3 id="po-list-title" class="text-base font-semibold text-gray-800">Commandes d'achat</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Suivi des réapprovisionnements</p>
+            </div>
+            <UButton
+              icon="i-lucide-plus"
+              size="sm"
+              class="bg-[#F57C00] hover:bg-[#e06d00] text-white"
+              @click="openPoCreate()"
+            >
+              Nouvelle commande
+            </UButton>
+          </div>
+
+          <div v-if="purchaseOrders.length === 0" class="text-center py-10 text-sm text-gray-400">
+            Aucune commande d'achat enregistrée.
+          </div>
+
+          <ul v-else class="space-y-2 max-h-[60vh] overflow-y-auto">
+            <li
+              v-for="po in purchaseOrders"
+              :key="po.id"
+              class="border border-gray-100 rounded-xl p-3 bg-white/70"
+            >
+              <div class="flex items-start justify-between gap-3 mb-2">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-mono text-xs text-gray-500">{{ po.poNumber }}</span>
+                    <UBadge :color="poStatusConfig[po.status].color" variant="subtle" size="xs">
+                      {{ poStatusConfig[po.status].label }}
+                    </UBadge>
+                  </div>
+                  <p class="text-sm font-medium text-gray-800 mt-1">{{ po.materialName }}</p>
+                  <p class="text-xs text-gray-500">{{ po.supplier }}<span v-if="po.expectedDate"> · Prévue le {{ formatDate(po.expectedDate) }}</span></p>
+                </div>
+                <div class="text-right shrink-0">
+                  <p class="text-sm font-semibold text-[#0F62BC] tabular-nums">
+                    {{ po.receivedQty }} / {{ po.quantity }}
+                  </p>
+                  <p class="text-[11px] text-gray-400">reçu</p>
+                </div>
+              </div>
+              <div v-if="po.status === 'ORDERED' || po.status === 'PARTIAL'" class="flex justify-end">
+                <UButton
+                  size="xs"
+                  variant="outline"
+                  color="success"
+                  icon="i-lucide-package-check"
+                  @click="openPoReceive(po)"
+                >
+                  Réceptionner
+                </UButton>
+              </div>
+            </li>
+          </ul>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isPoListModalOpen = false">Fermer</UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- ═══ Modal : Création commande d'achat ═══ -->
+    <UModal v-model:open="isPoCreateModalOpen" :ui="modalUi('lg')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="po-create-title">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-[#F57C00]/10 flex items-center justify-center flex-shrink-0">
+              <UIcon name="i-lucide-shopping-cart" class="text-[#F57C00] text-lg" />
+            </div>
+            <div>
+              <h3 id="po-create-title" class="text-base font-semibold text-gray-800">Nouvelle commande d'achat</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Réapprovisionnement matière</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <UFormField label="Référence matière *" name="materialReference" class="sm:col-span-2">
+              <UInput v-model="poDraft.materialReference" placeholder="MAT-004" class="w-full font-mono" />
+            </UFormField>
+
+            <UFormField label="Fournisseur *" name="supplier">
+              <UInput v-model="poDraft.supplier" placeholder="Ex : Aubert & Duval" class="w-full" />
+            </UFormField>
+
+            <UFormField label="Quantité *" name="quantity">
+              <UInput v-model.number="poDraft.quantity" type="number" min="1" class="w-full" />
+            </UFormField>
+
+            <UFormField label="Prix unitaire (€)" name="unitPrice">
+              <UInput v-model="poDraft.unitPrice" type="number" min="0" step="0.01" class="w-full" />
+            </UFormField>
+
+            <UFormField label="Date prévue de livraison" name="expectedDate">
+              <UInput v-model="poDraft.expectedDate" type="date" class="w-full" />
+            </UFormField>
+
+            <UFormField label="Notes" name="notes" class="sm:col-span-2">
+              <UTextarea v-model="poDraft.notes" :rows="2" placeholder="Conditions, références…" class="w-full" />
+            </UFormField>
+          </div>
+
+          <p v-if="poError" class="text-red-500 text-sm mt-3" role="alert">{{ poError }}</p>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isPoCreateModalOpen = false">Annuler</UButton>
+            <UButton
+              icon="i-lucide-check"
+              class="bg-[#F57C00] hover:bg-[#e06d00] text-white w-full sm:w-auto"
+              :loading="isMutating"
+              @click="confirmCreatePo"
+            >
+              Créer la commande
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- ═══ Modal : Réception PO ═══ -->
+    <UModal v-model:open="isPoReceiveModalOpen" :ui="modalUi('md')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="po-receive-title">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
+              <UIcon name="i-lucide-package-check" class="text-green-600 text-lg" />
+            </div>
+            <div>
+              <h3 id="po-receive-title" class="text-base font-semibold text-gray-800">Réception de commande</h3>
+              <p v-if="poReceiveTarget" class="text-xs text-gray-400 mt-0.5 font-mono">
+                {{ poReceiveTarget.poNumber }} — {{ poReceiveTarget.materialReference }}
+              </p>
+            </div>
+          </div>
+
+          <p v-if="poReceiveTarget" class="text-sm text-gray-600 mb-4">
+            Commande : <span class="font-semibold">{{ poReceiveTarget.quantity }}</span> — déjà reçu : <span class="font-semibold">{{ poReceiveTarget.receivedQty }}</span>
+            <br>Reste à réceptionner : <span class="font-semibold text-orange-600">{{ poReceiveTarget.quantity - poReceiveTarget.receivedQty }}</span>
+          </p>
+
+          <UFormField label="Quantité reçue *" name="receivedQty">
+            <UInput v-model.number="poReceiveQty" type="number" min="1" :max="poReceiveTarget ? poReceiveTarget.quantity - poReceiveTarget.receivedQty : undefined" class="w-full" />
+          </UFormField>
+
+          <p v-if="poError" class="text-red-500 text-sm mt-3" role="alert">{{ poError }}</p>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isPoReceiveModalOpen = false">Annuler</UButton>
+            <UButton
+              icon="i-lucide-package-check"
+              class="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
+              :loading="isMutating"
+              @click="confirmReceivePo"
+            >
+              Confirmer réception
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- ═══ Modal : Transfert inter-sites ═══ -->
+    <UModal v-model:open="isTransferModalOpen" :ui="modalUi('md')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="transfer-title">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-[#0F62BC]/8 flex items-center justify-center flex-shrink-0">
+              <UIcon name="i-lucide-arrow-right-left" class="text-[#0F62BC] text-lg" />
+            </div>
+            <div>
+              <h3 id="transfer-title" class="text-base font-semibold text-gray-800">Transfert inter-sites</h3>
+              <p class="text-xs text-gray-400 mt-0.5 font-mono">{{ transferDraft.materialReference }}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <UFormField label="Site source *" name="sourceSiteCode">
+              <UInput v-model="transferDraft.sourceSiteCode" placeholder="SITE-LYO" class="font-mono" />
+            </UFormField>
+            <UFormField label="Site destination *" name="destSiteCode">
+              <UInput v-model="transferDraft.destSiteCode" placeholder="SITE-PAR" class="font-mono" />
+            </UFormField>
+            <UFormField label="Quantité *" name="quantity">
+              <UInput v-model.number="transferDraft.quantity" type="number" min="1" />
+            </UFormField>
+            <UFormField label="Motif" name="reason" class="sm:col-span-2">
+              <UInput v-model="transferDraft.reason" placeholder="Réapprovisionnement urgent…" />
+            </UFormField>
+          </div>
+
+          <p v-if="transferError" class="text-red-500 text-sm mt-3" role="alert">{{ transferError }}</p>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isTransferModalOpen = false">Annuler</UButton>
+            <UButton
+              icon="i-lucide-arrow-right-left"
+              class="bg-[#0F62BC] hover:bg-[#0d56a6] text-white w-full sm:w-auto"
+              :loading="isMutating"
+              @click="confirmTransfer"
+            >
+              Transférer
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- ═══ Modal : Lots matière (traçabilité aéro) ═══ -->
+    <UModal v-model:open="isLotsModalOpen" :ui="modalUi('2xl')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="lots-title">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-[#0F62BC]/8 flex items-center justify-center flex-shrink-0">
+              <UIcon name="i-lucide-package-2" class="text-[#0F62BC] text-lg" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 id="lots-title" class="text-base font-semibold text-gray-800">Lots de matière</h3>
+              <p v-if="lotsTarget" class="text-xs text-gray-400 mt-0.5">
+                {{ lotsTarget.name }} — <span class="font-mono">{{ lotsTarget.reference }}</span>
+              </p>
+            </div>
+            <UButton
+              v-if="canManageStock"
+              icon="i-lucide-plus"
+              size="sm"
+              class="bg-[#F57C00] hover:bg-[#e06d00] text-white"
+              @click="openCreateLot"
+            >
+              Réception lot
+            </UButton>
+          </div>
+
+          <div v-if="lotsLoading" class="space-y-2 py-4">
+            <USkeleton v-for="i in 3" :key="i" class="h-20 w-full" />
+          </div>
+
+          <UAlert v-else-if="lotsError" color="error" variant="soft" :title="lotsError" class="mb-3" />
+
+          <div v-else-if="lotsItems.length === 0" class="text-center py-10 text-sm text-gray-400">
+            Aucun lot enregistré pour cette référence.
+          </div>
+
+          <ul v-else class="space-y-2 max-h-[60vh] overflow-y-auto">
+            <li
+              v-for="lot in lotsItems"
+              :key="lot.id"
+              class="border border-gray-100 rounded-xl p-3 bg-white/70"
+            >
+              <div class="flex items-start justify-between gap-3 mb-2">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-semibold text-gray-800 font-mono">{{ lot.lotNumber }}</span>
+                    <UBadge :color="lotStatusConfig[lot.status].color" variant="subtle" size="xs">
+                      {{ lotStatusConfig[lot.status].label }}
+                    </UBadge>
+                  </div>
+                  <p v-if="lot.supplier" class="text-xs text-gray-500 mt-0.5">{{ lot.supplier }}<span v-if="lot.supplierLot"> · Lot fournisseur {{ lot.supplierLot }}</span></p>
+                </div>
+                <div class="text-right shrink-0">
+                  <p class="text-sm font-semibold text-[#0F62BC] tabular-nums">
+                    {{ lot.remainingQty }} / {{ lot.quantity }}
+                  </p>
+                  <p class="text-[11px] text-gray-400">restant</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div>
+                  <p class="text-gray-400">Réception</p>
+                  <p class="text-gray-700">{{ formatDate(lot.receivedAt) }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-400">DLC</p>
+                  <p :class="['text-gray-700', daysUntilExpiry(lot) !== null && daysUntilExpiry(lot)! < 30 ? 'text-orange-600 font-medium' : '']">
+                    {{ formatDate(lot.expiryAt) }}
+                    <span v-if="daysUntilExpiry(lot) !== null && daysUntilExpiry(lot)! < 30" class="text-[10px] block">
+                      <span v-if="daysUntilExpiry(lot)! < 0">expiré</span>
+                      <span v-else>dans {{ daysUntilExpiry(lot) }} j</span>
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <p class="text-gray-400">Emplacement</p>
+                  <p class="text-gray-700 font-mono">{{ lot.location || '—' }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-400">Certificat</p>
+                  <p class="text-gray-700 font-mono">{{ lot.certificateRef || '—' }}</p>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isLotsModalOpen = false">Fermer</UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- ═══ Modal : Réception d'un nouveau lot ═══ -->
+    <UModal v-model:open="isCreateLotModalOpen" :ui="modalUi('lg')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="create-lot-title">
+          <div class="flex items-center gap-3 mb-5">
+            <div class="w-10 h-10 rounded-xl bg-[#F57C00]/10 flex items-center justify-center flex-shrink-0">
+              <UIcon name="i-lucide-arrow-down-circle" class="text-[#F57C00] text-lg" />
+            </div>
+            <div>
+              <h3 id="create-lot-title" class="text-base font-semibold text-gray-800">Réception lot matière</h3>
+              <p v-if="lotsTarget" class="text-xs text-gray-400 mt-0.5">
+                {{ lotsTarget.name }} — <span class="font-mono">{{ lotsTarget.reference }}</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <UFormField label="N° de lot interne *" name="lotNumber" class="sm:col-span-2">
+              <UInput v-model="newLot.lotNumber" placeholder="Ex : LOT-2026-001" class="w-full font-mono" />
+            </UFormField>
+
+            <UFormField label="Quantité reçue *" name="quantity">
+              <UInput v-model.number="newLot.quantity" type="number" min="1" class="w-full" />
+            </UFormField>
+
+            <UFormField label="DLC / Date péremption" name="expiryAt">
+              <UInput v-model="newLot.expiryAt" type="date" class="w-full" />
+            </UFormField>
+
+            <UFormField label="Fournisseur" name="supplier">
+              <UInput v-model="newLot.supplier" placeholder="Ex : SKF Aerospace" class="w-full" />
+            </UFormField>
+
+            <UFormField label="Lot fournisseur" name="supplierLot">
+              <UInput v-model="newLot.supplierLot" placeholder="Ex : SKF-2026-A12" class="w-full font-mono" />
+            </UFormField>
+
+            <UFormField label="Réf. certificat matière" name="certificateRef">
+              <UInput v-model="newLot.certificateRef" placeholder="Ex : EN10204-3.1" class="w-full font-mono" />
+            </UFormField>
+
+            <UFormField label="Emplacement (rack / bin)" name="location">
+              <UInput v-model="newLot.location" placeholder="Ex : A12-R03" class="w-full font-mono" />
+            </UFormField>
+
+            <UFormField label="Notes" name="notes" class="sm:col-span-2">
+              <UTextarea v-model="newLot.notes" :rows="2" placeholder="Observations particulières…" class="w-full" />
+            </UFormField>
+          </div>
+
+          <p v-if="createLotError" class="text-red-500 text-sm mt-3" role="alert">{{ createLotError }}</p>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isCreateLotModalOpen = false">Annuler</UButton>
+            <UButton
+              icon="i-lucide-check"
+              class="bg-[#F57C00] hover:bg-[#e06d00] text-white w-full sm:w-auto"
+              :loading="isMutating"
+              @click="confirmCreateLot"
+            >
+              Réceptionner
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- ═══ Modal : Historique des mouvements ═══ -->
+    <UModal v-model:open="isHistoryModalOpen" :ui="modalUi('lg')">
+      <template #content>
+        <div :class="MODAL_BODY" role="dialog" aria-labelledby="history-title">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-[#0F62BC]/8 flex items-center justify-center flex-shrink-0">
+              <UIcon name="i-lucide-history" class="text-[#0F62BC] text-lg" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 id="history-title" class="text-base font-semibold text-gray-800">Historique des mouvements</h3>
+              <p v-if="historyTarget" class="text-xs text-gray-400 mt-0.5">
+                {{ historyTarget.name }} — <span class="font-mono">{{ historyTarget.reference }}</span>
+              </p>
+            </div>
+          </div>
+
+          <div v-if="historyLoading" class="space-y-2 py-4">
+            <USkeleton v-for="i in 4" :key="i" class="h-12 w-full" />
+          </div>
+
+          <UAlert v-else-if="historyError" color="error" variant="soft" :title="historyError" class="mb-3" />
+
+          <div v-else-if="historyItems.length === 0" class="text-center py-10 text-sm text-gray-400">
+            Aucun mouvement enregistré pour cette référence.
+          </div>
+
+          <ul v-else class="divide-y divide-gray-100 max-h-[60vh] overflow-y-auto">
+            <li
+              v-for="mv in historyItems"
+              :key="mv.id"
+              class="flex items-center gap-3 py-2.5"
+            >
+              <UIcon :name="movementLabels[mv.type].icon" :class="['text-lg shrink-0',
+                mv.type === 'IN' ? 'text-green-600' : mv.type === 'OUT' ? 'text-red-500' : 'text-gray-500']" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <UBadge :color="movementLabels[mv.type].color" variant="subtle" size="xs">
+                    {{ movementLabels[mv.type].label }}
+                  </UBadge>
+                  <span class="text-sm font-semibold tabular-nums" :class="mv.type === 'OUT' ? 'text-red-600' : mv.type === 'IN' ? 'text-green-700' : 'text-gray-700'">
+                    {{ mv.type === 'OUT' ? '-' : mv.type === 'IN' ? '+' : '' }}{{ mv.quantity }}
+                  </span>
+                  <span v-if="mv.ofId" class="text-xs font-mono text-indigo-600">OF {{ mv.ofId }}</span>
+                </div>
+                <p v-if="mv.reason" class="text-xs text-gray-500 mt-0.5">{{ mv.reason }}</p>
+              </div>
+              <span class="text-xs text-gray-400 shrink-0 tabular-nums">{{ formatDateTime(mv.createdAt) }}</span>
+            </li>
+          </ul>
+
+          <div :class="MODAL_FOOTER">
+            <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isHistoryModalOpen = false">Fermer</UButton>
           </div>
         </div>
       </template>

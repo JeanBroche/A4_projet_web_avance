@@ -36,7 +36,8 @@ const {
   levelByReference,
   createReservation,
   updateReservation,
-  cancelReservation
+  cancelReservation,
+  releaseReservation
 } = useStock()
 const { canManageBatches, canManageBomOrders, canReserveMaterials, pageSubtitle } = useRoleCapabilities()
 const {
@@ -651,6 +652,18 @@ async function onCancelReservation(id: number) {
   }
 }
 
+async function onReleaseReservation(id: number) {
+  if (!selected.value) return
+  reservationActionError.value = null
+  try {
+    await releaseReservation(id)
+    await refreshStock()
+    await loadOfReservations(selected.value.ofNumber)
+  } catch (e) {
+    reservationActionError.value = stockError.value ?? toFailureResult(e).message
+  }
+}
+
 async function updateStatus(newStatus: Status) {
   if (!selected.value || newStatus === selected.value.status) return
   await updateBomOrderStatus(selected.value.id, newStatus)
@@ -1151,6 +1164,16 @@ const selectedEnrichedBom = computed(() =>
                       @click="alignReservationToNeed(res)"
                     >
                       Aligner
+                    </UButton>
+                    <UButton
+                      size="xs"
+                      variant="outline"
+                      color="success"
+                      icon="i-lucide-check-circle"
+                      :loading="isStockMutating"
+                      @click="onReleaseReservation(res.id)"
+                    >
+                      Libérer
                     </UButton>
                     <UButton
                       size="xs"

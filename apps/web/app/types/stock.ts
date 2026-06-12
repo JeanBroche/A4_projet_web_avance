@@ -79,3 +79,113 @@ export interface SupplierDelayInput {
   delayDays: number
   comment?: string
 }
+
+export type StockMovementType = 'IN' | 'OUT' | 'ADJUST'
+
+export interface StockMovement {
+  id: string
+  materialId: string
+  materialReference: string
+  siteCode: string
+  type: StockMovementType
+  quantity: number
+  reason?: string
+  documentRef?: string
+  ofId?: string
+  createdAt: Date
+}
+
+export interface ConsolidatedSite {
+  siteCode: string
+  current: number
+  reserved: number
+  available: number
+  minimum: number
+}
+
+export interface ConsolidatedStockLevel {
+  reference: string
+  name: string
+  unit: StockUnit
+  current: number
+  reserved: number
+  available: number
+  minimum: number
+  sites: ConsolidatedSite[]
+}
+
+export type MaterialLotStatus = 'ACTIVE' | 'EXHAUSTED' | 'QUARANTINE' | 'EXPIRED'
+
+export interface MaterialLot {
+  id: string
+  materialId: string
+  materialReference: string
+  materialName: string
+  siteCode: string
+  lotNumber: string
+  supplierLot?: string
+  supplier?: string
+  certificateRef?: string
+  certificateUrl?: string
+  manufacturedAt?: Date
+  expiryAt?: Date
+  receivedAt: Date
+  quantity: number
+  remainingQty: number
+  location?: string
+  status: MaterialLotStatus
+  notes?: string
+}
+
+export type PurchaseOrderStatus = 'DRAFT' | 'ORDERED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED'
+
+export interface PurchaseOrder {
+  id: string
+  poNumber: string
+  materialId: string
+  materialReference: string
+  materialName: string
+  siteCode: string
+  supplier: string
+  quantity: number
+  receivedQty: number
+  unitPrice?: number
+  status: PurchaseOrderStatus
+  expectedDate?: Date
+  receivedDate?: Date
+  notes?: string
+  createdAt: Date
+}
+
+export interface CreatePurchaseOrderInput {
+  materialReference: string
+  supplier: string
+  quantity: number
+  unitPrice?: number
+  expectedDate?: Date
+  notes?: string
+}
+
+export interface CreateTransferInput {
+  materialReference: string
+  sourceSiteCode: string
+  destSiteCode: string
+  quantity: number
+  reason?: string
+  notes?: string
+}
+
+export interface CreateMaterialLotInput {
+  materialReference: string
+  lotNumber: string
+  quantity: number
+  supplierLot?: string
+  supplier?: string
+  certificateRef?: string
+  certificateUrl?: string
+  manufacturedAt?: Date
+  expiryAt?: Date
+  receivedAt?: Date
+  location?: string
+  notes?: string
+}

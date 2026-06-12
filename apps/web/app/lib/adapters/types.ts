@@ -24,7 +24,16 @@ import type {
   Product,
   ReportAnomalyInput,
   ReportingDashboardOptions,
+  ConsolidatedStockLevel,
+  CreateMaterialLotInput,
+  CreatePurchaseOrderInput,
+  CreateTransferInput,
+  MaterialLot,
+  MaterialLotStatus,
+  PurchaseOrder,
+  PurchaseOrderStatus,
   RuptureForecast,
+  StockMovement,
   SupplierDelay,
   SupplierDelayInput,
   UpdateBomOrderInput,
@@ -57,7 +66,7 @@ export interface StockAlert {
 
 export interface StockAdapter {
   listLevels(): Promise<StockLevel[]>
-  listConsolidatedLevels(): Promise<StockLevel[]>
+  listConsolidatedLevels(): Promise<ConsolidatedStockLevel[]>
   listAlerts(): Promise<StockAlert[]>
   createLevel(input: CreateStockLevelInput): Promise<StockLevel>
   updateLevel(id: number, qty: number): Promise<StockLevel>
@@ -70,6 +79,14 @@ export interface StockAdapter {
   getRuptureForecast(): Promise<RuptureForecast[]>
   reportSupplierDelay(input: SupplierDelayInput): Promise<SupplierDelay>
   listSupplierDelays(): Promise<SupplierDelay[]>
+  listMovements(filters?: { materialReference?: string; limit?: number }): Promise<StockMovement[]>
+  listLots(filters?: { materialReference?: string; status?: MaterialLotStatus }): Promise<MaterialLot[]>
+  createLot(input: CreateMaterialLotInput): Promise<MaterialLot>
+  updateLotStatus(id: string, status: MaterialLotStatus): Promise<MaterialLot>
+  transferStock(input: CreateTransferInput): Promise<{ transferRef: string }>
+  listPurchaseOrders(filters?: { status?: PurchaseOrderStatus; materialReference?: string }): Promise<PurchaseOrder[]>
+  createPurchaseOrder(input: CreatePurchaseOrderInput): Promise<PurchaseOrder>
+  receivePurchaseOrder(id: string, receivedQty: number): Promise<PurchaseOrder>
 }
 
 export interface ProductionAdapter {

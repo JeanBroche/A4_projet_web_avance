@@ -171,7 +171,12 @@ const ShipmentService: ServiceSchema = {
           code: completed.code,
           orderNumber: completed.orderNumber,
           ofId: completed.ofId,
-          siteCode: completed.siteCode
+          siteCode: completed.siteCode,
+          lines: completed.lines.map((line) => ({
+            productCode: line.productCode,
+            quantity: line.quantity,
+            pickedQty: line.pickedQty ?? line.quantity
+          }))
         });
 
         await logShipmentAudit({

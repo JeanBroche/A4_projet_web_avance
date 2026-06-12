@@ -4,9 +4,11 @@ import { initStockAuditWriter, logStockAudit } from "../src/lib/audit.js";
 import { publishStockEvent } from "../src/lib/events.js";
 import { registerMaterialLowEmitter } from "../src/lib/alert-notifier.js";
 import { ofIdFromStockDocumentRef, DomainEvents } from "@aeronexis/shared";
+import { stockIntegrationEvents } from "./events/production-events.js";
 import {
   assertSiteAccess,
   createError,
+  generateCode,
   parseParams,
   requireAuth,
   requireAnyRole,
@@ -19,15 +21,23 @@ import {
   forecastRuptureSchema,
   levelConsolidateSchema,
   levelListSchema,
+  lotCreateSchema,
+  lotListSchema,
+  lotUpdateSchema,
   movementCreateSchema,
   movementListSchema,
   reservationByIdSchema,
   reservationCreateSchema,
   reservationListSchema,
   reservationUpdateSchema,
+  purchaseOrderCreateSchema,
+  purchaseOrderListSchema,
+  purchaseOrderReceiveSchema,
+  purchaseOrderUpdateSchema,
   supplierDelayListSchema,
   supplierDelayNotifySchema,
   thresholdUpsertSchema,
+  transferCreateSchema,
   materialListSchema,
   materialGetSchema,
   materialUpsertSchema
@@ -120,6 +130,8 @@ const StockService: ServiceSchema = {
       publishStockEvent(this, DomainEvents.stock.materialLow, payload);
     });
   },
+
+  events: stockIntegrationEvents,
 
   actions: {
     ping: {
@@ -692,6 +704,433 @@ const StockService: ServiceSchema = {
           notes: params.notes
         });
         return delay;
+      }
+    },
+    "lot.list": {
+      async handler(ctx) {
+        const params = parseParams(lotListSchema, ctx.params);
+        const auth = await requireStockRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
+        const lots = await prisma.materialLot.findMany({
+          where: {
+            ...(effectiveSite ? { siteCode: effectiveSite } : {}),
+            ...(params.materialId ? { materialId: params.materialId } : {}),
+            ...(params.status ? { status: params.status } : {})
+          },
+          orderBy: [{ expiryAt: "asc" }, { receivedAt: "desc" }],
+          take: params.limit ?? 100,
+          skip: params.offset ?? 0,
+          include: {
+            material: {
+              select: { code: true, description: true, unit: true, siteCode: true }
+            }
+          }
+        });
+        return lots;
+      }
+    },
+    "lot.create": {
+      async handler(ctx) {
+        const params = parseParams(lotCreateSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+        const material = await loadActiveMaterial(prisma, params.materialId);
+        assertSiteAccess(auth, material.siteCode);
+        if (material.siteCode !== params.siteCode) {
+          throw createError(
+            "VALIDATION_ERROR",
+            `Material ${material.code} does not belong to site ${params.siteCode}`
+          );
+        }
+        const lot = await prisma.$transaction(async (tx: DbClient) => {
+          const created = await tx.materialLot.create({
+            data: {
+              materialId: params.materialId,
+              siteCode: params.siteCode,
+              lotNumber: params.lotNumber,
+              supplierLot: params.supplierLot,
+              supplier: params.supplier ?? material.supplier,
+              certificateRef: params.certificateRef,
+              certificateUrl: params.certificateUrl,
+              manufacturedAt: params.manufacturedAt,
+              expiryAt: params.expiryAt,
+              receivedAt: params.receivedAt ?? new Date(),
+              quantity: params.quantity,
+              remainingQty: params.quantity,
+              location: params.location,
+              notes: params.notes
+            }
+          });
+          await tx.stockMovement.create({
+            data: {
+              materialId: material.id,
+              siteCode: material.siteCode,
+              type: "IN",
+              quantity: params.quantity,
+              reason: `Réception lot ${params.lotNumber}`,
+              documentRef: `LOT::${created.id}`
+            }
+          });
+          await tx.material.update({
+            where: { id: material.id },
+            data: {
+              currentStock: material.currentStock + params.quantity,
+              lastReplenishment: new Date()
+            }
+          });
+          await evaluateThreshold(tx, material.id);
+          return created;
+        });
+        await logStockAudit({
+          action: "stock.lot.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "MaterialLot",
+          entityId: lot.id,
+          siteCode: lot.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            materialCode: material.code,
+            lotNumber: lot.lotNumber,
+            quantity: lot.quantity
+          }
+        });
+        this.logger.info("Material lot created", {
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          lotId: lot.id,
+          materialId: lot.materialId
+        });
+        return lot;
+      }
+    },
+    "po.list": {
+      async handler(ctx) {
+        const params = parseParams(purchaseOrderListSchema, ctx.params);
+        const auth = await requireStockRead(ctx, params.accessToken);
+        const effectiveSite = resolveEffectiveSite(auth, params);
+        const orders = await prisma.purchaseOrder.findMany({
+          where: {
+            ...(effectiveSite ? { siteCode: effectiveSite } : {}),
+            ...(params.materialId ? { materialId: params.materialId } : {}),
+            ...(params.status ? { status: params.status } : {}),
+            ...(params.supplier ? { supplier: params.supplier } : {})
+          },
+          orderBy: { createdAt: "desc" },
+          take: params.limit ?? 100,
+          skip: params.offset ?? 0,
+          include: {
+            material: { select: { code: true, description: true, unit: true } }
+          }
+        });
+        return orders;
+      }
+    },
+    "po.create": {
+      async handler(ctx) {
+        const params = parseParams(purchaseOrderCreateSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+        const material = await loadActiveMaterial(prisma, params.materialId);
+        assertSiteAccess(auth, material.siteCode);
+        if (material.siteCode !== params.siteCode) {
+          throw createError(
+            "VALIDATION_ERROR",
+            `Material ${material.code} does not belong to site ${params.siteCode}`
+          );
+        }
+        const poNumber = `PO-${generateCode("PO")}`;
+        const order = await prisma.purchaseOrder.create({
+          data: {
+            poNumber,
+            materialId: params.materialId,
+            siteCode: params.siteCode,
+            supplier: params.supplier,
+            quantity: params.quantity,
+            unitPrice: params.unitPrice,
+            expectedDate: params.expectedDate,
+            notes: params.notes,
+            status: "ORDERED"
+          }
+        });
+        await logStockAudit({
+          action: "stock.po.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "PurchaseOrder",
+          entityId: order.id,
+          siteCode: order.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            poNumber: order.poNumber,
+            materialCode: material.code,
+            supplier: order.supplier,
+            quantity: order.quantity
+          }
+        });
+        this.logger.info("Purchase order created", {
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          poNumber: order.poNumber,
+          materialId: material.id
+        });
+        return order;
+      }
+    },
+    "po.update": {
+      async handler(ctx) {
+        const params = parseParams(purchaseOrderUpdateSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+        const existing = await prisma.purchaseOrder.findUnique({
+          where: { id: params.id }
+        });
+        if (!existing) {
+          throw createError("NOT_FOUND", `Purchase order not found: ${params.id}`);
+        }
+        assertSiteAccess(auth, existing.siteCode);
+        const updated = await prisma.purchaseOrder.update({
+          where: { id: params.id },
+          data: {
+            ...(params.status ? { status: params.status } : {}),
+            ...(params.expectedDate !== undefined ? { expectedDate: params.expectedDate } : {}),
+            ...(params.notes !== undefined ? { notes: params.notes } : {})
+          }
+        });
+        return updated;
+      }
+    },
+    "po.receive": {
+      async handler(ctx) {
+        const params = parseParams(purchaseOrderReceiveSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+        const order = await prisma.purchaseOrder.findUnique({
+          where: { id: params.id }
+        });
+        if (!order) {
+          throw createError("NOT_FOUND", `Purchase order not found: ${params.id}`);
+        }
+        if (order.status === "RECEIVED" || order.status === "CANCELLED") {
+          throw createError("VALIDATION_ERROR", `Cannot receive on a ${order.status} order`);
+        }
+        assertSiteAccess(auth, order.siteCode);
+        const remaining = order.quantity - order.receivedQty;
+        if (params.receivedQty > remaining) {
+          throw createError(
+            "VALIDATION_ERROR",
+            `Cannot receive ${params.receivedQty}: ${remaining} remaining on PO ${order.poNumber}`
+          );
+        }
+        const newReceivedQty = order.receivedQty + params.receivedQty;
+        const newStatus =
+          newReceivedQty >= order.quantity ? "RECEIVED" : "PARTIAL";
+        const material = await loadActiveMaterial(prisma, order.materialId);
+        const result = await prisma.$transaction(async (tx: DbClient) => {
+          const updatedOrder = await tx.purchaseOrder.update({
+            where: { id: order.id },
+            data: {
+              receivedQty: newReceivedQty,
+              status: newStatus,
+              receivedDate:
+                newStatus === "RECEIVED" ? new Date() : order.receivedDate
+            }
+          });
+          await tx.stockMovement.create({
+            data: {
+              materialId: material.id,
+              siteCode: material.siteCode,
+              type: "IN",
+              quantity: params.receivedQty,
+              reason: `Réception PO ${order.poNumber}`,
+              documentRef: `PO::${order.poNumber}`
+            }
+          });
+          await tx.material.update({
+            where: { id: material.id },
+            data: {
+              currentStock: material.currentStock + params.receivedQty,
+              lastReplenishment: new Date()
+            }
+          });
+          await evaluateThreshold(tx, material.id);
+          return updatedOrder;
+        });
+        await logStockAudit({
+          action: "stock.po.receive",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "PurchaseOrder",
+          entityId: result.id,
+          siteCode: result.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            poNumber: result.poNumber,
+            receivedQty: params.receivedQty,
+            status: result.status
+          }
+        });
+        this.logger.info("Purchase order received", {
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          poNumber: result.poNumber,
+          receivedQty: params.receivedQty,
+          status: result.status
+        });
+        return result;
+      }
+    },
+    "transfer.create": {
+      async handler(ctx) {
+        const params = parseParams(transferCreateSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+        const sourceMaterial = await loadActiveMaterial(prisma, params.materialId);
+        assertSiteAccess(auth, sourceMaterial.siteCode);
+        if (sourceMaterial.siteCode !== params.sourceSiteCode) {
+          throw createError(
+            "VALIDATION_ERROR",
+            `Material ${sourceMaterial.code} does not belong to source site ${params.sourceSiteCode}`
+          );
+        }
+        if (computeAvailable(sourceMaterial) < params.quantity) {
+          throw createError(
+            "INSUFFICIENT_STOCK",
+            `Material ${sourceMaterial.code}: requested ${params.quantity}, available ${computeAvailable(sourceMaterial)}`
+          );
+        }
+        const result = await prisma.$transaction(async (tx: DbClient) => {
+          let destMaterial = await tx.material.findFirst({
+            where: {
+              code: sourceMaterial.code,
+              siteCode: params.destSiteCode,
+              deletedAt: null
+            }
+          });
+          if (!destMaterial) {
+            destMaterial = await tx.material.create({
+              data: {
+                code: sourceMaterial.code,
+                siteCode: params.destSiteCode,
+                description: sourceMaterial.description,
+                unit: sourceMaterial.unit,
+                currentStock: 0,
+                minimumStock: 0,
+                supplier: sourceMaterial.supplier
+              }
+            });
+          }
+          const transferRef = `TRANSFER::${sourceMaterial.code}::${params.sourceSiteCode}->${params.destSiteCode}::${Date.now()}`;
+          const reason = params.reason ?? `Transfert ${params.sourceSiteCode} → ${params.destSiteCode}`;
+
+          const outMovement = await tx.stockMovement.create({
+            data: {
+              materialId: sourceMaterial.id,
+              siteCode: sourceMaterial.siteCode,
+              type: "OUT",
+              quantity: params.quantity,
+              reason,
+              documentRef: transferRef
+            }
+          });
+          await tx.material.update({
+            where: { id: sourceMaterial.id },
+            data: { currentStock: sourceMaterial.currentStock - params.quantity }
+          });
+          await evaluateThreshold(tx, sourceMaterial.id);
+
+          const inMovement = await tx.stockMovement.create({
+            data: {
+              materialId: destMaterial.id,
+              siteCode: destMaterial.siteCode,
+              type: "IN",
+              quantity: params.quantity,
+              reason,
+              documentRef: transferRef
+            }
+          });
+          await tx.material.update({
+            where: { id: destMaterial.id },
+            data: {
+              currentStock: destMaterial.currentStock + params.quantity,
+              lastReplenishment: new Date()
+            }
+          });
+          await evaluateThreshold(tx, destMaterial.id);
+
+          return {
+            transferRef,
+            outMovementId: outMovement.id,
+            inMovementId: inMovement.id,
+            sourceMaterialId: sourceMaterial.id,
+            destMaterialId: destMaterial.id
+          };
+        });
+        await logStockAudit({
+          action: "stock.transfer.create",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "StockMovement",
+          entityId: result.outMovementId,
+          siteCode: sourceMaterial.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: {
+            materialCode: sourceMaterial.code,
+            sourceSiteCode: params.sourceSiteCode,
+            destSiteCode: params.destSiteCode,
+            quantity: params.quantity,
+            transferRef: result.transferRef
+          }
+        });
+        this.logger.info("Inter-site transfer recorded", {
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          materialCode: sourceMaterial.code,
+          quantity: params.quantity,
+          sourceSiteCode: params.sourceSiteCode,
+          destSiteCode: params.destSiteCode
+        });
+        return result;
+      }
+    },
+    "lot.update": {
+      async handler(ctx) {
+        const params = parseParams(lotUpdateSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+        const existing = await prisma.materialLot.findUnique({
+          where: { id: params.id }
+        });
+        if (!existing) {
+          throw createError("NOT_FOUND", `Lot not found: ${params.id}`);
+        }
+        assertSiteAccess(auth, existing.siteCode);
+        const updated = await prisma.materialLot.update({
+          where: { id: params.id },
+          data: {
+            ...(params.status ? { status: params.status } : {}),
+            ...(params.location !== undefined ? { location: params.location } : {}),
+            ...(params.remainingQty !== undefined ? { remainingQty: params.remainingQty } : {}),
+            ...(params.notes !== undefined ? { notes: params.notes } : {})
+          }
+        });
+        await logStockAudit({
+          action: "stock.lot.update",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "MaterialLot",
+          entityId: updated.id,
+          siteCode: updated.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          diff: {
+            before: {
+              status: existing.status,
+              location: existing.location,
+              remainingQty: existing.remainingQty
+            },
+            after: {
+              status: updated.status,
+              location: updated.location,
+              remainingQty: updated.remainingQty
+            }
+          }
+        });
+        return updated;
       }
     }
   }

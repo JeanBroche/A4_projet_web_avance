@@ -18,7 +18,15 @@ export const restStockRoutes: RouteDefinition[] = [
   { method: "POST", path: "stock/supplier-delays", action: "stock.supplier.delay.notify", layer: "REST" },
   { method: "GET", path: "stock/materials", action: "stock.material.list", layer: "REST" },
   { method: "GET", path: "stock/materials/:materialId", action: "stock.material.get", layer: "REST" },
-  { method: "PUT", path: "stock/materials", action: "stock.material.upsert", layer: "REST" }
+  { method: "PUT", path: "stock/materials", action: "stock.material.upsert", layer: "REST" },
+  { method: "GET", path: "stock/lots", action: "stock.lot.list", layer: "REST" },
+  { method: "POST", path: "stock/lots", action: "stock.lot.create", layer: "REST" },
+  { method: "PATCH", path: "stock/lots/:id", action: "stock.lot.update", layer: "REST" },
+  { method: "POST", path: "stock/transfers", action: "stock.transfer.create", layer: "REST" },
+  { method: "GET", path: "stock/purchase-orders", action: "stock.po.list", layer: "REST" },
+  { method: "POST", path: "stock/purchase-orders", action: "stock.po.create", layer: "REST" },
+  { method: "PATCH", path: "stock/purchase-orders/:id", action: "stock.po.update", layer: "REST" },
+  { method: "POST", path: "stock/purchase-orders/:id/receive", action: "stock.po.receive", layer: "REST" }
 ];
 
 export const restStockAliases: RouteAliasMap = toAliases(restStockRoutes);

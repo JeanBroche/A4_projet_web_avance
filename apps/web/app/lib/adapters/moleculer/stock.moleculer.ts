@@ -1,8 +1,12 @@
 import { useApiClient } from '~/lib/api/client'
 import type { StockAdapter, StockAlert } from '~/lib/adapters/types'
 import {
+  mapConsolidatedToUi,
   mapForecastToUi,
+  mapLotToUi,
   mapMaterialToStockLevel,
+  mapMovementToUi,
+  mapPurchaseOrderToUi,
   mapReservationToUi,
   mapSupplierDelayToUi
 } from '~/lib/mappers/stock'
@@ -71,10 +75,11 @@ export function createMoleculerStockAdapter(
     },
 
     async listConsolidatedLevels() {
-      const levels = await request<LevelRow[]>('/stock/levels/consolidated', {
-        params: { siteCode: siteCode() }
-      })
-      return (levels ?? []).map(l => mapMaterialToStockLevel(l as Parameters<typeof mapMaterialToStockLevel>[0]))
+      const items = await request<Array<Parameters<typeof mapConsolidatedToUi>[0]>>(
+        '/stock/levels/consolidated',
+        {}
+      )
+      return (items ?? []).map(mapConsolidatedToUi)
     },
 
     async listAlerts() {
@@ -264,6 +269,144 @@ export function createMoleculerStockAdapter(
         { params: { siteCode: siteCode() } }
       )
       return (items ?? []).map(mapSupplierDelayToUi)
+    },
+
+    async listMovements(filters) {
+      let materialId: string | undefined
+      if (filters?.materialReference) {
+        const resolved = await resolveMaterialId(filters.materialReference)
+        if (!resolved) return []
+        materialId = resolved
+      }
+      const items = await request<Array<Parameters<typeof mapMovementToUi>[0]>>(
+        '/stock/movements',
+        {
+          params: {
+            siteCode: siteCode(),
+            ...(materialId ? { materialId } : {}),
+            ...(filters?.limit ? { limit: filters.limit } : {})
+          }
+        }
+      )
+      return (items ?? []).map(mapMovementToUi)
+    },
+
+    async listLots(filters) {
+      let materialId: string | undefined
+      if (filters?.materialReference) {
+        const resolved = await resolveMaterialId(filters.materialReference)
+        if (!resolved) return []
+        materialId = resolved
+      }
+      const items = await request<Array<Parameters<typeof mapLotToUi>[0]>>(
+        '/stock/lots',
+        {
+          params: {
+            siteCode: siteCode(),
+            ...(materialId ? { materialId } : {}),
+            ...(filters?.status ? { status: filters.status } : {})
+          }
+        }
+      )
+      return (items ?? []).map(mapLotToUi)
+    },
+
+    async createLot(input) {
+      const materialId = await resolveMaterialId(input.materialReference)
+      if (!materialId) throw new Error('NOT_FOUND')
+      const raw = await request<Parameters<typeof mapLotToUi>[0]>('/stock/lots', {
+        method: 'POST',
+        body: {
+          materialId,
+          siteCode: siteCode(),
+          lotNumber: input.lotNumber,
+          quantity: input.quantity,
+          supplierLot: input.supplierLot,
+          supplier: input.supplier,
+          certificateRef: input.certificateRef,
+          certificateUrl: input.certificateUrl,
+          manufacturedAt: input.manufacturedAt,
+          expiryAt: input.expiryAt,
+          receivedAt: input.receivedAt,
+          location: input.location,
+          notes: input.notes
+        }
+      })
+      return mapLotToUi(raw)
+    },
+
+    async updateLotStatus(id, status) {
+      const raw = await request<Parameters<typeof mapLotToUi>[0]>(
+        `/stock/lots/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: { status } }
+      )
+      return mapLotToUi(raw)
+    },
+
+    async transferStock(input) {
+      const materialId = await resolveMaterialId(input.materialReference)
+      if (!materialId) throw new Error('NOT_FOUND')
+      const result = await request<{ transferRef: string }>('/stock/transfers', {
+        method: 'POST',
+        body: {
+          materialId,
+          sourceSiteCode: input.sourceSiteCode,
+          destSiteCode: input.destSiteCode,
+          quantity: input.quantity,
+          reason: input.reason,
+          notes: input.notes
+        }
+      })
+      return { transferRef: result.transferRef }
+    },
+
+    async listPurchaseOrders(filters) {
+      let materialId: string | undefined
+      if (filters?.materialReference) {
+        const resolved = await resolveMaterialId(filters.materialReference)
+        if (!resolved) return []
+        materialId = resolved
+      }
+      const items = await request<Array<Parameters<typeof mapPurchaseOrderToUi>[0]>>(
+        '/stock/purchase-orders',
+        {
+          params: {
+            siteCode: siteCode(),
+            ...(filters?.status ? { status: filters.status } : {}),
+            ...(materialId ? { materialId } : {})
+          }
+        }
+      )
+      return (items ?? []).map(mapPurchaseOrderToUi)
+    },
+
+    async createPurchaseOrder(input) {
+      const materialId = await resolveMaterialId(input.materialReference)
+      if (!materialId) throw new Error('NOT_FOUND')
+      const raw = await request<Parameters<typeof mapPurchaseOrderToUi>[0]>(
+        '/stock/purchase-orders',
+        {
+          method: 'POST',
+          body: {
+            materialId,
+            siteCode: siteCode(),
+            supplier: input.supplier,
+            quantity: input.quantity,
+            unitPrice: input.unitPrice,
+            expectedDate: input.expectedDate,
+            notes: input.notes
+          }
+        }
+      )
+      return mapPurchaseOrderToUi(raw)
+    },
+
+    async receivePurchaseOrder(id, receivedQty) {
+      const raw = await request<Parameters<typeof mapPurchaseOrderToUi>[0]>(
+        `/stock/purchase-orders/${encodeURIComponent(id)}/receive`,
+        { method: 'POST', body: { receivedQty } }
+      )
+      return mapPurchaseOrderToUi(raw)
     }
   }
 }

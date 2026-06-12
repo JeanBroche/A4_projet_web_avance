@@ -6,6 +6,7 @@ import {
   canPlanShipments,
   canReserveMaterials,
   canViewBomAndStock,
+  canViewConsolidatedStock,
   canViewDashboard,
   canViewNotifications,
   rolePageSubtitle
@@ -21,6 +22,7 @@ export function useRoleCapabilities() {
     canReserveMaterials: computed(() => canReserveMaterials(role.value)),
     canViewBomAndStock: computed(() => canViewBomAndStock(role.value)),
     canManageStock: computed(() => canManageStock(role.value)),
+    canViewConsolidatedStock: computed(() => canViewConsolidatedStock(role.value)),
     canPlanShipments: computed(() => canPlanShipments(role.value)),
     canManageOrders: computed(() => canManageOrders(role.value)),
     canViewDashboard: computed(() => canViewDashboard(role.value)),

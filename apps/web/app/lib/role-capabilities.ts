@@ -38,6 +38,11 @@ export function canViewNotifications(role: UserRole | null): boolean {
   return role === 'logistique' || role === 'direction' || role === 'admin'
 }
 
+/** Vue consolidée multi-sites — direction (siège) ou admin. */
+export function canViewConsolidatedStock(role: UserRole | null): boolean {
+  return role === 'direction' || role === 'admin'
+}
+
 export function rolePageSubtitle(role: UserRole | null): string {
   switch (role) {
     case 'operateur':
