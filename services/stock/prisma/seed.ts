@@ -3,10 +3,13 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createPrismaClient } from "@aeronexis/db";
 import {
+  SEED_BATCHES,
   SEED_BOM,
   SEED_BOM_CATALOG,
   SEED_MATERIAL_LABELS,
+  SEED_MATERIAL_LOTS,
   SEED_MATERIALS,
+  SEED_PURCHASE_ORDERS,
   SEED_SITES
 } from "@aeronexis/shared";
 import { PrismaClient } from "../src/generated/prisma/client.js";
@@ -88,6 +91,36 @@ const MATERIALS: MaterialSeed[] = [
     siteCode: SEED_SITES.LYO
   },
   {
+    code: SEED_MATERIALS.TITANE,
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.TITANE].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.TITANE].unit,
+    currentStock: 10,
+    minimumStock: 8,
+    reservedStock: 0,
+    supplier: "AeroMat FR",
+    siteCode: SEED_SITES.PAR
+  },
+  {
+    code: SEED_MATERIALS.JOINT,
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.JOINT].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.JOINT].unit,
+    currentStock: 120,
+    minimumStock: 50,
+    reservedStock: 0,
+    supplier: "SealTech",
+    siteCode: SEED_SITES.PAR
+  },
+  {
+    code: SEED_MATERIALS.GRAISSE,
+    description: SEED_MATERIAL_LABELS[SEED_MATERIALS.GRAISSE].name,
+    unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.GRAISSE].unit,
+    currentStock: 2,
+    minimumStock: 3,
+    reservedStock: 0,
+    supplier: "Lubricants Aero",
+    siteCode: SEED_SITES.PAR
+  },
+  {
     code: SEED_MATERIALS.ACIER,
     description: SEED_MATERIAL_LABELS[SEED_MATERIALS.ACIER].name,
     unit: SEED_MATERIAL_LABELS[SEED_MATERIALS.ACIER].unit,
@@ -122,10 +155,11 @@ async function upsertReservation(
   ofId: string,
   materialId: string,
   siteCode: string,
-  quantity: number
+  quantity: number,
+  status: "ACTIVE" | "RELEASED" = "ACTIVE"
 ) {
   const existing = await prisma.stockReservation.findFirst({
-    where: { ofId, materialId, status: "ACTIVE" }
+    where: { ofId, materialId, status }
   });
   if (existing) {
     return prisma.stockReservation.update({
@@ -134,8 +168,55 @@ async function upsertReservation(
     });
   }
   return prisma.stockReservation.create({
-    data: { ofId, materialId, siteCode, quantity, status: "ACTIVE" }
+    data: { ofId, materialId, siteCode, quantity, status }
   });
+}
+
+async function upsertMaterialLot(
+  materialId: string,
+  spec: (typeof SEED_MATERIAL_LOTS)[number]
+) {
+  const existing = await prisma.materialLot.findFirst({
+    where: { materialId, lotNumber: spec.lotNumber }
+  });
+  const data = {
+    materialId,
+    siteCode: spec.siteCode,
+    lotNumber: spec.lotNumber,
+    supplier: spec.supplier,
+    certificateRef: "certificateRef" in spec ? spec.certificateRef : undefined,
+    quantity: spec.quantity,
+    remainingQty: spec.remainingQty,
+    status: spec.status
+  };
+  if (existing) {
+    return prisma.materialLot.update({ where: { id: existing.id }, data });
+  }
+  return prisma.materialLot.create({ data });
+}
+
+async function upsertPurchaseOrder(
+  materialId: string,
+  spec: (typeof SEED_PURCHASE_ORDERS)[number]
+) {
+  const existing = await prisma.purchaseOrder.findFirst({
+    where: { poNumber: spec.poNumber }
+  });
+  const data = {
+    materialId,
+    siteCode: spec.siteCode,
+    supplier: spec.supplier,
+    quantity: spec.quantity,
+    receivedQty: spec.receivedQty,
+    status: spec.status,
+    expectedDate: "expectedDate" in spec ? new Date(spec.expectedDate) : undefined,
+    receivedDate: "receivedDate" in spec ? new Date(spec.receivedDate) : undefined,
+    notes: "notes" in spec ? spec.notes : undefined
+  };
+  if (existing) {
+    return prisma.purchaseOrder.update({ where: { id: existing.id }, data });
+  }
+  return prisma.purchaseOrder.create({ data: { poNumber: spec.poNumber, ...data } });
 }
 
 async function main() {
@@ -257,6 +338,20 @@ async function main() {
     }
   }
 
+  for (const lotSpec of SEED_MATERIAL_LOTS) {
+    const materialId = persisted[`${lotSpec.siteCode}/${lotSpec.materialCode}`];
+    if (materialId) {
+      await upsertMaterialLot(materialId, lotSpec);
+    }
+  }
+
+  for (const poSpec of SEED_PURCHASE_ORDERS) {
+    const materialId = persisted[`${poSpec.siteCode}/${poSpec.materialCode}`];
+    if (materialId) {
+      await upsertPurchaseOrder(materialId, poSpec);
+    }
+  }
+
   if (matLyoAcier && matLyoTitane && matLyoJoint) {
     const palier = SEED_BOM_CATALOG.find((entry) => entry.key === "PALIER");
     if (palier?.reserveMaterials) {
@@ -278,14 +373,25 @@ async function main() {
         );
       }
     }
+    await upsertReservation(
+      SEED_BATCHES.LYO_COMPLETED,
+      matLyoAcier,
+      SEED_SITES.LYO,
+      2,
+      "RELEASED"
+    );
   }
 
   const reservationCount = await prisma.stockReservation.count({
     where: { ofId: SEED_BOM.PALIER, status: "ACTIVE" }
   });
+  const lotCount = await prisma.materialLot.count();
+  const poCount = await prisma.purchaseOrder.count();
 
   console.log("Stock seed completed:", {
     materials: MATERIALS.length,
+    materialLots: lotCount,
+    purchaseOrders: poCount,
     sites: Array.from(new Set(MATERIALS.map((m) => m.siteCode))),
     activeReservations: reservationCount,
     reservedForOf: SEED_BOM.PALIER

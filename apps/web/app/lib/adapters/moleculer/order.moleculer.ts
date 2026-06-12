@@ -74,6 +74,9 @@ export function createMoleculerOrderAdapter(
           clientId: client.id,
           siteCode: siteCode(),
           isUrgent: input.priority === 'urgent',
+          carrier: input.carrier,
+          deliveryAddress: input.destination,
+          emoji: input.emoji,
           lines: [{
             productCode,
             description: input.destination,
@@ -83,6 +86,36 @@ export function createMoleculerOrderAdapter(
         }
       })
       return mapOrderToUi(order)
+    },
+
+    async update(id, input) {
+      const orderId = await resolveOrderId(id)
+      if (!orderId) throw new Error('NOT_FOUND')
+      const order = await request<Parameters<typeof mapOrderToUi>[0]>(
+        `/commercial/orders/${encodeURIComponent(orderId)}`,
+        {
+          method: 'PATCH',
+          body: {
+            clientName: input.client,
+            destination: input.destination,
+            promisedDeliveryDate: input.deliveryDate,
+            isUrgent: input.priority === 'urgent',
+            itemsCount: input.itemsCount,
+            carrier: input.carrier,
+            emoji: input.emoji
+          }
+        }
+      )
+      return mapOrderToUi(order)
+    },
+
+    async remove(id) {
+      const orderId = await resolveOrderId(id)
+      if (!orderId) throw new Error('NOT_FOUND')
+      await request(
+        `/commercial/orders/${encodeURIComponent(orderId)}`,
+        { method: 'DELETE' }
+      )
     },
 
     async updateStatus(id, status) {

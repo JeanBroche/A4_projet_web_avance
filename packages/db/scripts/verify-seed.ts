@@ -31,14 +31,50 @@ const checks: Check[] = [
   {
     name: "production batches",
     url: process.env.PRODUCTION_DATABASE_URL,
-    query: `SELECT COUNT(*)::int AS c FROM production.batch_products WHERE "deletedAt" IS NULL`,
-    min: 4
+    query: `SELECT COUNT(*)::int AS c FROM production."BatchProduct" WHERE "deletedAt" IS NULL`,
+    min: 6
   },
   {
     name: "shipments",
     url: process.env.SHIPMENT_DATABASE_URL,
     query: `SELECT COUNT(*)::int AS c FROM shipment.shipments WHERE "deletedAt" IS NULL`,
+    min: 4
+  },
+  {
+    name: "material_lots",
+    url: process.env.STOCK_DATABASE_URL,
+    query: `SELECT COUNT(*)::int AS c FROM stock.material_lots`,
+    min: 4
+  },
+  {
+    name: "purchase_orders",
+    url: process.env.STOCK_DATABASE_URL,
+    query: `SELECT COUNT(*)::int AS c FROM stock.purchase_orders`,
+    min: 2
+  },
+  {
+    name: "orders with carrier",
+    url: process.env.ORDER_DATABASE_URL,
+    query: `SELECT COUNT(*)::int AS c FROM "order".customer_orders WHERE carrier IS NOT NULL AND "deletedAt" IS NULL`,
     min: 3
+  },
+  {
+    name: "paris batches",
+    url: process.env.PRODUCTION_DATABASE_URL,
+    query: `SELECT COUNT(*)::int AS c FROM production."BatchProduct" WHERE "siteCode" = 'SITE-PAR' AND "deletedAt" IS NULL`,
+    min: 1
+  },
+  {
+    name: "paris shipments",
+    url: process.env.SHIPMENT_DATABASE_URL,
+    query: `SELECT COUNT(*)::int AS c FROM shipment.shipments WHERE "siteCode" = 'SITE-PAR' AND "deletedAt" IS NULL`,
+    min: 1
+  },
+  {
+    name: "pick lists PENDING",
+    url: process.env.SHIPMENT_DATABASE_URL,
+    query: `SELECT COUNT(*)::int AS c FROM shipment.pick_lists WHERE status = 'PENDING'`,
+    min: 1
   }
 ];
 
@@ -68,13 +104,19 @@ async function verifyMongo(): Promise<void> {
     const db = client.db(process.env.MONGO_DB ?? "aeronexis_audit");
     const auditLogs = await db.collection("audit_logs").countDocuments();
     const critical = await db.collection("critical_events").countDocuments();
-    if (auditLogs < 8) {
-      throw new Error(`audit_logs: expected >= 8, got ${auditLogs}`);
+    const documents = await db.collection("document_attachments").countDocuments();
+    if (auditLogs < 12) {
+      throw new Error(`audit_logs: expected >= 12, got ${auditLogs}`);
     }
-    if (critical < 2) {
-      throw new Error(`critical_events: expected >= 2, got ${critical}`);
+    if (critical < 3) {
+      throw new Error(`critical_events: expected >= 3, got ${critical}`);
     }
-    console.log(`✓ mongo audit_logs (${auditLogs}), critical_events (${critical})`);
+    if (documents < 1) {
+      throw new Error(`document_attachments: expected >= 1, got ${documents}`);
+    }
+    console.log(
+      `✓ mongo audit_logs (${auditLogs}), critical_events (${critical}), document_attachments (${documents})`
+    );
   } finally {
     await client.close();
   }
@@ -89,10 +131,12 @@ async function verifyRedis(): Promise<void> {
   const client = new Redis(url);
   try {
     const lyoLen = await client.llen("notification:inbox:SITE-LYO");
-    if (lyoLen < 4) {
-      throw new Error(`notification inbox SITE-LYO: expected >= 4, got ${lyoLen}`);
+    const parLen = await client.llen("notification:inbox:SITE-PAR");
+    const total = lyoLen + parLen;
+    if (total < 8) {
+      throw new Error(`notification inboxes total: expected >= 8, got ${total}`);
     }
-    console.log(`✓ redis notification inbox SITE-LYO (${lyoLen})`);
+    console.log(`✓ redis notifications SITE-LYO (${lyoLen}), SITE-PAR (${parLen})`);
   } finally {
     await client.quit();
   }

@@ -9,7 +9,8 @@ export const restShipmentRoutes: RouteDefinition[] = [
   { method: "GET", path: "logistics/shipments/:id", action: "shipment.shipment.get", layer: "REST" },
   { method: "GET", path: "logistics/shipments/:id/track", action: "shipment.shipment.track", layer: "REST" },
   { method: "PATCH", path: "logistics/shipments/:id", action: "shipment.shipment.update", layer: "REST" },
-  { method: "PATCH", path: "logistics/shipments/:id/status", action: "shipment.shipment.updateStatus", layer: "REST" }
+  { method: "PATCH", path: "logistics/shipments/:id/status", action: "shipment.shipment.updateStatus", layer: "REST" },
+  { method: "DELETE", path: "logistics/shipments/:id", action: "shipment.shipment.delete", layer: "REST" }
 ];
 
 export const restShipmentAliases: RouteAliasMap = toAliases(restShipmentRoutes);

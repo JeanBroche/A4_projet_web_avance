@@ -15,6 +15,7 @@ import {
   toOrderSummary
 } from "../../src/lib/order-helpers.js";
 import { publishOrderEvent } from "../../src/lib/events.js";
+import { DomainEvents } from "@aeronexis/shared";
 import { logOrderAudit } from "../../src/lib/audit.js";
 
 type OrderSetLogisticsStatusParams = z.infer<typeof orderSetLogisticsStatusSchema>;
@@ -37,6 +38,8 @@ export const orderSetLogisticsStatusAction = {
       return toOrderSummary(order);
     }
 
+    const wasDraft = order.status === ORDER_STATUSES.DRAFT;
+
     const updated = await applyOrderStatusTransition(
       prisma,
       order,
@@ -45,6 +48,14 @@ export const orderSetLogisticsStatusAction = {
       params.notes ?? `Statut logistique défini sur ${params.status}`,
       { manual: true }
     );
+
+    if (wasDraft && nextStatus === ORDER_STATUSES.VALIDATED) {
+      publishOrderEvent(ctx.service!, DomainEvents.order.validated, {
+        orderId: updated.id,
+        orderNumber: updated.orderNumber,
+        status: updated.status
+      });
+    }
 
     if (nextStatus === ORDER_STATUSES.SHIPPED) {
       publishOrderEvent(ctx.service!, "order.order.shipped", {

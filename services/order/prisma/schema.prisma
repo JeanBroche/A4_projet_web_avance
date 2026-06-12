@@ -39,6 +39,9 @@ model CustomerOrder {
   isUrgent             Boolean              @default(false)
   dueDate              DateTime?
   promisedDeliveryDate DateTime?
+  carrier              String?
+  deliveryAddress      String?
+  emoji                String?              @default("📦")
   totalAmount          Int                  @default(0)
   deletedAt            DateTime?
   createdAt            DateTime             @default(now())

@@ -696,7 +696,7 @@ const selectedEnrichedBom = computed(() =>
 <template>
   <div class="mx-auto w-full max-w-6xl">
 
-      <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
+      <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" role="alert" />
       <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="reloadPageData">Réessayer</UButton>
 
       <!-- Header -->
@@ -821,6 +821,7 @@ const selectedEnrichedBom = computed(() =>
                       'bg-orange-400': bomLineStatus(item, order.ofNumber) === 'low',
                       'bg-red-500': bomLineStatus(item, order.ofNumber) === 'out'
                     }"
+                    :aria-label="bomLineStatusLabel(bomLineStatus(item, order.ofNumber))"
                   />
                   <span class="truncate flex-1">{{ item.name }}</span>
                   <span class="shrink-0 font-medium text-gray-600 tabular-nums">{{ item.qtyNeeded }} {{ item.unit }}</span>
@@ -842,19 +843,19 @@ const selectedEnrichedBom = computed(() =>
     <!-- ═══ Modal détail OF ═══ -->
     <UModal v-model:open="isDetailOpen" :ui="modalUi('2xl')">
       <template #content>
-        <div v-if="selected" :class="MODAL_BODY">
+        <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="bom-detail-title">
           <div class="flex items-start gap-4 mb-5">
-            <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-[#0F62BC]/10 to-[#156FD4]/5 flex items-center justify-center text-3xl flex-shrink-0">{{ selected.emoji }}</div>
+            <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-[#0F62BC]/10 to-[#156FD4]/5 flex items-center justify-center text-3xl flex-shrink-0" aria-hidden="true">{{ selected.emoji }}</div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                <h2 class="text-lg font-bold text-gray-800">{{ selected.name }}</h2>
+                <h2 id="bom-detail-title" class="text-lg font-bold text-gray-800">{{ selected.name }}</h2>
                 <span v-if="ofReservations.length > 0" class="flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                   <UIcon name="i-lucide-bookmark" class="text-sm" /> Matières réservées
                 </span>
               </div>
               <p class="text-sm font-mono text-gray-400 mt-0.5">{{ selected.ofNumber }}</p>
             </div>
-            <UButton icon="i-lucide-x" variant="ghost" color="neutral" size="sm" @click="isDetailOpen = false" />
+            <UButton icon="i-lucide-x" variant="ghost" color="neutral" size="sm" aria-label="Fermer la fiche OF" @click="isDetailOpen = false" />
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
             <div class="bg-gray-50 rounded-xl p-3 text-center">
@@ -871,6 +872,7 @@ const selectedEnrichedBom = computed(() =>
                   size="xs"
                   icon="i-lucide-check"
                   class="bg-[#0F62BC] hover:bg-[#0d56a8] text-white"
+                  aria-label="Appliquer la quantité"
                   :loading="isMutating"
                   @click="applyOrderQty"
                 />
@@ -997,7 +999,7 @@ const selectedEnrichedBom = computed(() =>
             />
           </div>
 
-          <UAlert v-if="bomEditError" color="error" variant="soft" :title="bomEditError" class="mb-3" />
+          <UAlert v-if="bomEditError" color="error" variant="soft" :title="bomEditError" class="mb-3" role="alert" />
 
           <!-- Mode édition BOM -->
           <div v-if="isEditingBom" class="space-y-3">
@@ -1018,7 +1020,7 @@ const selectedEnrichedBom = computed(() =>
                     = {{ computeBomNeed(row.qtyPerUnit, selected!.qty) }} {{ row.unit }}
                   </p>
                 </div>
-                <UButton icon="i-lucide-x" variant="ghost" color="error" size="xs" @click="removeEditBomRow(idx)" />
+                <UButton icon="i-lucide-x" variant="ghost" color="error" size="xs" :aria-label="`Supprimer la ligne ${row.name}`" @click="removeEditBomRow(idx)" />
               </div>
             </div>
             <p v-else class="text-sm text-gray-400 text-center py-4">Aucune ligne — ajoutez des pièces depuis le stock.</p>
@@ -1099,6 +1101,7 @@ const selectedEnrichedBom = computed(() =>
                   'bg-orange-400': bomLineStatus(item, selected.ofNumber) === 'low',
                   'bg-red-500': bomLineStatus(item, selected.ofNumber) === 'out'
                 }"
+                :aria-label="bomLineStatusLabel(bomLineStatus(item, selected.ofNumber))"
               />
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-800 truncate">{{ item.name }}</p>
@@ -1123,7 +1126,7 @@ const selectedEnrichedBom = computed(() =>
               <UIcon name="i-lucide-bookmark" class="text-indigo-500" />
               Réservations actives
             </h3>
-            <UAlert v-if="reservationActionError" color="error" variant="soft" :title="reservationActionError" class="mb-3" />
+            <UAlert v-if="reservationActionError" color="error" variant="soft" :title="reservationActionError" class="mb-3" role="alert" />
             <div class="space-y-2">
               <div
                 v-for="res in ofReservations"
@@ -1231,18 +1234,18 @@ const selectedEnrichedBom = computed(() =>
     <!-- ═══ Modal réservation matières ═══ -->
     <UModal v-model:open="isReserveOpen" :ui="modalUi('lg')">
       <template #content>
-        <div v-if="selected" :class="MODAL_BODY">
+        <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="bom-reserve-title">
           <div class="flex items-center gap-3 mb-4">
             <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
               <UIcon name="i-lucide-bookmark" class="text-indigo-600 text-lg" />
             </div>
             <div>
-              <h3 class="text-base font-semibold text-gray-800">Réserver les matières</h3>
+              <h2 id="bom-reserve-title" class="text-base font-semibold text-gray-800">Réserver les matières</h2>
               <p class="text-xs text-gray-400 mt-0.5">{{ selected.ofNumber }} — réservation au besoin exact de la BOM</p>
             </div>
           </div>
 
-          <UAlert v-if="reserveError" color="error" variant="soft" :title="reserveError" class="mb-4" />
+          <UAlert v-if="reserveError" color="error" variant="soft" :title="reserveError" class="mb-4" role="alert" />
 
           <div class="space-y-2 max-h-80 overflow-y-auto">
             <div
@@ -1300,7 +1303,7 @@ const selectedEnrichedBom = computed(() =>
     <!-- ═══ Modal création OF ═══ -->
     <UModal v-model:open="isCreateOpen" :ui="modalUi(canManageBomOrders ? '5xl' : '2xl')">
       <template #content>
-        <div :class="MODAL_BODY">
+        <div :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="bom-create-title">
 
           <!-- Header -->
           <div class="flex items-center gap-3 mb-5">
@@ -1308,7 +1311,7 @@ const selectedEnrichedBom = computed(() =>
               <UIcon name="i-lucide-plus-circle" class="text-[#0F62BC] text-lg" />
             </div>
             <div>
-              <h3 class="text-base font-semibold text-gray-800">Nouvel ordre de fabrication</h3>
+              <h2 id="bom-create-title" class="text-base font-semibold text-gray-800">Nouvel ordre de fabrication</h2>
               <p class="text-xs text-gray-400 mt-0.5">Renseigner les infos et la nomenclature (BOM)</p>
             </div>
           </div>
@@ -1319,6 +1322,7 @@ const selectedEnrichedBom = computed(() =>
             variant="soft"
             :title="createError"
             class="mb-4"
+            role="alert"
           />
 
           <UTabs
@@ -1343,7 +1347,10 @@ const selectedEnrichedBom = computed(() =>
               <div class="flex gap-2 flex-wrap">
                 <button
                   v-for="e in emojis" :key="e"
+                  type="button"
                   :class="['w-9 h-9 rounded-lg text-xl flex items-center justify-center transition-all', newOf.emoji === e ? 'bg-[#0F62BC]/10 ring-2 ring-[#0F62BC]/40' : 'bg-gray-50 hover:bg-gray-100']"
+                  :aria-label="`Icône ${e}`"
+                  :aria-pressed="newOf.emoji === e"
                   @click="newOf.emoji = e"
                 >{{ e }}</button>
               </div>
@@ -1387,7 +1394,7 @@ const selectedEnrichedBom = computed(() =>
                   <p class="text-[11px] font-mono text-gray-400">{{ row.reference }}</p>
                 </div>
                 <span class="text-xs text-gray-500 flex-shrink-0">{{ row.qtyPerUnit }} {{ row.unit }}/u</span>
-                <UButton icon="i-lucide-x" variant="ghost" color="error" size="xs" @click="removeBomRow(idx)" />
+                <UButton icon="i-lucide-x" variant="ghost" color="error" size="xs" :aria-label="`Supprimer la ligne ${row.name}`" @click="removeBomRow(idx)" />
               </div>
             </div>
 

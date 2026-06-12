@@ -21,22 +21,45 @@ type BatchListPage = {
 };
 
 const TERMINAL_STATUSES = ["COMPLETED", "CANCELLED"];
+const BATCH_PAGE_SIZE = 100;
+const MAX_BATCHES_FETCHED = 500;
 
-async function loadActiveBatches(
+async function loadAllBatches(
   ctx: Context,
   siteCode: string | undefined,
   accessToken: string | undefined
 ): Promise<BatchRow[]> {
-  const page = await callDownstream<BatchListPage>(
-    ctx,
-    "production.batch.list",
-    {
-      ...(siteCode ? { siteCode } : {}),
-      limit: 500
-    },
-    accessToken
-  );
-  return page.items.filter((b) => !TERMINAL_STATUSES.includes(b.status));
+  const collected: BatchRow[] = [];
+  let offset = 0;
+
+  while (collected.length < MAX_BATCHES_FETCHED) {
+    const page = await callDownstream<BatchListPage>(
+      ctx,
+      "production.batch.list",
+      {
+        ...(siteCode ? { siteCode } : {}),
+        limit: BATCH_PAGE_SIZE,
+        offset
+      },
+      accessToken
+    );
+
+    if (page.items.length === 0) {
+      break;
+    }
+
+    collected.push(...page.items);
+    offset += page.items.length;
+    if (offset >= page.total) {
+      break;
+    }
+  }
+
+  return collected;
+}
+
+function loadActiveBatches(batches: BatchRow[]): BatchRow[] {
+  return batches.filter((b) => !TERMINAL_STATUSES.includes(b.status));
 }
 
 export const avancementCalculation = {
@@ -49,11 +72,12 @@ export const avancementCalculation = {
       "calcul.production.avancement",
       { siteCode: params.siteCode ?? null },
       async () => {
-        const batches = await loadActiveBatches(
+        const allBatches = await loadAllBatches(
           ctx,
           params.siteCode,
           params.accessToken
         );
+        const batches = loadActiveBatches(allBatches);
 
         const totalActive = batches.length;
         const totalProgress = batches.reduce(
@@ -63,8 +87,20 @@ export const avancementCalculation = {
         const averageProgress =
           totalActive > 0 ? Math.round(totalProgress / totalActive) : 0;
 
+        const totalBatches = allBatches.length;
+        const completedBatches = allBatches.filter(
+          (b) => b.status === "COMPLETED"
+        ).length;
+        const yieldRate =
+          totalBatches > 0
+            ? Math.round((completedBatches / totalBatches) * 100)
+            : 0;
+
         return {
           siteCode: params.siteCode ?? null,
+          totalBatches,
+          completedBatches,
+          yieldRate,
           totalActiveBatches: totalActive,
           averageProgress
         };
@@ -83,10 +119,8 @@ export const retardLotsCalculation = {
       "calcul.production.retardLots",
       { siteCode: params.siteCode ?? null },
       async () => {
-        const batches = await loadActiveBatches(
-          ctx,
-          params.siteCode,
-          params.accessToken
+        const batches = loadActiveBatches(
+          await loadAllBatches(ctx, params.siteCode, params.accessToken)
         );
         const now = new Date();
 

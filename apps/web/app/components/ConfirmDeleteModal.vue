@@ -13,7 +13,7 @@ defineEmits<{ confirm: [] }>()
 <template>
   <UModal v-model:open="open" :ui="modalUi('sm')">
     <template #content>
-      <div :class="MODAL_BODY" role="dialog" aria-labelledby="confirm-delete-title">
+      <div :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
         <h2 id="confirm-delete-title" class="text-lg font-semibold text-gray-800 mb-2">
           {{ title ?? 'Confirmer la suppression' }}
         </h2>

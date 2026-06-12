@@ -58,6 +58,17 @@ export const createOrderSchema = z.object({
   emoji: z.string().min(1)
 })
 
+export const updateOrderSchema = z.object({
+  client: z.string().trim().min(1, 'Client requis'),
+  destination: z.string().trim().min(1, 'Destination requise'),
+  itemsCount: z.coerce.number().int().min(1, 'Au moins 1 article'),
+  weightValue: z.coerce.number().min(1, 'Poids minimal : 1 kg'),
+  carrier: z.string().trim().min(1, 'Transporteur requis'),
+  emoji: z.string().min(1),
+  deliveryDate: z.string().trim().min(1, 'Date de livraison requise'),
+  priority: z.enum(['normal', 'urgent'])
+})
+
 export const createProductSchema = z.object({
   productCode: z.string().trim().min(1, 'Code produit requis'),
   description: z.string().trim().min(1, 'Description requise'),

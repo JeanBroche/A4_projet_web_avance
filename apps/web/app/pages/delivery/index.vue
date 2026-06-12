@@ -5,8 +5,8 @@ import type { DeliveryStatus, Shipment } from '~/types'
 definePageMeta({ layout: 'sidebar' })
 
 const route = useRoute()
-const { shipments, status, error, isMutating, refresh, create, update: updateShipment } = useShipments()
-const { canPlanShipments, canManageStock, pageSubtitle } = useRoleCapabilities()
+const { shipments, status, error, isMutating, refresh, create, update: updateShipment, remove } = useShipments()
+const { canPlanShipments, pageSubtitle } = useRoleCapabilities()
 
 const createFormError = ref<string | null>(null)
 const editFormError = ref<string | null>(null)
@@ -149,6 +149,18 @@ async function submitEditShipment() {
     editFormError.value = error.value ?? 'Impossible d\'enregistrer les modifications.'
   }
 }
+
+async function handleDeleteShipment() {
+  if (!selected.value) return
+  if (!confirm(`Supprimer l'expédition ${selected.value.shipmentNumber} ?`)) return
+  try {
+    await remove(selected.value.id, selected.value.backendId)
+    isModalOpen.value = false
+    selected.value = null
+  } catch {
+    editFormError.value = error.value ?? 'Impossible de supprimer l\'expédition.'
+  }
+}
 </script>
 
 <template>
@@ -169,7 +181,8 @@ async function submitEditShipment() {
       </div>
 
       <div :class="TOOLBAR">
-        <UInput v-model="search" icon="i-lucide-search" placeholder="N° expédition, client..." class="w-full sm:flex-1" />
+        <label for="delivery-search" class="sr-only">Rechercher une expédition</label>
+        <UInput id="delivery-search" v-model="search" icon="i-lucide-search" placeholder="N° expédition, client..." class="w-full sm:flex-1" />
         <UButton
           v-if="canPlanShipments"
           icon="i-lucide-truck"
@@ -239,11 +252,11 @@ async function submitEditShipment() {
 
     <UModal v-model:open="isModalOpen" :ui="modalUi('lg')">
       <template #content>
-        <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-labelledby="shipment-detail-title">
+        <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="shipment-detail-title">
 
           <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-5">
             <div class="flex gap-3 flex-1 min-w-0">
-              <div v-if="!canManageStock" class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl shrink-0">
+              <div v-if="!canPlanShipments" class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-2xl shrink-0">
                 {{ selected.emoji }}
               </div>
               <USelectMenu
@@ -251,10 +264,11 @@ async function submitEditShipment() {
                 v-model="editForm.emoji"
                 :items="['🚚', '✈️', '📦', '🚢', '🚂']"
                 class="w-16 shrink-0"
+                aria-label="Vecteur de transport"
               />
               <div class="flex-1 min-w-0 space-y-2">
                 <h2 id="shipment-detail-title" class="text-lg font-bold text-gray-800">{{ selected.shipmentNumber }}</h2>
-                <template v-if="canManageStock">
+                <template v-if="canPlanShipments">
                   <UInput v-model="editForm.client" placeholder="Client" icon="i-lucide-building-2" size="sm" />
                   <UInput v-model="editForm.orderNumber" placeholder="N° commande" icon="i-lucide-file-text" size="sm" class="font-mono" />
                 </template>
@@ -264,7 +278,7 @@ async function submitEditShipment() {
                 </template>
               </div>
             </div>
-            <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="isModalOpen = false" />
+            <UButton icon="i-lucide-x" color="neutral" variant="ghost" aria-label="Fermer la fiche expédition" @click="isModalOpen = false" />
           </div>
 
           <UAlert
@@ -284,7 +298,7 @@ async function submitEditShipment() {
                 <div>
                   <label class="text-xs text-gray-400 block mb-1">Date de départ effective</label>
                   <UInput
-                    v-if="canManageStock"
+                    v-if="canPlanShipments"
                     v-model="editForm.departureDate"
                     type="date"
                     icon="i-lucide-log-out"
@@ -298,7 +312,7 @@ async function submitEditShipment() {
                 <div>
                   <label class="text-xs text-gray-400 block mb-1">Livraison prévue</label>
                   <UInput
-                    v-if="canManageStock"
+                    v-if="canPlanShipments"
                     v-model="editForm.estimatedDelivery"
                     type="date"
                     icon="i-lucide-calendar"
@@ -317,7 +331,7 @@ async function submitEditShipment() {
               <div>
                 <label class="text-xs text-gray-400 block mb-1">Transporteur officiel</label>
                 <USelectMenu
-                  v-if="canManageStock"
+                  v-if="canPlanShipments"
                   v-model="editForm.carrier"
                   :items="carrierOptions"
                   size="sm"
@@ -327,7 +341,7 @@ async function submitEditShipment() {
               <div>
                 <label class="text-xs text-gray-400 block mb-1">Adresse de livraison</label>
                 <UInput
-                  v-if="canManageStock"
+                  v-if="canPlanShipments"
                   v-model="editForm.address"
                   icon="i-lucide-map-pinned"
                   size="sm"
@@ -339,7 +353,7 @@ async function submitEditShipment() {
 
           <div class="border border-gray-100 rounded-xl p-4 mb-6">
             <p class="text-xs font-bold uppercase text-gray-400 mb-3">Statut de l'expédition</p>
-            <div v-if="canManageStock" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div v-if="canPlanShipments" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <UButton
                 v-for="option in statusOptions"
                 :key="option.value"
@@ -367,19 +381,34 @@ async function submitEditShipment() {
             class="mb-4"
           />
 
-          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-3 border-t border-gray-100">
-            <UButton variant="ghost" color="neutral" @click="isModalOpen = false">
-              Fermer
-            </UButton>
+          <div class="flex flex-wrap justify-between items-center gap-2 pt-3 border-t border-gray-100">
             <UButton
-              v-if="canManageStock"
-              class="bg-[#0F62BC] text-white hover:bg-[#156FD4]"
-              icon="i-lucide-save"
+              v-if="canPlanShipments"
+              icon="i-lucide-trash-2"
+              color="error"
+              variant="outline"
+              size="sm"
               :loading="isMutating"
-              @click="submitEditShipment"
+              @click="handleDeleteShipment"
             >
-              Enregistrer
+              Supprimer
             </UButton>
+
+            <div class="flex flex-wrap gap-2 ms-auto">
+              <UButton variant="ghost" color="neutral" @click="isModalOpen = false">
+                Fermer
+              </UButton>
+              <UButton
+                v-if="canPlanShipments"
+                class="bg-[#0F62BC] text-white hover:bg-[#156FD4]"
+                icon="i-lucide-save"
+                size="sm"
+                :loading="isMutating"
+                @click="submitEditShipment"
+              >
+                Enregistrer
+              </UButton>
+            </div>
           </div>
 
         </div>
@@ -388,13 +417,13 @@ async function submitEditShipment() {
 
     <UModal v-model:open="isCreateModalOpen" :ui="modalUi('md')">
       <template #content>
-        <div :class="MODAL_BODY" role="dialog" aria-labelledby="shipment-create-title">
+        <div :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="shipment-create-title">
           <div class="flex justify-between items-start mb-5">
             <div>
               <h2 id="shipment-create-title" class="text-lg font-bold text-gray-800">Planifier un transport</h2>
               <p class="text-xs text-gray-400 mt-0.5">L'identifiant séquentiel (EXP-2026-XXX) est calculé automatiquement.</p>
             </div>
-            <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="isCreateModalOpen = false" />
+            <UButton icon="i-lucide-x" color="neutral" variant="ghost" aria-label="Fermer le formulaire de planification" @click="isCreateModalOpen = false" />
           </div>
 
           <div class="space-y-4 mb-6">
@@ -425,7 +454,7 @@ async function submitEditShipment() {
               </div>
               <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Vecteur</label>
-                <USelectMenu v-model="createForm.emoji" :items="['🚚', '✈️', '📦', '🚢', '🚂']" />
+                <USelectMenu v-model="createForm.emoji" :items="['🚚', '✈️', '📦', '🚢', '🚂']" aria-label="Vecteur de transport" />
               </div>
             </div>
           </div>

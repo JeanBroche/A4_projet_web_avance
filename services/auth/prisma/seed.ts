@@ -117,6 +117,7 @@ async function main() {
     sites.set(entry.code, row.id);
   }
   const lyoSiteId = sites.get(SEED_SITES.LYO)!;
+  const parSiteId = sites.get(SEED_SITES.PAR)!;
 
   for (const role of ROLES) {
     const existingRole = await prisma.role.findFirst({
@@ -132,10 +133,11 @@ async function main() {
     }
   }
 
-  const seededUsers: string[] = [];
+  const seededUsers: Array<{ email: string; siteCode: string }> = [];
   for (const role of Object.keys(SEED_USERS) as SeedUserRole[]) {
-    const user = await upsertSeedUser(role, lyoSiteId);
-    seededUsers.push(user.email);
+    const siteId = role === "commercial" ? parSiteId : lyoSiteId;
+    const user = await upsertSeedUser(role, siteId);
+    seededUsers.push({ email: user.email, siteCode: SEED_USERS[role].siteCode });
   }
 
   console.log("Auth seed completed:", {

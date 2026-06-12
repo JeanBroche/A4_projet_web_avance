@@ -2,7 +2,7 @@
 withDefaults(defineProps<{
   alt?: string
 }>(), {
-  alt: 'AERONEXIS Dynamics — Precision Beyond Limits'
+  alt: 'AERONEXIS Dynamics — Précision au-delà des limites'
 })
 </script>
 

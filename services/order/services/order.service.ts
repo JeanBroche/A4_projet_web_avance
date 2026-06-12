@@ -25,6 +25,8 @@ import {
   orderMarkShippedAction,
   orderMarkDeliveredAction,
   orderSetLogisticsStatusAction,
+  orderUpdateAction,
+  orderDeleteAction,
  } from "./actions/index.js"
 
 const OrderService: ServiceSchema = {
@@ -77,6 +79,10 @@ const OrderService: ServiceSchema = {
     "order.markDelivered": orderMarkDeliveredAction,
 
     "order.setLogisticsStatus": orderSetLogisticsStatusAction,
+
+    "order.update": orderUpdateAction,
+
+    "order.delete": orderDeleteAction,
   },
 
   events: {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FIELD_HINT } from '~/utils/a11y'
 import type { AiOfProposal } from '~/lib/validation/ai-of'
 import type { OfAssistantMessage } from '~/composables/useOfAssistant'
 import type { StockLevel } from '~/types'
@@ -44,12 +45,12 @@ function onKeydown(event: KeyboardEvent) {
 <template>
   <div class="flex flex-col h-full min-h-[280px] lg:min-h-[420px] rounded-xl border border-gray-200 bg-gray-50/50 overflow-hidden">
     <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white shrink-0">
-      <UIcon name="i-lucide-sparkles" class="text-[#0F62BC] text-lg" />
+      <UIcon name="i-lucide-sparkles" class="text-[#0F62BC] text-lg" aria-hidden="true" />
       <div>
         <p class="text-sm font-semibold text-gray-800">
           Assistant IA
         </p>
-        <p class="text-[11px] text-gray-400">
+        <p :class="FIELD_HINT">
           Décrivez l'OF à créer
         </p>
       </div>
@@ -61,12 +62,19 @@ function onKeydown(event: KeyboardEvent) {
       variant="soft"
       :title="error"
       class="m-3 mb-0 shrink-0"
+      role="alert"
     />
 
-    <div class="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+    <div
+      class="flex-1 overflow-y-auto p-3 space-y-3 min-h-0"
+      role="log"
+      aria-live="polite"
+      aria-label="Conversation avec l'assistant IA"
+      :aria-busy="isLoading"
+    >
       <div
         v-if="messages.length === 0 && !isLoading"
-        class="text-xs text-gray-400 italic px-2 py-4 text-center"
+        class="text-xs text-gray-500 italic px-2 py-4 text-center"
       >
         Ex. : « 4 bras articulés A320, priorité haute, avec roulements et vis »
         <span v-if="materials.length === 0" class="block mt-2 text-amber-600 not-italic">
@@ -83,11 +91,12 @@ function onKeydown(event: KeyboardEvent) {
             ? 'ml-auto bg-[#0F62BC] text-white'
             : 'mr-auto bg-white border border-gray-100 text-gray-700'
         ]"
+        :aria-label="msg.role === 'user' ? 'Vous' : 'Assistant'"
       >
         {{ msg.content }}
       </div>
 
-      <div v-if="isLoading" class="mr-auto flex items-center gap-2 text-xs text-gray-400 px-2">
+      <div v-if="isLoading" class="mr-auto flex items-center gap-2 text-xs text-gray-500 px-2" role="status">
         <USkeleton class="h-4 w-4 rounded-full" />
         <span>L'assistant réfléchit…</span>
       </div>
@@ -112,6 +121,7 @@ function onKeydown(event: KeyboardEvent) {
         <UTextarea
           v-model="chatInput"
           placeholder="Décrivez l'ordre de fabrication…"
+          aria-label="Décrire l'ordre de fabrication"
           :rows="2"
           autoresize
           :maxrows="4"
@@ -122,6 +132,7 @@ function onKeydown(event: KeyboardEvent) {
         <UButton
           icon="i-lucide-send"
           class="self-end bg-[#0F62BC] hover:bg-[#0d56a8] text-white shrink-0"
+          aria-label="Envoyer le message"
           :loading="isLoading"
           :disabled="!chatInput.trim()"
           @click="submit"

@@ -51,7 +51,7 @@ async function onSubmit() {
           <UInput v-model="password" type="password" placeholder="••••••••" class="w-full" />
         </UFormField>
 
-        <p v-if="error" class="text-red-500 text-sm text-center">
+        <p v-if="error" class="text-red-500 text-sm text-center" role="alert">
           {{ error }}
         </p>
 
@@ -84,7 +84,9 @@ async function onSubmit() {
   33%       { transform: scale(1.1) translate(-20px, -25px); opacity: 0.65; }
   66%       { transform: scale(0.95) translate(25px, 10px); opacity: 0.4; }
 }
-.animate-blob-1 { animation: blob-1 8s ease-in-out infinite; }
-.animate-blob-2 { animation: blob-2 10s ease-in-out infinite; }
-.animate-blob-3 { animation: blob-3 9s ease-in-out infinite; }
+@media (prefers-reduced-motion: no-preference) {
+  .animate-blob-1 { animation: blob-1 8s ease-in-out infinite; }
+  .animate-blob-2 { animation: blob-2 10s ease-in-out infinite; }
+  .animate-blob-3 { animation: blob-3 9s ease-in-out infinite; }
+}
 </style>

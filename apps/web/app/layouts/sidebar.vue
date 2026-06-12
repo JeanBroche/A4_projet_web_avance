@@ -2,6 +2,7 @@
 import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
 import { canSeeNavItem, getDefaultRouteForRole, getRoleConfig } from '~/lib/roles'
 import type { UserRole } from '~/types'
+import { SKIP_LINK_CLASSES } from '~/utils/a11y'
 
 const { open, isDesktop, toggleSidebar, closeSidebar } = useSidebarLayout()
 
@@ -109,7 +110,7 @@ const userDisplay = computed(() => ({
 const userItems = computed<DropdownMenuItem[][]>(() => [
   [
     {
-      label: 'Mon Activité',
+      label: 'Mon activité',
       icon: 'i-lucide-square-activity',
       to: '/activity'
     },
@@ -126,6 +127,9 @@ const userItems = computed<DropdownMenuItem[][]>(() => [
 
 <template>
   <div class="flex min-h-dvh min-w-0 flex-1">
+    <a href="#main-content" :class="SKIP_LINK_CLASSES">
+      Aller au contenu
+    </a>
     <Transition
       enter-active-class="transition-opacity duration-200"
       enter-from-class="opacity-0"
@@ -261,7 +265,11 @@ const userItems = computed<DropdownMenuItem[][]>(() => [
         </NuxtLink>
       </header>
 
-      <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50/50 px-3 py-4 sm:px-5 sm:py-6">
+      <main
+        id="main-content"
+        tabindex="-1"
+        class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50/50 px-3 py-4 sm:px-5 sm:py-6"
+      >
         <slot />
       </main>
     </div>

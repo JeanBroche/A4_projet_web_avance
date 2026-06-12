@@ -23,6 +23,6 @@ export const MODAL_FOOTER = 'flex flex-col-reverse gap-2 sm:flex-row sm:justify-
 
 export const PAGE_HEADER = 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6'
 export const PAGE_TITLE = 'text-xl sm:text-2xl font-bold text-[#0F62BC]'
-export const PAGE_SUBTITLE = 'text-xs sm:text-sm text-gray-400 mt-0.5'
+export const PAGE_SUBTITLE = 'text-xs sm:text-sm text-gray-500 mt-0.5'
 export const TOOLBAR = 'flex flex-col gap-2 sm:flex-row sm:items-center mb-4 sm:mb-6'
 export const TOOLBAR_ACTIONS = 'flex flex-col xs:flex-row gap-2 w-full sm:w-auto sm:items-center'

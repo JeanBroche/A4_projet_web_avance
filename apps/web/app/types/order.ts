@@ -31,6 +31,17 @@ export interface CreateOrderInput {
   productCode?: string
 }
 
+export interface UpdateOrderInput {
+  client: string
+  destination: string
+  itemsCount: number
+  weightValue: number
+  carrier: string
+  emoji: string
+  deliveryDate: string
+  priority: OrderPriority
+}
+
 export interface ClientStats {
   client: string
   orderCount: number

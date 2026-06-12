@@ -41,6 +41,27 @@ export const marginCalculation = {
         );
         const margin = totalRevenue - estimatedCost;
 
+        const orderMargins = orders
+          .map((order) => {
+            const revenue = estimateOrderRevenue(order);
+            const cost = estimateOrderCost(revenue, config);
+            const marginPercent =
+              revenue > 0
+                ? Math.round(((revenue - cost) / revenue) * 1000) / 10
+                : 0;
+            const firstLine = order.lines?.[0];
+            return {
+              orderNumber: order.orderNumber,
+              clientName: order.client?.name ?? "—",
+              productCode: firstLine?.productCode ?? "—",
+              ofNumber: firstLine?.ofId ?? order.orderNumber,
+              totalAmount: revenue,
+              estimatedCost: cost,
+              marginPercent
+            };
+          })
+          .sort((a, b) => a.marginPercent - b.marginPercent);
+
         return {
           siteCode: params.siteCode ?? null,
           windowDays,
@@ -49,7 +70,8 @@ export const marginCalculation = {
           estimatedCost,
           margin,
           targetMarginRate: config.targetMarginRate,
-          costRatio: 1 - config.targetMarginRate
+          costRatio: 1 - config.targetMarginRate,
+          orders: orderMargins
         };
       }
     );

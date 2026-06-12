@@ -51,6 +51,9 @@ export const orderCreateAction = {
           isUrgent: params.isUrgent ?? false,
           dueDate: params.dueDate,
           promisedDeliveryDate: params.promisedDeliveryDate,
+          carrier: params.carrier,
+          deliveryAddress: params.deliveryAddress ?? params.lines[0]?.description,
+          emoji: params.emoji ?? "📦",
           totalAmount,
           lines: {
             create: params.lines.map((line, index) => ({

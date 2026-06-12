@@ -12,7 +12,7 @@ useHead({
 })
 
 const title = 'AERONEXIS Dynamics'
-const description = 'ERP modulaire pour composants mecaniques de haute precision.'
+const description = 'ERP modulaire pour composants mécaniques de haute précision.'
 
 useSeoMeta({
   title,

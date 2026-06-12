@@ -4,6 +4,7 @@ import type {
   AsyncStatus,
   ClientStats,
   CreateOrderInput,
+  UpdateOrderInput,
   Order,
   OrderHistoryEntry,
   OrderPriority,
@@ -36,10 +37,43 @@ export function useOrders() {
 
   async function create(input: CreateOrderInput) {
     isMutating.value = true
+    mutationError.value = null
     try {
       await adapters.order.create(input)
       await refresh()
       await syncNotificationsAfterMutation()
+    } catch (e) {
+      mutationError.value = toFailureResult(e).message
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function update(id: number, input: UpdateOrderInput) {
+    isMutating.value = true
+    mutationError.value = null
+    try {
+      await adapters.order.update(id, input)
+      await refresh()
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      mutationError.value = toFailureResult(e).message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
+  async function remove(id: number) {
+    isMutating.value = true
+    mutationError.value = null
+    try {
+      await adapters.order.remove(id)
+      await refresh()
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      mutationError.value = toFailureResult(e).message
+      throw e
     } finally {
       isMutating.value = false
     }
@@ -118,6 +152,8 @@ export function useOrders() {
     orderHistory,
     refresh,
     create,
+    update,
+    remove,
     updateStatus,
     validate,
     reject,

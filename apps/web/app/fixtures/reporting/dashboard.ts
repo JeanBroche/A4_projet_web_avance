@@ -1,4 +1,4 @@
-import type { CriticalIncident, KpiDashboard, MarginData } from '~/types'
+import type { AtRiskMaterial, CriticalIncident, KpiDashboard, MarginData } from '~/types'
 
 export function createInitialMarginOrders(): MarginData[] {
   return createSiteMarginOrders('SITE-LYO')
@@ -24,9 +24,16 @@ export function createConsolidatedMarginOrders(): MarginData[] {
 }
 
 export interface KpiLiveMetrics {
-  delayedOrders: number
-  bomAnomalies: number
   yieldRate: number
+  averageProgress: number
+  activeBatches: number
+  lateBatches: number
+  stockRuptures: number
+  atRiskMaterials: AtRiskMaterial[]
+  averageConsumptionPerDay: number
+  urgentOrders: number
+  delayRiskOrders: number
+  estimatedDelayCost: string
   criticalIncidents: CriticalIncident[]
 }
 
@@ -37,11 +44,22 @@ export function computeKpiDashboard(marginOrders: MarginData[], metrics: KpiLive
 
   return {
     globalMargin: avgMargin.toFixed(1),
-    delayedOrders: metrics.delayedOrders,
-    bomAnomalies: metrics.bomAnomalies,
     totalValue: totalRevenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }),
-    yieldRate: metrics.yieldRate,
+    estimatedDelayCost: metrics.estimatedDelayCost,
     marginOrders,
+
+    yieldRate: metrics.yieldRate,
+    averageProgress: metrics.averageProgress,
+    activeBatches: metrics.activeBatches,
+    lateBatches: metrics.lateBatches,
+
+    stockRuptures: metrics.stockRuptures,
+    atRiskMaterials: metrics.atRiskMaterials,
+    averageConsumptionPerDay: metrics.averageConsumptionPerDay,
+
+    urgentOrders: metrics.urgentOrders,
+    delayRiskOrders: metrics.delayRiskOrders,
+
     criticalIncidents: metrics.criticalIncidents
   }
 }

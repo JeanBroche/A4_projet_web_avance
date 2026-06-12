@@ -46,6 +46,7 @@ export function useReporting() {
           label: ev.title,
           detail: ev.description,
           severity: 'error' as const,
+          category: 'audit' as const,
           targetRoute: '/activity'
         }))
         const merged = [...dashboard.value.criticalIncidents, ...auditIncidents]

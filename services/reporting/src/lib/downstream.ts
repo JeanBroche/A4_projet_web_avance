@@ -1,4 +1,5 @@
 import type { Context } from "moleculer";
+import { unwrapResponse } from "@aeronexis/services-shared";
 
 export async function callDownstream<T>(
   ctx: Context,
@@ -11,5 +12,7 @@ export async function callDownstream<T>(
   if (token) {
     payload.accessToken = token;
   }
-  return ctx.call<T, Record<string, unknown>>(action, payload);
+  return unwrapResponse(
+    await ctx.call<T, Record<string, unknown>>(action, payload)
+  );
 }

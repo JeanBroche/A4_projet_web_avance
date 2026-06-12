@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { ServiceBroker } from "moleculer";
 import jwt, { type SignOptions } from "jsonwebtoken";
-import { getErrorCode } from "@aeronexis/services-shared";
+import { getErrorCode, successResponse, unwrapResponse } from "@aeronexis/services-shared";
+import { resetRedisClient } from "@aeronexis/redis-infra";
 import moleculerConfig from "../moleculer.config.js";
 import ReportingService from "../services/reporting.service.js";
 import { getKpiConfig } from "../src/lib/kpi-config.js";
@@ -30,6 +31,7 @@ const tokens = {
 };
 
 let lastBatchListParams: Record<string, unknown> = {};
+const batchListCalls: Array<Record<string, unknown>> = [];
 
 function signTestToken(
   roles: string[],
@@ -48,7 +50,7 @@ function signTestToken(
 }
 
 async function callAction<T>(action: string, params?: Record<string, unknown>): Promise<T> {
-  return broker.call(action, params) as Promise<T>;
+  return unwrapResponse(await broker.call(action, params)) as T;
 }
 
 const FIXED_NOW = new Date();
@@ -56,9 +58,52 @@ const dayMs = 24 * 60 * 60 * 1000;
 const inPast = (days: number) => new Date(FIXED_NOW.getTime() - days * dayMs);
 const inFuture = (days: number) => new Date(FIXED_NOW.getTime() + days * dayMs);
 
+type BatchListItem = {
+  batch_id: string;
+  batch_code: string;
+  status: string;
+  progress: number;
+  plannedStartAt: string;
+  plannedEndAt: string;
+};
+
+function defaultBatchItems(): BatchListItem[] {
+  return [
+    {
+      batch_id: "b1",
+      batch_code: "BATCH-001",
+      status: "IN_PROGRESS",
+      progress: 60,
+      plannedStartAt: inPast(2).toISOString(),
+      plannedEndAt: inFuture(3).toISOString()
+    },
+    {
+      batch_id: "b2",
+      batch_code: "BATCH-002",
+      status: "IN_PROGRESS",
+      progress: 40,
+      plannedStartAt: inPast(5).toISOString(),
+      plannedEndAt: inPast(1).toISOString()
+    },
+    {
+      batch_id: "b3",
+      batch_code: "BATCH-003",
+      status: "COMPLETED",
+      progress: 100,
+      plannedStartAt: inPast(10).toISOString(),
+      plannedEndAt: inPast(2).toISOString()
+    }
+  ];
+}
+
+let batchListItems: BatchListItem[] = [];
+
 let historyOrders: Array<Record<string, unknown>> = [];
 
 before(async () => {
+  delete process.env.REDIS_URL;
+  resetRedisClient();
+
   historyOrders = [
     {
       id: "h1",
@@ -100,16 +145,16 @@ before(async () => {
     actions: {
       "level.list": {
         handler() {
-          return [
+          return successResponse([
             { materialId: "MAT-1", code: "M1", siteCode: "SITE-LYO", available: 0 },
             { materialId: "MAT-2", code: "M2", siteCode: "SITE-LYO", available: 12 },
             { materialId: "MAT-3", code: "M3", siteCode: "SITE-LYO", available: 0 }
-          ];
+          ]);
         }
       },
       "forecast.rupture": {
         handler() {
-          return [
+          return successResponse([
             {
               materialId: "MAT-1",
               code: "M1",
@@ -130,7 +175,7 @@ before(async () => {
               estimatedDaysToRupture: 45,
               score: 30
             }
-          ];
+          ]);
         }
       }
     }
@@ -141,7 +186,7 @@ before(async () => {
     actions: {
       "order.listUrgent": {
         handler() {
-          return [
+          return successResponse([
             {
               id: "o1",
               orderNumber: "CMD-001",
@@ -162,7 +207,7 @@ before(async () => {
               promisedDeliveryDate: inFuture(5).toISOString(),
               createdAt: inPast(3).toISOString()
             }
-          ];
+          ]);
         }
       },
       "order.history": {
@@ -170,7 +215,7 @@ before(async () => {
           const limit = Number(ctx.params.limit ?? 100);
           const offset = Number(ctx.params.offset ?? 0);
           const items = historyOrders.slice(offset, offset + limit);
-          return { total: historyOrders.length, limit, offset, items };
+          return successResponse({ total: historyOrders.length, limit, offset, items });
         }
       }
     }
@@ -181,38 +226,24 @@ before(async () => {
     actions: {
       "batch.list": {
         handler(ctx) {
-          lastBatchListParams = ctx.params as Record<string, unknown>;
-          const items = [
-            {
-              batch_id: "b1",
-              batch_code: "BATCH-001",
-              status: "IN_PROGRESS",
-              progress: 60,
-              plannedStartAt: inPast(2).toISOString(),
-              plannedEndAt: inFuture(3).toISOString()
-            },
-            {
-              batch_id: "b2",
-              batch_code: "BATCH-002",
-              status: "IN_PROGRESS",
-              progress: 40,
-              plannedStartAt: inPast(5).toISOString(),
-              plannedEndAt: inPast(1).toISOString()
-            },
-            {
-              batch_id: "b3",
-              batch_code: "BATCH-003",
-              status: "COMPLETED",
-              progress: 100,
-              plannedStartAt: inPast(10).toISOString(),
-              plannedEndAt: inPast(2).toISOString()
-            }
-          ];
-          return { total: items.length, limit: 500, offset: 0, items };
+          const params = ctx.params as Record<string, unknown>;
+          lastBatchListParams = params;
+          batchListCalls.push({ ...params });
+          const limit = Number(params.limit ?? 100);
+          const offset = Number(params.offset ?? 0);
+          const items = batchListItems.slice(offset, offset + limit);
+          return successResponse({
+            total: batchListItems.length,
+            limit,
+            offset,
+            items
+          });
         }
       }
     }
   });
+
+  batchListItems = defaultBatchItems();
 
   broker.createService(ReportingService);
   await broker.start();
@@ -343,6 +374,7 @@ describe("calcul.finance", () => {
       margin: number;
       targetMarginRate: number;
       costRatio: number;
+      orders: Array<{ orderNumber: string; marginPercent: number }>;
     }>("reporting.calcul.finance.margin", {
       accessToken: tokens.direction,
       windowDays: 30
@@ -352,6 +384,9 @@ describe("calcul.finance", () => {
     assert.equal(result.costRatio, 1 - config.targetMarginRate);
     assert.equal(result.estimatedCost, Math.round(490_000 * result.costRatio));
     assert.equal(result.margin, 490_000 - result.estimatedCost);
+    assert.ok(Array.isArray(result.orders));
+    assert.equal(result.orders.length, 3);
+    assert.equal(result.orders[0]?.orderNumber, "CMD-100");
   });
 
   it("totalDelay applies variable penalty from days late and revenue", async () => {
@@ -383,15 +418,53 @@ describe("calcul.finance", () => {
 describe("calcul.production", () => {
   it("avancement averages progress of active batches only", async () => {
     const result = await callAction<{
+      totalBatches: number;
+      completedBatches: number;
+      yieldRate: number;
       totalActiveBatches: number;
       averageProgress: number;
     }>("reporting.calcul.production.avancement", {
       accessToken: tokens.direction,
       siteCode: "SITE-LYO"
     });
+    assert.equal(result.totalBatches, 3);
+    assert.equal(result.completedBatches, 1);
+    assert.equal(result.yieldRate, 33);
     assert.equal(result.totalActiveBatches, 2);
     assert.equal(result.averageProgress, 50);
     assert.equal(lastBatchListParams.siteCode, "SITE-LYO");
+    assert.equal(lastBatchListParams.limit, 100);
+    assert.equal(lastBatchListParams.offset, 0);
+  });
+
+  it("loadAllBatches paginates when more than 100 batches exist", async () => {
+    batchListCalls.length = 0;
+    batchListItems = Array.from({ length: 105 }, (_, index) => ({
+      batch_id: `b${index}`,
+      batch_code: `BATCH-${index}`,
+      status: "IN_PROGRESS",
+      progress: 50,
+      plannedStartAt: inPast(2).toISOString(),
+      plannedEndAt: inFuture(3).toISOString()
+    }));
+
+    const result = await callAction<{ totalBatches: number }>(
+      "reporting.calcul.production.avancement",
+      {
+        accessToken: tokens.direction,
+        siteCode: "SITE-BIG"
+      }
+    );
+
+    assert.equal(result.totalBatches, 105);
+    assert.equal(batchListCalls.length, 2);
+    assert.equal(batchListCalls[0]?.limit, 100);
+    assert.equal(batchListCalls[0]?.offset, 0);
+    assert.equal(batchListCalls[1]?.limit, 100);
+    assert.equal(batchListCalls[1]?.offset, 100);
+
+    batchListItems = defaultBatchItems();
+    batchListCalls.length = 0;
   });
 
   it("retardLots lists active batches past plannedEndAt", async () => {

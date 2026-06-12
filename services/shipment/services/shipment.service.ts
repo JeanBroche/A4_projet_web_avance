@@ -465,6 +465,66 @@ const ShipmentService: ServiceSchema = {
       }
     },
 
+    "shipment.delete": {
+      async handler(this: Service, ctx: Context) {
+        const params = parseParams(shipmentByIdSchema, ctx.params);
+        const auth = await requireLogistique(ctx, params.accessToken);
+
+        const shipment = await loadActiveShipment(params.id);
+        assertSiteAccess(auth, shipment.siteCode);
+
+        if (["IN_TRANSIT", "DELIVERED"].includes(shipment.status)) {
+          throw createError(
+            "SHIPMENT_NOT_DELETABLE",
+            `Shipment ${shipment.code} cannot be deleted in status ${shipment.status}`
+          );
+        }
+
+        const deletedAt = new Date();
+
+        await prisma.$transaction(async (tx) => {
+          await tx.shipment.update({
+            where: { id: shipment.id },
+            data: { deletedAt }
+          });
+          if (shipment.pickListId) {
+            await tx.pickListLine.updateMany({
+              where: { pickListId: shipment.pickListId, deletedAt: null },
+              data: { deletedAt }
+            });
+            await tx.pickList.update({
+              where: { id: shipment.pickListId },
+              data: { deletedAt }
+            });
+          }
+        });
+
+        await logShipmentAudit({
+          action: "shipment.shipment.delete",
+          actorId: auth.sub,
+          actorEmail: auth.email,
+          roles: auth.roles,
+          entity: "Shipment",
+          entityId: shipment.id,
+          siteCode: shipment.siteCode,
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          metadata: { code: shipment.code, orderNumber: shipment.orderNumber },
+          diff: {
+            before: { deletedAt: null, status: shipment.status },
+            after: { deletedAt: deletedAt.toISOString(), status: shipment.status }
+          }
+        });
+
+        this.logger.info("Shipment deleted", {
+          correlationId: (ctx.meta as { correlationId?: string }).correlationId,
+          id: shipment.id,
+          code: shipment.code
+        });
+
+        return { id: shipment.id, code: shipment.code, deleted: true };
+      }
+    },
+
     "shipment.history": {
       async handler(ctx: Context) {
         const params = parseParams(shipmentHistorySchema, ctx.params);

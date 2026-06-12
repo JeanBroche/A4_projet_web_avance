@@ -22,6 +22,7 @@ const severityIcon: Record<string, string> = {
       <button
         type="button"
         class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        aria-label="Afficher les alertes"
         :aria-expanded="open"
         aria-controls="notification-panel"
         @click="open = !open"

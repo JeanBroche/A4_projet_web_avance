@@ -30,9 +30,9 @@ Les noms d actions et de fichiers existants sont conserves. Le mapping vers les 
 | `reporting.calcul.logistique.rotation` | #55 logistique | `stock.forecast.rupture` | `averageConsumptionPerDay`, `atRiskMaterials` |
 | `reporting.calcul.commerciaux.urgentOrders` | #56 commerciaux | `order.order.listUrgent` | `totalUrgentOrders`, `orders` |
 | `reporting.calcul.commerciaux.delayRiskOrders` | #56 commerciaux | `order.order.history` | `totalDelayRiskOrders`, `orders` |
-| `reporting.calcul.finance.margin` | #57 finance | `order.order.history` | `totalRevenue`, `estimatedCost`, `margin` |
+| `reporting.calcul.finance.margin` | #57 finance | `order.order.history` | `totalRevenue`, `estimatedCost`, `margin`, `orders[]` (marge par commande) |
 | `reporting.calcul.finance.totalDelay` | #57 finance | `order.order.history` | `totalDelays`, `estimatedDelayCost` |
-| `reporting.calcul.production.avancement` | #54 production | `production.batch.list` | `totalActiveBatches`, `averageProgress` |
+| `reporting.calcul.production.avancement` | #54 production | `production.batch.list` | `totalBatches`, `completedBatches`, `yieldRate`, `totalActiveBatches`, `averageProgress` |
 | `reporting.calcul.production.retardLots` | #54 production | `production.batch.list` | `lateBatches`, `batches` |
 
 ### Parametres communs
@@ -47,7 +47,7 @@ Les actions `calcul.finance.margin` et `calcul.finance.totalDelay` couvrent la f
 
 | Action | Donnees source | Hypotheses V1 | Limites connues |
 |--------|----------------|---------------|-----------------|
-| `calcul.finance.margin` | `order.order.history` (CA estime par commande) | Ratio cout/CA fixe a **65 %** (`KPI_COST_RATIO`, voir [`src/lib/kpi-config.ts`](src/lib/kpi-config.ts)) | Pas de couts reels BOM, pas de charges fixes, pas de marge par produit |
+| `calcul.finance.margin` | `order.order.history` (CA estime par commande) | Ratio cout/CA fixe a **65 %** (`KPI_COST_RATIO`, voir [`src/lib/kpi-config.ts`](src/lib/kpi-config.ts)) | Pas de couts reels BOM, pas de charges fixes ; `orders[]` fournit une marge **estimee** par commande |
 | `calcul.finance.totalDelay` | commandes actives en retard dans la fenetre | Penalite forfaitaire **5 000 centimes** par commande en retard (`KPI_DELAY_PENALTY_CENTS`) | Pas de penalites contractuelles client, pas de SLA par client |
 
 **Reponse attendue en soutenance :** la direction dispose deja d'indicateurs finance **indicatifs** ; la V2 remplacera les coefficients par un microservice finance ou des exports comptables. Les KPI logistique, commercial et production, eux, s'appuient sur des donnees operationnelles reelles.

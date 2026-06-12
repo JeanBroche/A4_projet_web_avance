@@ -3,11 +3,9 @@ import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createPrismaClient } from "@aeronexis/db";
 import {
-  SEED_BATCHES,
-  SEED_CLIENTS,
   SEED_ORDERS,
-  SEED_PICKLISTS,
-  SEED_PRODUCTS,
+  SEED_PICK_LIST_VARIANTS,
+  SEED_SHIPMENT_DETAILS,
   SEED_SHIPMENTS,
   SEED_SITES
 } from "@aeronexis/shared";
@@ -17,58 +15,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 const prisma = createPrismaClient(PrismaClient, process.env.SHIPMENT_DATABASE_URL);
 
-type PickListSeed = {
-  id: string;
-  code: string;
-  orderNumber: string;
-  clientCode: string;
-  siteCode: string;
-  status: string;
-  ofId: string;
-  productCode: string;
-  quantity: number;
-};
-
-const PICK_LISTS: PickListSeed[] = [
-  {
-    id: SEED_PICKLISTS.PLANNED,
-    code: "PICK-2025-00001",
-    orderNumber: SEED_ORDERS.CMD01,
-    clientCode: SEED_CLIENTS.LYO,
-    siteCode: SEED_SITES.LYO,
-    status: "COMPLETED",
-    ofId: SEED_BATCHES.LYO_IN_PROGRESS,
-    productCode: SEED_PRODUCTS.PALIER,
-    quantity: 2
-  },
-  {
-    id: SEED_PICKLISTS.IN_TRANSIT,
-    code: "PICK-2025-00002",
-    orderNumber: SEED_ORDERS.CMD04,
-    clientCode: SEED_CLIENTS.LYO,
-    siteCode: SEED_SITES.LYO,
-    status: "COMPLETED",
-    ofId: SEED_BATCHES.LYO_IN_PROGRESS,
-    productCode: SEED_PRODUCTS.PALIER,
-    quantity: 2
-  },
-  {
-    id: SEED_PICKLISTS.DELIVERED,
-    code: "PICK-2025-00003",
-    orderNumber: SEED_ORDERS.CMD05,
-    clientCode: SEED_CLIENTS.LYO,
-    siteCode: SEED_SITES.LYO,
-    status: "COMPLETED",
-    ofId: SEED_BATCHES.LYO_COMPLETED,
-    productCode: SEED_PRODUCTS.PALIER,
-    quantity: 2
-  }
-];
+type PickListSeed = (typeof SEED_PICK_LIST_VARIANTS)[number];
 
 type ShipmentSeed = {
   code: string;
   pickListId: string;
   status: string;
+  carrier?: string;
+  deliveryAddress?: string;
+  emoji?: string;
+  plannedShipDate?: Date;
+  plannedDeliveryDate?: Date;
   tracking: Array<{ fromStatus: string | null; toStatus: string; notes: string; createdAt?: Date }>;
   shippedAt?: Date;
   deliveredAt?: Date;
@@ -81,6 +38,7 @@ function daysAgo(days: number): Date {
 }
 
 async function upsertPickList(seed: PickListSeed) {
+  const pickedQty = "pickedQty" in seed ? seed.pickedQty : seed.quantity;
   const pickList = await prisma.pickList.upsert({
     where: { id: seed.id },
     update: {
@@ -105,7 +63,7 @@ async function upsertPickList(seed: PickListSeed) {
             lineNumber: 1,
             productCode: seed.productCode,
             quantity: seed.quantity,
-            pickedQty: seed.quantity
+            pickedQty
           }
         ]
       }
@@ -120,7 +78,16 @@ async function upsertPickList(seed: PickListSeed) {
         lineNumber: 1,
         productCode: seed.productCode,
         quantity: seed.quantity,
-        pickedQty: seed.quantity
+        pickedQty
+      }
+    });
+  } else {
+    await prisma.pickListLine.updateMany({
+      where: { pickListId: pickList.id },
+      data: {
+        productCode: seed.productCode,
+        quantity: seed.quantity,
+        pickedQty
       }
     });
   }
@@ -128,32 +95,42 @@ async function upsertPickList(seed: PickListSeed) {
   return pickList;
 }
 
-async function upsertShipment(seed: ShipmentSeed, pickList: { orderNumber: string; clientCode: string | null; siteCode: string }) {
+async function upsertShipment(
+  seed: ShipmentSeed,
+  pickList: { orderNumber: string; clientCode: string | null; siteCode: string }
+) {
   const existing = await prisma.shipment.findFirst({
     where: { code: seed.code, deletedAt: null }
   });
+
+  const shipmentData = {
+    pickListId: seed.pickListId,
+    orderNumber: pickList.orderNumber,
+    clientCode: pickList.clientCode,
+    siteCode: pickList.siteCode,
+    status: seed.status,
+    carrier: seed.carrier,
+    deliveryAddress: seed.deliveryAddress,
+    emoji: seed.emoji,
+    plannedShipDate: seed.plannedShipDate,
+    plannedDeliveryDate: seed.plannedDeliveryDate,
+    shippedAt: seed.shippedAt,
+    deliveredAt: seed.deliveredAt,
+    trackingEvents: {
+      create: seed.tracking.map((event) => ({
+        fromStatus: event.fromStatus,
+        toStatus: event.toStatus,
+        notes: event.notes,
+        ...(event.createdAt ? { createdAt: event.createdAt } : {})
+      }))
+    }
+  };
 
   if (existing) {
     await prisma.shipmentTrackingEvent.deleteMany({ where: { shipmentId: existing.id } });
     await prisma.shipment.update({
       where: { id: existing.id },
-      data: {
-        pickListId: seed.pickListId,
-        orderNumber: pickList.orderNumber,
-        clientCode: pickList.clientCode,
-        siteCode: pickList.siteCode,
-        status: seed.status,
-        shippedAt: seed.shippedAt,
-        deliveredAt: seed.deliveredAt,
-        trackingEvents: {
-          create: seed.tracking.map((event) => ({
-            fromStatus: event.fromStatus,
-            toStatus: event.toStatus,
-            notes: event.notes,
-            ...(event.createdAt ? { createdAt: event.createdAt } : {})
-          }))
-        }
-      }
+      data: shipmentData
     });
     return;
   }
@@ -161,40 +138,39 @@ async function upsertShipment(seed: ShipmentSeed, pickList: { orderNumber: strin
   await prisma.shipment.create({
     data: {
       code: seed.code,
-      pickListId: seed.pickListId,
-      orderNumber: pickList.orderNumber,
-      clientCode: pickList.clientCode,
-      siteCode: pickList.siteCode,
-      status: seed.status,
-      shippedAt: seed.shippedAt,
-      deliveredAt: seed.deliveredAt,
-      trackingEvents: {
-        create: seed.tracking.map((event) => ({
-          fromStatus: event.fromStatus,
-          toStatus: event.toStatus,
-          notes: event.notes,
-          ...(event.createdAt ? { createdAt: event.createdAt } : {})
-        }))
-      }
+      ...shipmentData
     }
   });
 }
 
+function shipmentDetails(code: keyof typeof SEED_SHIPMENT_DETAILS) {
+  const details = SEED_SHIPMENT_DETAILS[code];
+  return {
+    carrier: details.carrier,
+    deliveryAddress: details.deliveryAddress,
+    emoji: details.emoji,
+    plannedShipDate: new Date(details.plannedShipDate),
+    plannedDeliveryDate: new Date(details.plannedDeliveryDate)
+  };
+}
+
 async function main() {
   const pickLists = new Map<string, Awaited<ReturnType<typeof upsertPickList>>>();
-  for (const seed of PICK_LISTS) {
+  for (const seed of SEED_PICK_LIST_VARIANTS) {
     pickLists.set(seed.id, await upsertPickList(seed));
   }
 
-  const planned = pickLists.get(SEED_PICKLISTS.PLANNED)!;
-  const inTransit = pickLists.get(SEED_PICKLISTS.IN_TRANSIT)!;
-  const delivered = pickLists.get(SEED_PICKLISTS.DELIVERED)!;
+  const planned = pickLists.get(SEED_PICK_LIST_VARIANTS[0].id)!;
+  const inTransit = pickLists.get(SEED_PICK_LIST_VARIANTS[1].id)!;
+  const delivered = pickLists.get(SEED_PICK_LIST_VARIANTS[2].id)!;
+  const parPlanned = pickLists.get(SEED_PICK_LIST_VARIANTS[4].id)!;
 
   await upsertShipment(
     {
       code: SEED_SHIPMENTS.PLANNED,
       pickListId: planned.id,
       status: "PLANNED",
+      ...shipmentDetails(SEED_SHIPMENTS.PLANNED),
       tracking: [{ fromStatus: null, toStatus: "PLANNED", notes: "Expedition planifiee" }]
     },
     planned
@@ -205,6 +181,7 @@ async function main() {
       code: SEED_SHIPMENTS.IN_TRANSIT,
       pickListId: inTransit.id,
       status: "IN_TRANSIT",
+      ...shipmentDetails(SEED_SHIPMENTS.IN_TRANSIT),
       shippedAt: daysAgo(2),
       tracking: [
         { fromStatus: null, toStatus: "PLANNED", notes: "Preparation", createdAt: daysAgo(4) },
@@ -224,6 +201,7 @@ async function main() {
       code: SEED_SHIPMENTS.DELIVERED,
       pickListId: delivered.id,
       status: "DELIVERED",
+      ...shipmentDetails(SEED_SHIPMENTS.DELIVERED),
       shippedAt: daysAgo(5),
       deliveredAt: daysAgo(1),
       tracking: [
@@ -245,10 +223,30 @@ async function main() {
     delivered
   );
 
+  await upsertShipment(
+    {
+      code: SEED_SHIPMENTS.PAR_PLANNED,
+      pickListId: parPlanned.id,
+      status: "PLANNED",
+      ...shipmentDetails(SEED_SHIPMENTS.PAR_PLANNED),
+      tracking: [
+        {
+          fromStatus: null,
+          toStatus: "PLANNED",
+          notes: `Expedition Paris planifiee pour ${SEED_ORDERS.CMD_PAR}`
+        }
+      ]
+    },
+    parPlanned
+  );
+
+  const pendingCount = await prisma.pickList.count({ where: { status: "PENDING" } });
+
   console.log("Expedition seed completed:", {
-    pickLists: PICK_LISTS.map((p) => p.code),
-    shipments: Object.values(SEED_SHIPMENTS),
-    siteCode: SEED_SITES.LYO
+    pickLists: SEED_PICK_LIST_VARIANTS.map((p) => p.code),
+    shipments: [...Object.values(SEED_SHIPMENTS)],
+    pendingPickLists: pendingCount,
+    sites: [SEED_SITES.LYO, SEED_SITES.PAR]
   });
 }
 

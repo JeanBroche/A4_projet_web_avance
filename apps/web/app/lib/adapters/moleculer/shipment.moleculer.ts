@@ -82,6 +82,14 @@ export function createMoleculerShipmentAdapter(
       return mapShipmentToUi(updated.shipment)
     },
 
+    async remove(id, backendId?: string) {
+      const shipmentId = backendId ?? await resolveShipmentId(id)
+      if (!shipmentId) throw new Error('NOT_FOUND')
+      await request(`/logistics/shipments/${encodeURIComponent(shipmentId)}`, {
+        method: 'DELETE'
+      })
+    },
+
     async updateStatus(id, status: DeliveryStatus, backendId?: string) {
       const shipmentId = backendId ?? await resolveShipmentId(id)
       if (!shipmentId) throw new Error('NOT_FOUND')

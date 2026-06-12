@@ -67,6 +67,9 @@ export function toOrderSummary(order: OrderWithRelations) {
     isUrgent: order.isUrgent,
     dueDate: order.dueDate ?? null,
     promisedDeliveryDate: order.promisedDeliveryDate ?? null,
+    carrier: order.carrier ?? null,
+    deliveryAddress: order.deliveryAddress ?? null,
+    emoji: order.emoji ?? null,
     totalAmount: order.totalAmount,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
@@ -167,6 +170,23 @@ export function mapUiLogisticsToOrderStatus(status: UiLogisticsStatus): string {
 }
 
 export function assertManualLogisticsTransition(currentStatus: string, nextStatus: string) {
+  if (currentStatus === ORDER_STATUSES.REJECTED) {
+    throw createError(
+      "ORDER_INVALID_STATUS_TRANSITION",
+      "Le statut logistique ne peut pas être modifié sur une commande rejetée"
+    );
+  }
+
+  if (currentStatus === ORDER_STATUSES.DRAFT) {
+    if (nextStatus === ORDER_STATUSES.VALIDATED) {
+      return;
+    }
+    throw createError(
+      "ORDER_INVALID_STATUS_TRANSITION",
+      "Validez la commande (statut Préparée) avant d'expédier ou de livrer"
+    );
+  }
+
   if (!MANUAL_LOGISTICS_STATUSES.has(currentStatus)) {
     throw createError(
       "ORDER_INVALID_STATUS_TRANSITION",
@@ -255,6 +275,21 @@ export async function applyOrderStatusTransition(
         notes
       }
     });
+
+    if (
+      options?.manual &&
+      order.status === ORDER_STATUSES.DRAFT &&
+      nextStatus === ORDER_STATUSES.VALIDATED
+    ) {
+      await tx.orderValidation.create({
+        data: {
+          orderId: order.id,
+          action: VALIDATION_ACTIONS.VALIDATE,
+          validatedBy: changedBy,
+          reason: notes ?? "Validation via statut logistique"
+        }
+      });
+    }
 
     return updated;
   });

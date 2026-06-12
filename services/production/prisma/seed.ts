@@ -8,15 +8,13 @@ import {
 
   SEED_ANOMALY,
 
+  SEED_ANOMALY_RESOLVED,
+
   SEED_BATCH_SPECS,
 
   SEED_BOM_CATALOG,
 
   SEED_PRODUCT_NAMES,
-
-  SEED_PRODUCTS,
-
-  SEED_SITES,
 
   SEED_USER_IDS
 
@@ -400,6 +398,96 @@ async function upsertOpenAnomaly(batchId: string) {
 
 
 
+async function upsertResolvedAnomaly(batchId: string) {
+
+  const existing = await prisma.anomalies.findFirst({
+
+    where: { anomaly_code: SEED_ANOMALY_RESOLVED.CODE, batch_id: batchId }
+
+  });
+
+
+
+  const anomaly = existing
+
+    ? await prisma.anomalies.update({
+
+        where: { anomaly_id: existing.anomaly_id },
+
+        data: {
+
+          description: "Ecart de soudure corrige apres reprise",
+
+          status: VALIDATION_ANOMALIES.CLOSED
+
+        }
+
+      })
+
+    : await prisma.anomalies.create({
+
+        data: {
+
+          anomaly_id: SEED_ANOMALY_RESOLVED.ID,
+
+          batch_id: batchId,
+
+          anomaly_code: SEED_ANOMALY_RESOLVED.CODE,
+
+          description: "Ecart de soudure corrige apres reprise",
+
+          status: VALIDATION_ANOMALIES.CLOSED
+
+        }
+
+      });
+
+
+
+  await prisma.anomalies_Batch.upsert({
+
+    where: {
+
+      batch_id_anomaly_id: { batch_id: batchId, anomaly_id: anomaly.anomaly_id }
+
+    },
+
+    update: {},
+
+    create: { batch_id: batchId, anomaly_id: anomaly.anomaly_id }
+
+  });
+
+
+
+  const historyExists = await prisma.batchActionHistory.findFirst({
+
+    where: { batch_id: batchId, action: "batch.anomaly_resolved" }
+
+  });
+
+  if (!historyExists) {
+
+    await recordBatchHistory(
+
+      prisma,
+
+      batchId,
+
+      "batch.anomaly_resolved",
+
+      SEED_ANOMALY_RESOLVED.CODE,
+
+      SEED_USER_IDS.operateur
+
+    );
+
+  }
+
+}
+
+
+
 async function main() {
 
   const bomByKey = new Map<string, { id: string; bom_code: string }>();
@@ -450,22 +538,6 @@ async function main() {
 
 
 
-  await upsertProduct(
-
-    SEED_PRODUCTS.PARIS,
-
-    SEED_PRODUCT_NAMES[SEED_PRODUCTS.PARIS],
-
-    SEED_SITES.PAR,
-
-    5,
-
-    0
-
-  );
-
-
-
   const seededBatches: Array<{ code: string; progress: number; bomKey: string }> = [];
 
 
@@ -505,6 +577,14 @@ async function main() {
     if (spec.anomaly) {
 
       await upsertOpenAnomaly(synced.batch_id);
+
+    }
+
+
+
+    if ("resolvedAnomaly" in spec && spec.resolvedAnomaly) {
+
+      await upsertResolvedAnomaly(synced.batch_id);
 
     }
 

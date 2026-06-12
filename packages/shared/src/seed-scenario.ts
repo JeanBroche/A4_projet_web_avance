@@ -140,7 +140,9 @@ export const SEED_BOM = {
 
   VERIN: "BOM-SEED-003",
 
-  BRAS: "BOM-SEED-004"
+  BRAS: "BOM-SEED-004",
+
+  PARIS: "BOM-SEED-PAR-001"
 
 } as const;
 
@@ -312,6 +314,44 @@ export const SEED_BOM_CATALOG = [
 
     ]
 
+  },
+
+  {
+
+    key: "PARIS",
+
+    bomCode: SEED_BOM.PARIS,
+
+    productCode: SEED_PRODUCTS.PARIS,
+
+    name: "Support transmission TR-450",
+
+    summary: "Pièce assemblage — site Paris",
+
+    emoji: "🗼",
+
+    status: "PENDING" satisfies SeedBomProductionStatus,
+
+    priority: "normal" satisfies SeedBomPriority,
+
+    quantity: 2,
+
+    siteCode: SEED_SITES.PAR,
+
+    materialScenario: "ok" satisfies SeedMaterialScenario,
+
+    reserveMaterials: false,
+
+    primaryMaterialId: SEED_MATERIALS.ACIER,
+
+    lines: [
+
+      { material_id: SEED_MATERIALS.ACIER, quantity: 2 },
+
+      { material_id: SEED_MATERIALS.JOINT, quantity: 1 }
+
+    ]
+
   }
 
 ] as const;
@@ -454,6 +494,8 @@ export const SEED_BATCH_SPECS = [
 
     anomaly: false,
 
+    resolvedAnomaly: true,
+
     plannedStartAt: "2026-01-05T08:00:00.000Z",
 
     plannedEndAt: "2026-01-10T17:00:00.000Z"
@@ -536,7 +578,7 @@ export const SEED_BATCH_SPECS = [
 
     code: SEED_BATCHES.PAR_PENDING,
 
-    bomKey: "PALIER" as const,
+    bomKey: "PARIS" as const,
 
     commandId: SEED_ORDERS.CMD_PAR,
 
@@ -562,13 +604,25 @@ export const SEED_ANOMALY = {
 
 
 
+export const SEED_ANOMALY_RESOLVED = {
+
+  CODE: "ANOMALY-SEED-002",
+
+  ID: "clh7seedanomaly000000002"
+
+} as const;
+
+
+
 export const SEED_SHIPMENTS = {
 
   PLANNED: "SHP-2025-00001",
 
   IN_TRANSIT: "SHP-2025-00002",
 
-  DELIVERED: "SHP-2025-00003"
+  DELIVERED: "SHP-2025-00003",
+
+  PAR_PLANNED: "SHP-PAR-00001"
 
 } as const;
 
@@ -580,7 +634,11 @@ export const SEED_PICKLISTS = {
 
   IN_TRANSIT: "seed-picklist-002",
 
-  DELIVERED: "seed-picklist-003"
+  DELIVERED: "seed-picklist-003",
+
+  PENDING: "seed-picklist-004",
+
+  PAR_PLANNED: "seed-picklist-par-001"
 
 } as const;
 
@@ -660,7 +718,7 @@ export const SEED_USERS: Record<
 
     lastName: "Aeronexis",
 
-    siteCode: SEED_SITES.LYO
+    siteCode: SEED_SITES.PAR
 
   },
 
@@ -681,5 +739,735 @@ export const SEED_USERS: Record<
 
 
 export const SEED_OF_ID = SEED_BATCHES.LYO_IN_PROGRESS;
+
+
+
+export const SEED_CLIENT_PROFILES = {
+
+  [SEED_CLIENTS.LYO]: {
+
+    annualRevenue: 12_500_000,
+
+    firstContractDate: "2018-03-15"
+
+  },
+
+  [SEED_CLIENTS.PAR]: {
+
+    annualRevenue: 3_200_000,
+
+    firstContractDate: "2022-09-01"
+
+  }
+
+} as const;
+
+
+
+export const SEED_ORDER_DETAILS = {
+
+  [SEED_ORDERS.CMD01]: {
+
+    carrier: "Chronopost Aero",
+
+    deliveryAddress: "12 rue de l'Aviation, 69007 Lyon",
+
+    emoji: "📦"
+
+  },
+
+  [SEED_ORDERS.CMD02]: {
+
+    carrier: "DHL Express",
+
+    deliveryAddress: "Zone fret Satolas, 69125 Lyon Saint-Exupéry",
+
+    emoji: "✈️"
+
+  },
+
+  [SEED_ORDERS.CMD03]: {
+
+    carrier: "Geodis",
+
+    deliveryAddress: "Parc industriel Gerland, 69007 Lyon",
+
+    emoji: "🚛"
+
+  },
+
+  [SEED_ORDERS.CMD04]: {
+
+    carrier: "FedEx Freight",
+
+    deliveryAddress: "Aerospace Dynamics SA, 69007 Lyon",
+
+    emoji: "📦"
+
+  },
+
+  [SEED_ORDERS.CMD05]: {
+
+    carrier: "DHL",
+
+    deliveryAddress: "Aerospace Dynamics SA — quai réception B, 69007 Lyon",
+
+    emoji: "✅"
+
+  },
+
+  [SEED_ORDERS.CMD_PAR]: {
+
+    carrier: "Colissimo Pro",
+
+    deliveryAddress: "Paris Aero Components, 75015 Paris",
+
+    emoji: "🗼"
+
+  }
+
+} as const;
+
+
+
+export const SEED_MATERIAL_LOTS = [
+
+  {
+
+    lotNumber: "LOT-ACIER-2024-018",
+
+    materialCode: SEED_MATERIALS.ACIER,
+
+    siteCode: SEED_SITES.LYO,
+
+    supplier: "MetalSupply SA",
+
+    certificateRef: "CERT-ACIER-2024-018",
+
+    quantity: 50,
+
+    remainingQty: 35,
+
+    status: "ACTIVE"
+
+  },
+
+  {
+
+    lotNumber: "LOT-TI-2024-007",
+
+    materialCode: SEED_MATERIALS.TITANE,
+
+    siteCode: SEED_SITES.LYO,
+
+    supplier: "AeroMat FR",
+
+    certificateRef: "CERT-TI-2024-007",
+
+    quantity: 20,
+
+    remainingQty: 8,
+
+    status: "ACTIVE"
+
+  },
+
+  {
+
+    lotNumber: "LOT-JOINT-2025-003",
+
+    materialCode: SEED_MATERIALS.JOINT,
+
+    siteCode: SEED_SITES.LYO,
+
+    supplier: "SealTech",
+
+    certificateRef: "CERT-JOINT-2025-003",
+
+    quantity: 200,
+
+    remainingQty: 180,
+
+    status: "ACTIVE"
+
+  },
+
+  {
+
+    lotNumber: "LOT-GRAISSE-2023-011",
+
+    materialCode: SEED_MATERIALS.GRAISSE,
+
+    siteCode: SEED_SITES.LYO,
+
+    supplier: "Lubricants Aero",
+
+    quantity: 10,
+
+    remainingQty: 0,
+
+    status: "DEPLETED"
+
+  },
+
+  {
+
+    lotNumber: "LOT-TI-PAR-2025-001",
+
+    materialCode: SEED_MATERIALS.TITANE,
+
+    siteCode: SEED_SITES.PAR,
+
+    supplier: "AeroMat FR",
+
+    certificateRef: "CERT-TI-PAR-2025-001",
+
+    quantity: 8,
+
+    remainingQty: 6,
+
+    status: "ACTIVE"
+
+  },
+
+  {
+
+    lotNumber: "LOT-ACIER-PAR-2025-002",
+
+    materialCode: SEED_MATERIALS.ACIER,
+
+    siteCode: SEED_SITES.PAR,
+
+    supplier: "MetalSupply SA",
+
+    quantity: 30,
+
+    remainingQty: 28,
+
+    status: "ACTIVE"
+
+  }
+
+] as const;
+
+
+
+export const SEED_PURCHASE_ORDERS = [
+
+  {
+
+    poNumber: "PO-2025-TI-001",
+
+    materialCode: SEED_MATERIALS.TITANE,
+
+    siteCode: SEED_SITES.LYO,
+
+    supplier: "AeroMat FR",
+
+    quantity: 25,
+
+    receivedQty: 0,
+
+    status: "ORDERED",
+
+    expectedDate: "2026-06-20",
+
+    notes: "Commande urgente — retard fournisseur en cours"
+
+  },
+
+  {
+
+    poNumber: "PO-2025-GR-001",
+
+    materialCode: SEED_MATERIALS.GRAISSE,
+
+    siteCode: SEED_SITES.LYO,
+
+    supplier: "Lubricants Aero",
+
+    quantity: 15,
+
+    receivedQty: 0,
+
+    status: "DRAFT",
+
+    notes: "Brouillon — rupture graisse VH-450"
+
+  },
+
+  {
+
+    poNumber: "PO-2025-JOINT-002",
+
+    materialCode: SEED_MATERIALS.JOINT,
+
+    siteCode: SEED_SITES.LYO,
+
+    supplier: "SealTech",
+
+    quantity: 100,
+
+    receivedQty: 60,
+
+    status: "PARTIALLY_RECEIVED",
+
+    expectedDate: "2026-06-05",
+
+    receivedDate: "2026-06-01"
+
+  }
+
+] as const;
+
+
+
+export const SEED_SHIPMENT_DETAILS = {
+
+  [SEED_SHIPMENTS.PLANNED]: {
+
+    carrier: "Chronopost Aero",
+
+    deliveryAddress: "12 rue de l'Aviation, 69007 Lyon",
+
+    emoji: "📦",
+
+    plannedShipDate: "2026-06-18",
+
+    plannedDeliveryDate: "2026-06-22"
+
+  },
+
+  [SEED_SHIPMENTS.IN_TRANSIT]: {
+
+    carrier: "FedEx Freight",
+
+    deliveryAddress: "Aerospace Dynamics SA, 69007 Lyon",
+
+    emoji: "🚚",
+
+    plannedShipDate: "2026-06-10",
+
+    plannedDeliveryDate: "2026-06-14"
+
+  },
+
+  [SEED_SHIPMENTS.DELIVERED]: {
+
+    carrier: "DHL",
+
+    deliveryAddress: "Aerospace Dynamics SA — quai réception B, 69007 Lyon",
+
+    emoji: "✅",
+
+    plannedShipDate: "2026-01-08",
+
+    plannedDeliveryDate: "2026-01-12"
+
+  },
+
+  [SEED_SHIPMENTS.PAR_PLANNED]: {
+
+    carrier: "Colissimo Pro",
+
+    deliveryAddress: "Paris Aero Components, 75015 Paris",
+
+    emoji: "🗼",
+
+    plannedShipDate: "2026-06-25",
+
+    plannedDeliveryDate: "2026-06-28"
+
+  }
+
+} as const;
+
+
+
+export const SEED_PICK_LIST_VARIANTS = [
+
+  {
+
+    id: SEED_PICKLISTS.PLANNED,
+
+    code: "PICK-2025-00001",
+
+    orderNumber: SEED_ORDERS.CMD01,
+
+    clientCode: SEED_CLIENTS.LYO,
+
+    siteCode: SEED_SITES.LYO,
+
+    status: "COMPLETED",
+
+    ofId: SEED_BATCHES.BRAS_COMPLETED,
+
+    productCode: SEED_PRODUCTS.BRAS,
+
+    quantity: 1
+
+  },
+
+  {
+
+    id: SEED_PICKLISTS.IN_TRANSIT,
+
+    code: "PICK-2025-00002",
+
+    orderNumber: SEED_ORDERS.CMD04,
+
+    clientCode: SEED_CLIENTS.LYO,
+
+    siteCode: SEED_SITES.LYO,
+
+    status: "COMPLETED",
+
+    ofId: SEED_BATCHES.LYO_IN_PROGRESS,
+
+    productCode: SEED_PRODUCTS.PALIER,
+
+    quantity: 2
+
+  },
+
+  {
+
+    id: SEED_PICKLISTS.DELIVERED,
+
+    code: "PICK-2025-00003",
+
+    orderNumber: SEED_ORDERS.CMD05,
+
+    clientCode: SEED_CLIENTS.LYO,
+
+    siteCode: SEED_SITES.LYO,
+
+    status: "COMPLETED",
+
+    ofId: SEED_BATCHES.LYO_COMPLETED,
+
+    productCode: SEED_PRODUCTS.PALIER,
+
+    quantity: 2
+
+  },
+
+  {
+
+    id: SEED_PICKLISTS.PENDING,
+
+    code: "PICK-2025-00004",
+
+    orderNumber: SEED_ORDERS.CMD03,
+
+    clientCode: SEED_CLIENTS.LYO,
+
+    siteCode: SEED_SITES.LYO,
+
+    status: "PENDING",
+
+    ofId: SEED_BATCHES.LYO_PLAQUE_PENDING,
+
+    productCode: SEED_PRODUCTS.PLAQUE,
+
+    quantity: 1,
+
+    pickedQty: 0
+
+  },
+
+  {
+
+    id: SEED_PICKLISTS.PAR_PLANNED,
+
+    code: "PICK-PAR-00001",
+
+    orderNumber: SEED_ORDERS.CMD_PAR,
+
+    clientCode: SEED_CLIENTS.PAR,
+
+    siteCode: SEED_SITES.PAR,
+
+    status: "PENDING",
+
+    ofId: SEED_BATCHES.PAR_PENDING,
+
+    productCode: SEED_PRODUCTS.PARIS,
+
+    quantity: 1,
+
+    pickedQty: 0
+
+  }
+
+] as const;
+
+
+
+export const SEED_AUDIT_DOCUMENTS = [
+
+  {
+
+    id: "seed-doc-titane-cert",
+
+    lotId: "LOT-TI-2024-007",
+
+    filename: "certificat-titane-LOT-TI-2024-007.pdf",
+
+    contentType: "application/pdf",
+
+    objectKey: "seed/lots/LOT-TI-2024-007/certificat-titane.pdf",
+
+    sizeBytes: 204_800,
+
+    uploadedBy: SEED_USER_IDS.logistique
+
+  },
+
+  {
+
+    id: "seed-doc-bl-cmd05",
+
+    lotId: SEED_BATCHES.LYO_COMPLETED,
+
+    filename: "bon-livraison-CMD-2025-00005.pdf",
+
+    contentType: "application/pdf",
+
+    objectKey: "seed/shipments/SHP-2025-00003/bon-livraison.pdf",
+
+    sizeBytes: 98_304,
+
+    uploadedBy: SEED_USER_IDS.logistique
+
+  }
+
+] as const;
+
+
+
+export const SEED_NOTIFICATIONS = [
+
+  {
+
+    id: "seed-notif-001",
+
+    type: "stock.material.low",
+
+    severity: "CRITICAL" as const,
+
+    title: "Rupture ou seuil stock",
+
+    message: `Stock ${SEED_MATERIALS.TITANE} sous le seuil minimum sur Lyon`,
+
+    siteCode: SEED_SITES.LYO,
+
+    read: false,
+
+    payload: { materialCode: SEED_MATERIALS.TITANE },
+
+    dedup: "seed:stock-low-lyo"
+
+  },
+
+  {
+
+    id: "seed-notif-002",
+
+    type: "stock.supplier.delay",
+
+    severity: "WARNING" as const,
+
+    title: "Retard fournisseur",
+
+    message: "Retard AeroMat FR sur livraison titane grade 5",
+
+    siteCode: SEED_SITES.LYO,
+
+    read: true,
+
+    payload: { supplier: "AeroMat FR", materialCode: SEED_MATERIALS.TITANE },
+
+    dedup: "seed:supplier-delay-lyo"
+
+  },
+
+  {
+
+    id: "seed-notif-003",
+
+    type: "shipment.delivery.alert",
+
+    severity: "WARNING" as const,
+
+    title: "Retard livraison",
+
+    message: `Expedition ${SEED_SHIPMENTS.IN_TRANSIT} en transit avec risque de retard`,
+
+    siteCode: SEED_SITES.LYO,
+
+    read: false,
+
+    payload: { shipmentCode: SEED_SHIPMENTS.IN_TRANSIT, orderNumber: SEED_ORDERS.CMD04 },
+
+    dedup: "seed:shipment-delay-lyo"
+
+  },
+
+  {
+
+    id: "seed-notif-004",
+
+    type: "production.batch.anomaly",
+
+    severity: "WARNING" as const,
+
+    title: "Anomalie lot production",
+
+    message: `Anomalie ouverte sur lot ${SEED_BATCHES.LYO_IN_PROGRESS} (${SEED_ANOMALY.CODE})`,
+
+    siteCode: SEED_SITES.LYO,
+
+    read: false,
+
+    payload: { lotId: SEED_BATCHES.LYO_IN_PROGRESS, anomalyCode: SEED_ANOMALY.CODE },
+
+    dedup: "seed:batch-anomaly-lyo"
+
+  },
+
+  {
+
+    id: "seed-notif-005",
+
+    type: "order.draft",
+
+    severity: "INFO" as const,
+
+    title: "Nouvelle commande Paris",
+
+    message: `Commande brouillon ${SEED_ORDERS.CMD_PAR} en attente sur le site Paris`,
+
+    siteCode: SEED_SITES.PAR,
+
+    read: false,
+
+    payload: { orderNumber: SEED_ORDERS.CMD_PAR },
+
+    dedup: "seed:order-par"
+
+  },
+
+  {
+
+    id: "seed-notif-006",
+
+    type: "stock.purchase_order.created",
+
+    severity: "INFO" as const,
+
+    title: "Commande fournisseur titane",
+
+    message: `PO ${SEED_PURCHASE_ORDERS[0].poNumber} commandée — retard fournisseur`,
+
+    siteCode: SEED_SITES.LYO,
+
+    read: true,
+
+    payload: { poNumber: SEED_PURCHASE_ORDERS[0].poNumber },
+
+    dedup: "seed:po-titane-lyo"
+
+  },
+
+  {
+
+    id: "seed-notif-007",
+
+    type: "shipment.picklist.pending",
+
+    severity: "INFO" as const,
+
+    title: "Préparation en cours",
+
+    message: `Pick list PICK-2025-00004 en attente pour ${SEED_ORDERS.CMD03}`,
+
+    siteCode: SEED_SITES.LYO,
+
+    read: false,
+
+    payload: { pickListCode: "PICK-2025-00004", orderNumber: SEED_ORDERS.CMD03 },
+
+    dedup: "seed:pick-pending-lyo"
+
+  },
+
+  {
+
+    id: "seed-notif-008",
+
+    type: "shipment.planned",
+
+    severity: "INFO" as const,
+
+    title: "Expédition Paris planifiée",
+
+    message: `Expédition ${SEED_SHIPMENTS.PAR_PLANNED} planifiée pour ${SEED_ORDERS.CMD_PAR}`,
+
+    siteCode: SEED_SITES.PAR,
+
+    read: false,
+
+    payload: { shipmentCode: SEED_SHIPMENTS.PAR_PLANNED, orderNumber: SEED_ORDERS.CMD_PAR },
+
+    dedup: "seed:shipment-par"
+
+  },
+
+  {
+
+    id: "seed-notif-009",
+
+    type: "production.anomaly.resolved",
+
+    severity: "INFO" as const,
+
+    title: "Anomalie résolue",
+
+    message: `Anomalie ${SEED_ANOMALY_RESOLVED.CODE} clôturée sur lot ${SEED_BATCHES.LYO_COMPLETED}`,
+
+    siteCode: SEED_SITES.LYO,
+
+    read: true,
+
+    payload: { lotId: SEED_BATCHES.LYO_COMPLETED, anomalyCode: SEED_ANOMALY_RESOLVED.CODE },
+
+    dedup: "seed:anomaly-resolved-lyo"
+
+  },
+
+  {
+
+    id: "seed-notif-010",
+
+    type: "order.urgent",
+
+    severity: "WARNING" as const,
+
+    title: "Commande urgente",
+
+    message: `Commande ${SEED_ORDERS.CMD02} marquée urgente — vérin VH-450`,
+
+    siteCode: SEED_SITES.LYO,
+
+    read: false,
+
+    payload: { orderNumber: SEED_ORDERS.CMD02, isUrgent: true },
+
+    dedup: "seed:order-urgent-lyo"
+
+  }
+
+] as const;
 
 

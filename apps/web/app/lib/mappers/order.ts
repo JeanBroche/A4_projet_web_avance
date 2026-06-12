@@ -6,10 +6,13 @@ type BackendOrder = {
   status: string
   isUrgent?: boolean
   promisedDeliveryDate?: string | Date | null
+  carrier?: string | null
+  deliveryAddress?: string | null
+  emoji?: string | null
   createdAt: string | Date
   totalAmount?: number
   client?: { name?: string; code?: string }
-  lines?: Array<{ quantity?: number }>
+  lines?: Array<{ quantity?: number; description?: string | null }>
 }
 
 const STATUS_MAP: Record<string, 'prepared' | 'shipped' | 'delivered'> = {
@@ -42,16 +45,19 @@ export function mapOrderToUi(order: BackendOrder) {
     id: toNumericId(order.id),
     orderNumber: order.orderNumber,
     client: order.client?.name ?? order.client?.code ?? '—',
-    destination: order.client?.code ?? '—',
+    destination: order.deliveryAddress
+      ?? order.lines?.[0]?.description
+      ?? order.client?.code
+      ?? '—',
     createdAt: new Date(order.createdAt).toISOString().slice(0, 10),
     itemsCount,
     weight: `${Math.max(1, itemsCount)} kg`,
-    carrier: 'AERONEXIS Logistics',
+    carrier: order.carrier ?? 'AERONEXIS Logistics',
     status: STATUS_MAP[order.status] ?? 'prepared',
     validationStatus: VALIDATION_MAP[order.status] ?? 'pending',
     priority: order.isUrgent ? ('urgent' as const) : ('normal' as const),
     hasAnomaly: false,
-    emoji: '📦',
+    emoji: order.emoji ?? '📦',
     deliveryDate: order.promisedDeliveryDate
       ? new Date(order.promisedDeliveryDate).toISOString().slice(0, 10)
       : new Date().toISOString().slice(0, 10)

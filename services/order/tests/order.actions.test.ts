@@ -483,6 +483,47 @@ describe("order lifecycle", () => {
     );
   });
 
+  it("promotes DRAFT to VALIDATED via prepared logistics status", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const created = await callAction<{ id: string; status: string }>("order.order.create", {
+      accessToken: tokens.commercial,
+      clientId,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-DRAFT-LOG", quantity: 1, unitPrice: 500 }]
+    });
+
+    assert.equal(created.status, "DRAFT");
+
+    const validated = await callAction<{ status: string }>("order.order.setLogisticsStatus", {
+      accessToken: tokens.logistique,
+      orderId: created.id,
+      status: "prepared"
+    });
+    assert.equal(validated.status, "VALIDATED");
+  });
+
+  it("refuses shipped logistics status from DRAFT", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const created = await callAction<{ id: string }>("order.order.create", {
+      accessToken: tokens.commercial,
+      clientId,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-DRAFT-SHIP", quantity: 1 }]
+    });
+
+    await assert.rejects(
+      () =>
+        callAction("order.order.setLogisticsStatus", {
+          accessToken: tokens.logistique,
+          orderId: created.id,
+          status: "shipped"
+        }),
+      (error) => getErrorCode(error) === "ORDER_INVALID_STATUS_TRANSITION"
+    );
+  });
+
   it("sets logistics status manually from the UI", async (t) => {
     if (skipIfNoDb(t)) return;
 
@@ -542,6 +583,67 @@ describe("order lifecycle", () => {
           orderId: created.id
         }),
       (error) => getErrorCode(error) === "ORDER_INVALID_STATUS_TRANSITION"
+    );
+  });
+});
+
+describe("order.order.update and delete", () => {
+  it("updates delivery fields on a draft order", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const created = await callAction<{ id: string }>("order.order.create", {
+      accessToken: tokens.commercial,
+      clientId,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-UPD", quantity: 2, description: "Lyon" }]
+    });
+
+    const updated = await callAction<{
+      carrier: string | null;
+      deliveryAddress: string | null;
+      isUrgent: boolean;
+      lines: Array<{ quantity: number; description: string | null }>;
+    }>("order.order.update", {
+      accessToken: tokens.commercial,
+      orderId: created.id,
+      destination: "CLI-999",
+      carrier: "DHL Aviation",
+      emoji: "✈️",
+      isUrgent: true,
+      itemsCount: 5
+    });
+
+    assert.equal(updated.deliveryAddress, "CLI-999");
+    assert.equal(updated.carrier, "DHL Aviation");
+    assert.equal(updated.isUrgent, true);
+    assert.equal(updated.lines[0]?.quantity, 5);
+    assert.equal(updated.lines[0]?.description, "CLI-999");
+  });
+
+  it("soft deletes a draft order", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const created = await callAction<{ id: string; orderNumber: string }>("order.order.create", {
+      accessToken: tokens.commercial,
+      clientId,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-DEL", quantity: 1 }]
+    });
+
+    const deleted = await callAction<{ deleted: boolean }>("order.order.delete", {
+      accessToken: tokens.commercial,
+      orderId: created.id
+    });
+
+    assert.equal(deleted.deleted, true);
+
+    await assert.rejects(
+      () =>
+        callAction("order.order.get", {
+          accessToken: tokens.commercial,
+          orderId: created.id
+        }),
+      (error) => getErrorCode(error) === "NOT_FOUND"
     );
   });
 });

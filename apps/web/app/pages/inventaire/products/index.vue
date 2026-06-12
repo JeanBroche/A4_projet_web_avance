@@ -77,8 +77,8 @@ const columns: TableColumn<Product>[] = [
     cell: ({ row }) => {
       if (!canManageStock.value) return null
       return h('div', { class: 'flex gap-1 justify-end' }, [
-        h(UButton, { icon: 'i-lucide-pencil', size: 'xs', variant: 'ghost', color: 'neutral', onClick: () => openEdit(row.original) }),
-        h(UButton, { icon: 'i-lucide-trash-2', size: 'xs', variant: 'ghost', color: 'error', onClick: () => openDelete(row.original) })
+        h(UButton, { icon: 'i-lucide-pencil', size: 'xs', variant: 'ghost', color: 'neutral', 'aria-label': `Modifier ${row.original.productCode}`, onClick: () => openEdit(row.original) }),
+        h(UButton, { icon: 'i-lucide-trash-2', size: 'xs', variant: 'ghost', color: 'error', 'aria-label': `Supprimer ${row.original.productCode}`, onClick: () => openDelete(row.original) })
       ])
     }
   }
@@ -144,11 +144,12 @@ async function confirmDelete() {
       :subtitle="pageSubtitle || 'Stock des productions terminées'"
     />
 
-    <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" />
+    <UAlert v-if="error" color="error" variant="soft" :title="error" class="mb-4" role="alert" />
     <UButton v-if="error" size="sm" variant="outline" class="mb-4" @click="refreshProducts">Réessayer</UButton>
 
     <div class="flex flex-col sm:flex-row gap-3 mb-5">
-      <UInput v-model="search" icon="i-lucide-search" placeholder="Rechercher par code ou description..." class="flex-1" />
+      <label for="products-search" class="sr-only">Rechercher un produit fini</label>
+      <UInput id="products-search" v-model="search" icon="i-lucide-search" placeholder="Rechercher par code ou description..." class="flex-1" />
       <UButton
         v-if="canManageStock"
         icon="i-lucide-plus"
@@ -169,7 +170,7 @@ async function confirmDelete() {
           <div class="flex gap-4 mt-2 text-sm text-gray-600">
             <span>Stock : <strong>{{ product.quantity }}</strong></span>
             <span>Réservé : {{ product.reservedQuantity }}</span>
-            <span class="text-xs text-gray-400">{{ product.siteCode }}</span>
+            <span class="text-xs text-gray-500">{{ product.siteCode }}</span>
           </div>
         </UCard>
       </div>
@@ -177,9 +178,9 @@ async function confirmDelete() {
 
     <UModal v-model:open="isCreateOpen">
       <template #content>
-        <div class="p-6">
-          <h2 class="text-lg font-bold mb-4">Nouveau produit fini</h2>
-          <UAlert v-if="formError" color="error" variant="soft" :title="formError" class="mb-3" />
+        <div class="p-6" role="dialog" aria-modal="true" aria-labelledby="product-create-title">
+          <h2 id="product-create-title" class="text-lg font-bold mb-4">Nouveau produit fini</h2>
+          <UAlert v-if="formError" color="error" variant="soft" :title="formError" class="mb-3" role="alert" />
           <div class="space-y-3">
             <UFormField label="Code produit">
               <UInput v-model="newProduct.productCode" placeholder="PROD-001" />
@@ -204,9 +205,9 @@ async function confirmDelete() {
 
     <UModal v-model:open="isEditOpen">
       <template #content>
-        <div class="p-6">
-          <h2 class="text-lg font-bold mb-4">Modifier {{ editTarget?.productCode }}</h2>
-          <UAlert v-if="formError" color="error" variant="soft" :title="formError" class="mb-3" />
+        <div class="p-6" role="dialog" aria-modal="true" aria-labelledby="product-edit-title">
+          <h2 id="product-edit-title" class="text-lg font-bold mb-4">Modifier {{ editTarget?.productCode }}</h2>
+          <UAlert v-if="formError" color="error" variant="soft" :title="formError" class="mb-3" role="alert" />
           <div class="space-y-3">
             <UFormField label="Description">
               <UInput v-model="editForm.description" />

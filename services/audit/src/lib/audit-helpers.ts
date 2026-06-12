@@ -3,14 +3,18 @@ import type { Db, Filter } from "mongodb";
 import { COLLECTIONS } from "../db.js";
 import type { UserActionLoggedPayload } from "@aeronexis/shared";
 import {
+  SEED_ANOMALY_RESOLVED,
+  SEED_AUDIT_DOCUMENTS,
   SEED_BATCHES,
   SEED_MATERIALS,
   SEED_ORDERS,
+  SEED_PURCHASE_ORDERS,
   SEED_SHIPMENTS,
   SEED_SITES,
   SEED_USER_IDS,
   SEED_USERS
 } from "@aeronexis/shared";
+import type { DocumentAttachmentRecord } from "./document-store.js";
 
 export interface AuditLogDocument {
   _id?: ObjectId;
@@ -233,40 +237,70 @@ export async function seedDemoScenario(db: Db) {
   const eventCollection = db.collection<EventHistoryDocument>(COLLECTIONS.eventHistory);
   const auditCollection = db.collection<AuditLogDocument>(COLLECTIONS.auditLogs);
   const criticalCollection = db.collection<CriticalEventDocument>(COLLECTIONS.criticalEvents);
+  const documentCollection = db.collection<DocumentAttachmentRecord>(COLLECTIONS.documentAttachments);
   const now = new Date();
   const baseTime = new Date("2026-01-15T08:00:00.000Z");
 
-  await lotCollection.updateOne(
-    { lotId: DEMO_LOT_ID },
+  const lotProgressEntries: LotProgressDocument[] = [
     {
-      $set: {
-        lotId: DEMO_LOT_ID,
-        ofId: DEMO_LOT_ID,
-        siteCode: SEED_SITES.LYO,
-        status: "IN_PROGRESS",
-        productCode: "PROD-001",
-        createdAt: baseTime,
-        updatedAt: now
-      }
+      lotId: SEED_BATCHES.LYO_IN_PROGRESS,
+      ofId: SEED_BATCHES.LYO_IN_PROGRESS,
+      siteCode: SEED_SITES.LYO,
+      status: "IN_PROGRESS",
+      productCode: "PROD-001",
+      createdAt: baseTime,
+      updatedAt: now
     },
-    { upsert: true }
-  );
+    {
+      lotId: SEED_BATCHES.LYO_COMPLETED,
+      ofId: SEED_BATCHES.LYO_COMPLETED,
+      siteCode: SEED_SITES.LYO,
+      status: "COMPLETED",
+      productCode: "PROD-001",
+      createdAt: new Date("2026-01-05T08:00:00.000Z"),
+      updatedAt: now
+    },
+    {
+      lotId: SEED_BATCHES.LYO_PLAQUE_PENDING,
+      ofId: SEED_BATCHES.LYO_PLAQUE_PENDING,
+      siteCode: SEED_SITES.LYO,
+      status: "PENDING",
+      productCode: "PROD-002",
+      createdAt: new Date("2026-01-12T08:00:00.000Z"),
+      updatedAt: now
+    },
+    {
+      lotId: SEED_BATCHES.VERIN_IN_PROGRESS,
+      ofId: SEED_BATCHES.VERIN_IN_PROGRESS,
+      siteCode: SEED_SITES.LYO,
+      status: "IN_PROGRESS",
+      productCode: "PROD-003",
+      createdAt: new Date("2026-01-10T08:00:00.000Z"),
+      updatedAt: now
+    },
+    {
+      lotId: SEED_BATCHES.BRAS_COMPLETED,
+      ofId: SEED_BATCHES.BRAS_COMPLETED,
+      siteCode: SEED_SITES.LYO,
+      status: "COMPLETED",
+      productCode: "PROD-004",
+      createdAt: new Date("2025-11-01T08:00:00.000Z"),
+      updatedAt: now
+    },
+    {
+      lotId: SEED_BATCHES.PAR_PENDING,
+      ofId: SEED_BATCHES.PAR_PENDING,
+      siteCode: SEED_SITES.PAR,
+      status: "PENDING",
+      productCode: "PROD-PAR-001",
+      createdAt: new Date("2026-01-18T08:00:00.000Z"),
+      updatedAt: now
+    }
+  ];
 
-  await lotCollection.updateOne(
-    { lotId: SEED_BATCHES.LYO_COMPLETED },
-    {
-      $set: {
-        lotId: SEED_BATCHES.LYO_COMPLETED,
-        ofId: SEED_BATCHES.LYO_COMPLETED,
-        siteCode: SEED_SITES.LYO,
-        status: "COMPLETED",
-        productCode: "PROD-001",
-        createdAt: new Date("2026-01-05T08:00:00.000Z"),
-        updatedAt: now
-      }
-    },
-    { upsert: true }
-  );
+  for (const entry of lotProgressEntries) {
+    await lotCollection.updateOne({ lotId: entry.lotId }, { $set: entry }, { upsert: true });
+  }
 
   const events: EventHistoryDocument[] = [
     {
@@ -316,6 +350,53 @@ export async function seedDemoScenario(db: Db) {
       siteCode: SEED_SITES.LYO,
       payload: { orderNumber: SEED_ORDERS.CMD05, shipmentCode: SEED_SHIPMENTS.DELIVERED },
       timestamp: new Date("2026-01-20T16:00:00.000Z")
+    },
+    {
+      type: "production.batch.created",
+      lotId: SEED_BATCHES.LYO_PLAQUE_PENDING,
+      ofId: SEED_BATCHES.LYO_PLAQUE_PENDING,
+      siteCode: SEED_SITES.LYO,
+      payload: { status: "PENDING", command_id: SEED_ORDERS.CMD03 },
+      timestamp: new Date("2026-01-12T08:00:00.000Z")
+    },
+    {
+      type: "production.batch.created",
+      lotId: SEED_BATCHES.VERIN_IN_PROGRESS,
+      ofId: SEED_BATCHES.VERIN_IN_PROGRESS,
+      siteCode: SEED_SITES.LYO,
+      payload: { status: "IN_PROGRESS", command_id: SEED_ORDERS.CMD02 },
+      timestamp: new Date("2026-01-10T08:00:00.000Z")
+    },
+    {
+      type: "stock.purchase_order.created",
+      lotId: SEED_PURCHASE_ORDERS[0].poNumber,
+      siteCode: SEED_SITES.LYO,
+      payload: { poNumber: SEED_PURCHASE_ORDERS[0].poNumber, materialCode: SEED_MATERIALS.TITANE },
+      timestamp: new Date("2026-01-13T10:00:00.000Z")
+    },
+    {
+      type: "shipment.picklist.created",
+      lotId: SEED_BATCHES.LYO_PLAQUE_PENDING,
+      ofId: SEED_BATCHES.LYO_PLAQUE_PENDING,
+      siteCode: SEED_SITES.LYO,
+      payload: { pickListCode: "PICK-2025-00004", orderNumber: SEED_ORDERS.CMD03, status: "PENDING" },
+      timestamp: new Date("2026-01-17T09:00:00.000Z")
+    },
+    {
+      type: "shipment.planned",
+      lotId: SEED_BATCHES.PAR_PENDING,
+      ofId: SEED_BATCHES.PAR_PENDING,
+      siteCode: SEED_SITES.PAR,
+      payload: { orderNumber: SEED_ORDERS.CMD_PAR, shipmentCode: SEED_SHIPMENTS.PAR_PLANNED },
+      timestamp: new Date("2026-01-19T14:00:00.000Z")
+    },
+    {
+      type: "production.anomaly.resolved",
+      lotId: SEED_BATCHES.LYO_COMPLETED,
+      ofId: SEED_BATCHES.LYO_COMPLETED,
+      siteCode: SEED_SITES.LYO,
+      payload: { anomalyCode: SEED_ANOMALY_RESOLVED.CODE, status: "CLOSED" },
+      timestamp: new Date("2026-01-09T15:00:00.000Z")
     }
   ];
 
@@ -436,6 +517,60 @@ export async function seedDemoScenario(db: Db) {
       severity: "INFO",
       metadata: { isUrgent: true },
       timestamp: new Date("2026-01-21T09:00:00.000Z")
+    },
+    {
+      action: "stock.purchase_order.create",
+      userId: SEED_USER_IDS.logistique,
+      actorEmail: SEED_USERS.logistique.email,
+      roles: ["logistique"],
+      entity: "purchase_order",
+      entityId: SEED_PURCHASE_ORDERS[0].poNumber,
+      siteCode: SEED_SITES.LYO,
+      severity: "INFO",
+      timestamp: new Date("2026-01-13T10:00:00.000Z")
+    },
+    {
+      action: "shipment.picklist.create",
+      userId: SEED_USER_IDS.logistique,
+      actorEmail: SEED_USERS.logistique.email,
+      roles: ["logistique"],
+      entity: "pick_list",
+      entityId: "PICK-2025-00004",
+      siteCode: SEED_SITES.LYO,
+      severity: "INFO",
+      timestamp: new Date("2026-01-17T09:00:00.000Z")
+    },
+    {
+      action: "production.anomaly.resolve",
+      userId: SEED_USER_IDS.operateur,
+      actorEmail: SEED_USERS.operateur.email,
+      roles: ["operateur"],
+      entity: "batch",
+      entityId: SEED_BATCHES.LYO_COMPLETED,
+      siteCode: SEED_SITES.LYO,
+      severity: "INFO",
+      metadata: { anomalyCode: SEED_ANOMALY_RESOLVED.CODE },
+      timestamp: new Date("2026-01-09T15:00:00.000Z")
+    },
+    {
+      action: "shipment.plan",
+      userId: SEED_USER_IDS.logistique,
+      actorEmail: SEED_USERS.logistique.email,
+      roles: ["logistique"],
+      entity: "shipment",
+      entityId: SEED_SHIPMENTS.PAR_PLANNED,
+      siteCode: SEED_SITES.PAR,
+      severity: "INFO",
+      timestamp: new Date("2026-01-19T14:00:00.000Z")
+    },
+    {
+      action: "auth.login",
+      userId: SEED_USER_IDS.commercial,
+      actorEmail: SEED_USERS.commercial.email,
+      roles: ["commercial"],
+      siteCode: SEED_SITES.PAR,
+      severity: "INFO",
+      timestamp: new Date("2026-01-21T08:30:00.000Z")
     }
   ];
 
@@ -479,6 +614,15 @@ export async function seedDemoScenario(db: Db) {
       actorId: SEED_USER_IDS.logistique,
       metadata: { supplier: "AeroMat FR" },
       timestamp: new Date("2026-01-13T15:00:00.000Z")
+    },
+    {
+      severity: "CRITICAL",
+      type: "stock.material.out",
+      message: "Rupture graisse aéronautique — réapprovisionnement urgent",
+      siteCode: SEED_SITES.LYO,
+      actorId: SEED_USER_IDS.logistique,
+      metadata: { materialCode: SEED_MATERIALS.GRAISSE },
+      timestamp: new Date("2026-01-14T14:00:00.000Z")
     }
   ];
 
@@ -486,6 +630,19 @@ export async function seedDemoScenario(db: Db) {
     await criticalCollection.updateOne(
       { type: event.type, siteCode: event.siteCode, timestamp: event.timestamp },
       { $set: event },
+      { upsert: true }
+    );
+  }
+
+  for (const doc of SEED_AUDIT_DOCUMENTS) {
+    await documentCollection.updateOne(
+      { id: doc.id },
+      {
+        $set: {
+          ...doc,
+          uploadedAt: new Date("2026-01-14T10:00:00.000Z")
+        }
+      },
       { upsert: true }
     );
   }

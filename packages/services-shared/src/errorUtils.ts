@@ -17,6 +17,7 @@ export const ErrorCodes = {
   // Order
   ORDER_INVALID_STATUS_TRANSITION: { status: 409, message: "Invalid order status transition" },
   ORDER_NOT_EDITABLE: { status: 409, message: "Order cannot be edited in its current status" },
+  ORDER_NOT_DELETABLE: { status: 409, message: "Order cannot be deleted in its current status" },
 
   // Stock
   INSUFFICIENT_STOCK: { status: 422, message: "Insufficient stock available" },
@@ -33,6 +34,7 @@ export const ErrorCodes = {
   PICKLIST_ALREADY_COMPLETED: { status: 409, message: "Pick list is already completed" },
   PICKLIST_NOT_COMPLETED: { status: 409, message: "Pick list must be completed before planning shipment" },
   SHIPMENT_ALREADY_EXISTS: { status: 409, message: "Shipment already exists for this pick list" },
+  SHIPMENT_NOT_DELETABLE: { status: 409, message: "Shipment cannot be deleted in its current status" },
   STOCK_RESERVATION_MISSING: { status: 409, message: "No active stock reservation found for this order" }
 } as const;
 

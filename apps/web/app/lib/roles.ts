@@ -8,9 +8,9 @@ export interface RoleConfig {
 }
 
 export const ROLES: RoleConfig[] = [
-  { code: 'operateur', label: 'Opérateur Production', icon: 'i-hugeicons-drill', defaultRoute: '/batch' },
-  { code: 'logistique', label: 'Responsable Logistique', icon: 'i-boxicons-package', defaultRoute: '/inventaire/spare' },
-  { code: 'commercial', label: 'Responsable Commercial', icon: 'i-icon-park-solid-delivery', defaultRoute: '/commands' },
+  { code: 'operateur', label: 'Production', icon: 'i-hugeicons-drill', defaultRoute: '/batch' },
+  { code: 'logistique', label: 'Logistique', icon: 'i-boxicons-package', defaultRoute: '/inventaire/spare' },
+  { code: 'commercial', label: 'Commercial', icon: 'i-icon-park-solid-delivery', defaultRoute: '/commands' },
   { code: 'direction', label: 'Direction', icon: 'i-lucide-briefcase', defaultRoute: '/dashboard' },
   { code: 'admin', label: 'Administrateur', icon: 'i-lucide-shield', defaultRoute: '/dashboard' }
 ]

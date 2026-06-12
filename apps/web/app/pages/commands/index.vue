@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { createOrderSchema, firstZodError } from '~/lib/validation/schemas'
+import { computeLogisticsStatusBreakdown } from '~/lib/order-stats'
+import { createOrderSchema, firstZodError, updateOrderSchema } from '~/lib/validation/schemas'
 import type { Order, OrderPriority, OrderStatus } from '~/types'
 
 definePageMeta({ layout: 'sidebar' })
@@ -7,8 +8,8 @@ definePageMeta({ layout: 'sidebar' })
 type PreparedOrder = Order
 
 const {
-  orders, status, error, mutationError, isMutating, refresh, create,
-  updateStatus: updateOrderStatus, validate, reject, changePriority,
+  orders, status, error, mutationError, isMutating, refresh, create, update, remove,
+  updateStatus: updateOrderStatus, validate, reject,
   clientStats, orderHistory, loadClientStats, loadOrderHistory
 } = useOrders()
 
@@ -28,15 +29,8 @@ const commercialStats = computed(() => {
   }
 })
 
-const statusBreakdown = computed(() => {
-  const list = orders.value
-  const total = Math.max(list.length, 1)
-  return [
-    { label: 'Préparées', value: Math.round((list.filter(o => o.status === 'prepared').length / total) * 100), color: 'primary' as const },
-    { label: 'Expédiées', value: Math.round((list.filter(o => o.status === 'shipped').length / total) * 100), color: 'warning' as const },
-    { label: 'Livrées', value: Math.round((list.filter(o => o.status === 'delivered').length / total) * 100), color: 'success' as const }
-  ]
-})
+const logisticsBreakdown = computed(() => computeLogisticsStatusBreakdown(orders.value))
+const statusBreakdown = computed(() => logisticsBreakdown.value.rows)
 
 function formatDeliveryDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -54,6 +48,37 @@ const statusOptions = [
   { label: 'Expédiée', value: 'shipped', icon: 'i-lucide-truck' },
   { label: 'Livrée', value: 'delivered', icon: 'i-lucide-check-circle' }
 ]
+
+function logisticsStatusOptions(order: PreparedOrder) {
+  if (order.validationStatus === 'pending') {
+    return statusOptions.filter((option) => option.value === 'prepared')
+  }
+  if (order.validationStatus === 'rejected') {
+    return []
+  }
+  return statusOptions
+}
+
+function logisticsStatusLabel(order: PreparedOrder) {
+  if (order.validationStatus === 'pending') {
+    return 'En attente validation'
+  }
+  return statusConfig[order.status].label
+}
+
+function logisticsStatusClass(order: PreparedOrder) {
+  if (order.validationStatus === 'pending') {
+    return 'text-amber-600 bg-amber-50'
+  }
+  return statusConfig[order.status].class
+}
+
+function logisticsStatusIcon(order: PreparedOrder) {
+  if (order.validationStatus === 'pending') {
+    return 'i-lucide-clock'
+  }
+  return statusConfig[order.status].icon
+}
 
 const validationConfig = {
   pending: { label: 'En attente', class: 'text-amber-600 bg-amber-50' },
@@ -77,6 +102,18 @@ const adapters = useAdapters()
 const isModalOpen = ref(false)
 const isCreateModalOpen = ref(false)
 const createFormError = ref<string | null>(null)
+const editFormError = ref<string | null>(null)
+
+const editForm = ref({
+  client: '',
+  destination: '',
+  itemsCount: 1,
+  weightValue: 10,
+  carrier: 'DHL Aviation',
+  emoji: '📦',
+  deliveryDate: '',
+  priority: 'normal' as OrderPriority
+})
 
 // Formulaire réactif pour une nouvelle commande
 const createForm = ref({
@@ -96,9 +133,29 @@ const filteredOrders = computed(() =>
   )
 )
 
+function parseWeight(weight: string) {
+  const parsed = Number.parseInt(weight, 10)
+  return Number.isNaN(parsed) ? 1 : parsed
+}
+
+function syncEditForm(order: PreparedOrder) {
+  editForm.value = {
+    client: order.client,
+    destination: order.destination === '—' ? '' : order.destination,
+    itemsCount: order.itemsCount,
+    weightValue: parseWeight(order.weight),
+    carrier: order.carrier,
+    emoji: order.emoji,
+    deliveryDate: order.deliveryDate.slice(0, 10),
+    priority: order.priority
+  }
+}
+
 // Actions
 async function openModal(order: PreparedOrder) {
   selected.value = orders.value.find(item => item.id === order.id) || null
+  editFormError.value = null
+  if (selected.value) syncEditForm(selected.value)
   isModalOpen.value = true
   delayRisk.value = null
   if (selected.value) {
@@ -167,17 +224,40 @@ async function handleReject(order: PreparedOrder) {
   }
 }
 
-async function handlePriorityChange(order: PreparedOrder, priority: OrderPriority) {
-  await changePriority(order.id, priority)
-  if (selected.value?.id === order.id) {
-    selected.value = orders.value.find(o => o.id === order.id) ?? null
-  }
-}
-
 async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
   await updateOrderStatus(order.id, newStatus)
   if (selected.value?.id === order.id) {
     selected.value = orders.value.find(o => o.id === order.id) ?? null
+    if (selected.value) syncEditForm(selected.value)
+  }
+}
+
+async function submitEditOrder() {
+  if (!selected.value) return
+  editFormError.value = null
+  const parsed = updateOrderSchema.safeParse(editForm.value)
+  if (!parsed.success) {
+    editFormError.value = firstZodError(parsed.error)
+    return
+  }
+  try {
+    await update(selected.value.id, parsed.data)
+    selected.value = orders.value.find(o => o.id === selected.value?.id) ?? null
+    if (selected.value) syncEditForm(selected.value)
+  } catch {
+    editFormError.value = mutationError.value ?? 'Impossible d\'enregistrer les modifications.'
+  }
+}
+
+async function handleDeleteOrder() {
+  if (!selected.value) return
+  if (!confirm(`Supprimer la commande ${selected.value.orderNumber} ?`)) return
+  try {
+    await remove(selected.value.id)
+    isModalOpen.value = false
+    selected.value = null
+  } catch {
+    editFormError.value = mutationError.value ?? 'Impossible de supprimer la commande.'
   }
 }
 </script>
@@ -224,20 +304,32 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
       </div>
 
       <UCard v-if="status !== 'pending' && commercialStats.total > 0" class="border-none shadow-sm mb-5">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Répartition par statut logistique</p>
-        <div class="space-y-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Répartition par statut logistique</p>
+          <p class="text-[11px] text-gray-400">
+            {{ logisticsBreakdown.total }} commande{{ logisticsBreakdown.total > 1 ? 's' : '' }} validée{{ logisticsBreakdown.total > 1 ? 's' : '' }}
+            <span v-if="logisticsBreakdown.total < commercialStats.total">
+              sur {{ commercialStats.total }}
+            </span>
+          </p>
+        </div>
+        <div v-if="logisticsBreakdown.total > 0" class="space-y-3">
           <div v-for="row in statusBreakdown" :key="row.label">
             <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-500">{{ row.label }}</span>
+              <span class="text-gray-500">{{ row.label }} ({{ row.count }})</span>
               <span class="font-semibold text-gray-700">{{ row.value }}%</span>
             </div>
             <UProgress :model-value="row.value" :max="100" :color="row.color" size="sm" />
           </div>
         </div>
+        <p v-else class="text-sm text-gray-400">
+          Aucune commande validée — les brouillons et rejets ne sont pas inclus dans ce graphique.
+        </p>
       </UCard>
 
       <div :class="TOOLBAR">
-        <UInput v-model="search" icon="i-lucide-search" placeholder="Rechercher une commande..." class="w-full sm:flex-1" />
+        <label for="commands-search" class="sr-only">Rechercher une commande</label>
+        <UInput id="commands-search" v-model="search" icon="i-lucide-search" placeholder="Rechercher une commande..." class="w-full sm:flex-1" />
         <UButton
           v-if="canManageOrders"
           icon="i-lucide-plus-circle"
@@ -301,15 +393,18 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
           </div>
 
           <div class="flex items-center justify-between pt-3 border-t border-gray-100 gap-2" @click.stop>
-            <UDropdownMenu v-if="canUpdateOrderLogistics" :items="[statusOptions.map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(order, s.value as OrderStatus) }))]">
-              <UButton 
-                :class="statusConfig[order.status].class" 
-                variant="subtle" 
+            <UDropdownMenu
+              v-if="canUpdateOrderLogistics && logisticsStatusOptions(order).length > 0"
+              :items="[logisticsStatusOptions(order).map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(order, s.value as OrderStatus) }))]"
+            >
+              <UButton
+                :class="logisticsStatusClass(order)"
+                variant="subtle"
                 size="xs"
                 trailing-icon="i-lucide-chevron-down"
               >
-                <UIcon :name="statusConfig[order.status].icon" class="mr-1" />
-                {{ statusConfig[order.status].label }}
+                <UIcon :name="logisticsStatusIcon(order)" class="mr-1" />
+                {{ logisticsStatusLabel(order) }}
               </UButton>
             </UDropdownMenu>
           </div>
@@ -321,18 +416,29 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
 
     <UModal v-model:open="isModalOpen" :ui="modalUi('xl')">
       <template #content>
-        <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-labelledby="order-detail-title">
+        <div v-if="selected" :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="order-detail-title">
 
           <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-5 sm:mb-6">
-            <div class="flex gap-3 sm:gap-4 min-w-0">
-              <div class="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center text-3xl">
+            <div class="flex gap-3 sm:gap-4 min-w-0 flex-1">
+              <div v-if="!canManageOrders" class="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center text-3xl shrink-0">
                 {{ selected.emoji }}
               </div>
-              <div>
+              <USelectMenu
+                v-else
+                v-model="editForm.emoji"
+                :items="['📦', '✈️', '🚀', '🔩', '⚙️']"
+                class="w-16 shrink-0"
+              />
+              <div class="flex-1 min-w-0 space-y-2">
                 <h2 id="order-detail-title" class="text-lg sm:text-xl font-bold text-gray-800 break-all">{{ selected.orderNumber }}</h2>
-                <div class="flex flex-wrap items-center gap-2 mt-0.5">
-                  <span class="text-sm font-semibold text-[#0F62BC]">{{ selected.client }}</span>
-                </div>
+                <UInput
+                  v-if="canManageOrders"
+                  v-model="editForm.client"
+                  placeholder="Client"
+                  icon="i-lucide-building-2"
+                  size="sm"
+                />
+                <span v-else class="text-sm font-semibold text-[#0F62BC]">{{ selected.client }}</span>
               </div>
             </div>
             <UButton icon="i-lucide-x" color="neutral" variant="ghost" aria-label="Fermer la fiche commande" @click="isModalOpen = false" />
@@ -372,45 +478,77 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
 
           <div class="bg-gray-50 rounded-2xl p-4 space-y-3 mb-6">
             <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Informations de livraison</h4>
-            
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 text-sm">
               <div>
                 <span class="text-xs text-gray-400 block">Date de création</span>
                 <span class="font-medium text-gray-800">{{ selected.createdAt }}</span>
               </div>
               <div>
-                <span class="text-xs text-gray-400 block">Transporteur assigné</span>
-                <span class="font-medium text-gray-800 flex items-center gap-1">
+                <label class="text-xs text-gray-400 block mb-1">Transporteur assigné</label>
+                <USelectMenu
+                  v-if="canManageOrders"
+                  v-model="editForm.carrier"
+                  :items="carrierOptions"
+                  size="sm"
+                />
+                <span v-else class="font-medium text-gray-800 flex items-center gap-1">
                   <UIcon name="i-lucide-plane-takeoff" class="text-gray-400 text-xs" />
                   {{ selected.carrier }}
                 </span>
               </div>
               <div class="col-span-2">
-                <span class="text-xs text-gray-400 block">Destination finale</span>
-                <span class="font-medium text-gray-800 flex items-center gap-1">
+                <label class="text-xs text-gray-400 block mb-1">Destination finale</label>
+                <UInput
+                  v-if="canManageOrders"
+                  v-model="editForm.destination"
+                  icon="i-lucide-map-pin"
+                  size="sm"
+                />
+                <span v-else class="font-medium text-gray-800 flex items-center gap-1">
                   <UIcon name="i-lucide-map-pin" class="text-[#0F62BC] text-xs" />
                   {{ selected.destination }}
                 </span>
               </div>
-              <div class="col-span-2">
-                <span class="text-xs text-gray-400 block">Date de livraison prévue</span>
-                <span class="font-medium text-gray-800 flex items-center gap-1">
+              <div>
+                <label class="text-xs text-gray-400 block mb-1">Date de livraison prévue</label>
+                <UInput
+                  v-if="canManageOrders"
+                  v-model="editForm.deliveryDate"
+                  type="date"
+                  icon="i-lucide-calendar"
+                  size="sm"
+                />
+                <span v-else class="font-medium text-gray-800 flex items-center gap-1">
                   <UIcon name="i-lucide-calendar" class="text-gray-400 text-xs" />
                   {{ formatDeliveryDate(selected.deliveryDate) }}
                 </span>
               </div>
+              <template v-if="canManageOrders">
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Nombre d'articles</label>
+                  <UInput v-model="editForm.itemsCount" type="number" :min="1" icon="i-lucide-layers" size="sm" />
+                </div>
+                <div>
+                  <label class="text-xs text-gray-400 block mb-1">Poids total (kg)</label>
+                  <UInput v-model="editForm.weightValue" type="number" :min="1" icon="i-lucide-scale" size="sm" />
+                </div>
+              </template>
             </div>
           </div>
 
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 border border-gray-100 rounded-xl mb-4">
             <div>
               <p class="text-[11px] font-bold uppercase text-gray-400">Statut logistique</p>
-              <span :class="['text-xs font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 mt-1', statusConfig[selected.status].class]">
-                <UIcon :name="statusConfig[selected.status].icon" />
-                {{ statusConfig[selected.status].label }}
+              <span :class="['text-xs font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 mt-1', logisticsStatusClass(selected)]">
+                <UIcon :name="logisticsStatusIcon(selected)" />
+                {{ logisticsStatusLabel(selected) }}
               </span>
             </div>
-            <UDropdownMenu v-if="canUpdateOrderLogistics" :items="[statusOptions.map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(selected!, s.value as OrderStatus) }))]">
+            <UDropdownMenu
+              v-if="canUpdateOrderLogistics && logisticsStatusOptions(selected).length > 0"
+              :items="[logisticsStatusOptions(selected).map(s => ({ label: s.label, icon: s.icon, onSelect: () => updateStatus(selected!, s.value as OrderStatus) }))]"
+            >
               <UButton label="Modifier le flux" color="neutral" variant="outline" size="xs" trailing-icon="i-lucide-chevron-down" />
             </UDropdownMenu>
           </div>
@@ -418,14 +556,28 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 border border-gray-100 rounded-xl mb-6">
             <div>
               <p class="text-[11px] font-bold uppercase text-gray-400">Priorité</p>
-              <span class="text-xs font-semibold text-gray-700 mt-1 block">
+              <USelectMenu
+                v-if="canManageOrders"
+                v-model="editForm.priority"
+                :items="priorityOptions"
+                value-key="value"
+                label-key="label"
+                size="sm"
+                class="mt-1"
+              />
+              <span v-else class="text-xs font-semibold text-gray-700 mt-1 block">
                 {{ selected.priority === 'urgent' ? 'Urgente' : 'Normale' }}
               </span>
             </div>
-            <UDropdownMenu v-if="canManageOrders" :items="[priorityOptions.map(p => ({ label: p.label, onSelect: () => handlePriorityChange(selected!, p.value) }))]">
-              <UButton label="Changer la priorité" color="neutral" variant="outline" size="xs" trailing-icon="i-lucide-chevron-down" />
-            </UDropdownMenu>
           </div>
+
+          <UAlert
+            v-if="editFormError"
+            color="error"
+            variant="soft"
+            :title="editFormError"
+            class="mb-4"
+          />
 
           <div v-if="clientStats" class="mb-6 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
             <h4 class="text-xs font-bold uppercase tracking-wider text-[#0F62BC] mb-3">Statistiques client — {{ clientStats.client }}</h4>
@@ -496,11 +648,34 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
                   Rejeter
                 </UButton>
               </template>
+              <UButton
+                v-if="canManageOrders"
+                icon="i-lucide-trash-2"
+                color="error"
+                variant="outline"
+                size="sm"
+                :loading="isMutating"
+                @click="handleDeleteOrder"
+              >
+                Supprimer
+              </UButton>
             </div>
-            
-            <UButton class="bg-[#0F62BC] text-white hover:bg-[#156FD4]" @click="isModalOpen = false">
-              Fermer
-            </UButton>
+
+            <div class="flex flex-wrap gap-2">
+              <UButton variant="ghost" color="neutral" @click="isModalOpen = false">
+                Fermer
+              </UButton>
+              <UButton
+                v-if="canManageOrders"
+                class="bg-[#0F62BC] text-white hover:bg-[#156FD4]"
+                icon="i-lucide-save"
+                size="sm"
+                :loading="isMutating"
+                @click="submitEditOrder"
+              >
+                Enregistrer
+              </UButton>
+            </div>
           </div>
 
         </div>
@@ -509,13 +684,13 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
 
     <UModal v-model:open="isCreateModalOpen" :ui="modalUi('md')">
       <template #content>
-        <div :class="MODAL_BODY" role="dialog" aria-labelledby="order-create-title">
+        <div :class="MODAL_BODY" role="dialog" aria-modal="true" aria-labelledby="order-create-title">
           <div class="flex justify-between items-start mb-5">
             <div>
               <h2 id="order-create-title" class="text-lg font-bold text-gray-800">Enregistrer une commande</h2>
               <p class="text-xs text-gray-400 mt-0.5">Le code CMD-XXXX sera alloué dynamiquement en séquence.</p>
             </div>
-            <UButton icon="i-lucide-x" color="neutral" variant="ghost" @click="isCreateModalOpen = false" />
+            <UButton icon="i-lucide-x" color="neutral" variant="ghost" aria-label="Fermer le formulaire de création" @click="isCreateModalOpen = false" />
           </div>
 
           <div class="space-y-4 mb-6">
@@ -547,12 +722,12 @@ async function updateStatus(order: PreparedOrder, newStatus: OrderStatus) {
               </div>
               <div>
                 <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Type de fret</label>
-                <USelectMenu v-model="createForm.emoji" :items="['📦', '✈️', '🚀', '🔩', '⚙️']" />
+                <USelectMenu v-model="createForm.emoji" :items="['📦', '✈️', '🚀', '🔩', '⚙️']" aria-label="Type de fret" />
               </div>
             </div>
           </div>
 
-          <p v-if="createFormError" class="text-red-500 text-sm mb-3">{{ createFormError }}</p>
+          <p v-if="createFormError" class="text-red-500 text-sm mb-3" role="alert">{{ createFormError }}</p>
 
           <div :class="MODAL_FOOTER">
             <UButton variant="ghost" color="neutral" class="w-full sm:w-auto" @click="isCreateModalOpen = false">Annuler</UButton>

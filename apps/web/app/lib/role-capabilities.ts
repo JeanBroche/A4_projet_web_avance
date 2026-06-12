@@ -56,7 +56,7 @@ export function rolePageSubtitle(role: UserRole | null): string {
     case 'commercial':
       return 'Suivi des commandes clients, validations et statistiques'
     case 'direction':
-      return 'KPI consolidés, marges et incidents critiques'
+      return 'Pilotage consolidé — production, stocks, performance et traçabilité'
     case 'admin':
       return 'Accès complet à tous les modules'
     default:

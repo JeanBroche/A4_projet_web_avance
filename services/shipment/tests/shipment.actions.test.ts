@@ -327,6 +327,46 @@ describe("shipment.shipment", () => {
     assert.equal(result.pagination.page, 1);
     assert.ok(result.pagination.total >= 1);
   });
+
+  it("soft deletes a planned shipment", async (t) => {
+    if (skipIfNoDb(t)) return;
+
+    const pickList = await callAction<{ pickList: { id: string } }>("shipment.picklist.create", {
+      accessToken: tokens.logistique,
+      orderNumber: `CMD-DEL-${Date.now()}`,
+      siteCode: "SITE-LYO",
+      lines: [{ productCode: "PROD-DEL", quantity: 1 }]
+    });
+
+    await callAction("shipment.picklist.complete", {
+      accessToken: tokens.logistique,
+      id: pickList.pickList.id
+    });
+
+    const planned = await callAction<{ shipment: { id: string; code: string } }>(
+      "shipment.shipment.plan",
+      {
+        accessToken: tokens.logistique,
+        pickListId: pickList.pickList.id
+      }
+    );
+
+    const deleted = await callAction<{ deleted: boolean }>("shipment.shipment.delete", {
+      accessToken: tokens.logistique,
+      id: planned.shipment.id
+    });
+
+    assert.equal(deleted.deleted, true);
+
+    await assert.rejects(
+      () =>
+        callAction("shipment.shipment.get", {
+          accessToken: tokens.logistique,
+          id: planned.shipment.id
+        }),
+      (error) => getErrorCode(error) === "SHIPMENT_NOT_FOUND"
+    );
+  });
 });
 
 describe("shipment.events", () => {

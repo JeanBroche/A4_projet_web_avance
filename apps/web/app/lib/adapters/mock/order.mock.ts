@@ -6,6 +6,7 @@ import type { OrderAdapter } from '~/lib/adapters/types'
 import type {
   ClientStats,
   CreateOrderInput,
+  UpdateOrderInput,
   Order,
   OrderHistoryEntry,
   OrderPriority,
@@ -59,6 +60,31 @@ export function createMockOrderAdapter(): OrderAdapter {
         meta: order.orderNumber
       })
       return order
+    },
+
+    async update(id: number, input: UpdateOrderInput) {
+      await simulateDelay()
+      const idx = ordersStore.findIndex(o => o.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Commande introuvable')
+      ordersStore[idx] = {
+        ...ordersStore[idx]!,
+        client: input.client,
+        destination: input.destination,
+        itemsCount: input.itemsCount,
+        weight: `${input.weightValue} kg`,
+        carrier: input.carrier,
+        emoji: input.emoji,
+        deliveryDate: input.deliveryDate,
+        priority: input.priority
+      }
+      return ordersStore[idx]!
+    },
+
+    async remove(id: number) {
+      await simulateDelay()
+      const idx = ordersStore.findIndex(o => o.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Commande introuvable')
+      ordersStore.splice(idx, 1)
     },
 
     async updateStatus(id: number, status: OrderStatus) {

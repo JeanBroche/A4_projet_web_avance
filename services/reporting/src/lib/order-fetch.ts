@@ -6,6 +6,7 @@ export type ReportingOrderLine = {
   quantity: number;
   unitPrice?: number | null;
   ofId?: string | null;
+  productCode?: string;
 };
 
 export type ReportingOrderSummary = {
@@ -17,6 +18,7 @@ export type ReportingOrderSummary = {
   dueDate?: string | Date | null;
   promisedDeliveryDate?: string | Date | null;
   createdAt: string | Date;
+  client?: { name: string; code?: string };
   lines?: ReportingOrderLine[];
 };
 

@@ -16,6 +16,8 @@ export const restOrderRoutes: RouteDefinition[] = [
   { method: "POST", path: "commercial/orders/:orderId/mark-shipped", action: "order.order.markShipped", layer: "REST" },
   { method: "POST", path: "commercial/orders/:orderId/mark-delivered", action: "order.order.markDelivered", layer: "REST" },
   { method: "PATCH", path: "commercial/orders/:orderId/logistics-status", action: "order.order.setLogisticsStatus", layer: "REST" },
+  { method: "PATCH", path: "commercial/orders/:orderId", action: "order.order.update", layer: "REST" },
+  { method: "DELETE", path: "commercial/orders/:orderId", action: "order.order.delete", layer: "REST" },
   { method: "GET", path: "commercial/clients", action: "order.client.list", layer: "REST" },
   { method: "GET", path: "commercial/clients/:clientId", action: "order.client.get", layer: "REST" },
   { method: "PUT", path: "commercial/clients", action: "order.client.upsert", layer: "REST" },

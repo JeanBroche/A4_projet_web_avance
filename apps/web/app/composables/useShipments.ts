@@ -50,6 +50,22 @@ export function useShipments() {
     }
   }
 
+  async function remove(id: number, backendId?: string) {
+    isMutating.value = true
+    error.value = null
+    try {
+      await adapters.shipment.remove(id, backendId)
+      await refresh()
+      await syncNotificationsAfterMutation()
+    } catch (e) {
+      const failure = toFailureResult(e)
+      error.value = failure.message
+      throw e
+    } finally {
+      isMutating.value = false
+    }
+  }
+
   async function updateStatus(id: number, shipmentStatus: DeliveryStatus, backendId?: string) {
     isMutating.value = true
     error.value = null
@@ -66,5 +82,5 @@ export function useShipments() {
     }
   }
 
-  return { shipments, status, error, isMutating, refresh, create, update, updateStatus }
+  return { shipments, status, error, isMutating, refresh, create, update, remove, updateStatus }
 }

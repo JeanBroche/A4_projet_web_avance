@@ -8,6 +8,7 @@ import type {
   CreateBatchInput,
   CreateManufacturingOrderInput,
   CreateOrderInput,
+  UpdateOrderInput,
   CreateProductInput,
   CreateShipmentInput,
   CreateStockLevelInput,
@@ -131,6 +132,8 @@ export interface OrderDelayRisk {
 export interface OrderAdapter {
   list(): Promise<Order[]>
   create(input: CreateOrderInput): Promise<Order>
+  update(id: number, input: UpdateOrderInput): Promise<Order>
+  remove(id: number): Promise<void>
   updateStatus(id: number, status: OrderStatus): Promise<Order>
   validate(id: number): Promise<Order>
   reject(id: number): Promise<Order>
@@ -144,6 +147,7 @@ export interface ShipmentAdapter {
   list(): Promise<Shipment[]>
   create(input: CreateShipmentInput): Promise<Shipment>
   update(id: number, input: UpdateShipmentInput, backendId?: string): Promise<Shipment>
+  remove(id: number, backendId?: string): Promise<void>
   updateStatus(id: number, status: DeliveryStatus, backendId?: string): Promise<Shipment>
 }
 

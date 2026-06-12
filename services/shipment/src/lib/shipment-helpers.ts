@@ -108,7 +108,7 @@ export async function loadActiveShipment(id: string): Promise<ShipmentWithRelati
     }
   });
 
-  if (!shipment) {
+  if (!shipment || shipment.deletedAt) {
     throw createError("SHIPMENT_NOT_FOUND");
   }
 

@@ -60,6 +60,13 @@ export function createMockShipmentAdapter(): ShipmentAdapter {
       return shipmentsStore[idx]!
     },
 
+    async remove(id: number, _backendId?: string) {
+      await simulateDelay()
+      const idx = shipmentsStore.findIndex(s => s.id === id)
+      if (idx === -1) throw new ApiClientError('NOT_FOUND', 'Expédition introuvable')
+      shipmentsStore.splice(idx, 1)
+    },
+
     async updateStatus(id: number, status: DeliveryStatus, _backendId?: string) {
       await simulateDelay()
       const idx = shipmentsStore.findIndex(s => s.id === id)

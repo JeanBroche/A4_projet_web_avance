@@ -23,7 +23,25 @@ export const orderCreateSchema = accessTokenSchema.extend({
   promisedDeliveryDate: z.coerce.date().optional(),
   isUrgent: z.boolean().optional(),
   dueDate: z.coerce.date().optional(),
+  carrier: z.string().min(1).optional(),
+  deliveryAddress: z.string().min(1).optional(),
+  emoji: z.string().min(1).optional(),
   lines: z.array(orderLineSchema).min(1)
+});
+
+export const orderUpdateSchema = accessTokenSchema.extend({
+  orderId: cuidLikeSchema,
+  clientName: z.string().min(1).optional(),
+  destination: z.string().min(1).optional(),
+  promisedDeliveryDate: z.coerce.date().optional(),
+  isUrgent: z.boolean().optional(),
+  itemsCount: z.number().int().positive().optional(),
+  carrier: z.string().min(1).optional(),
+  emoji: z.string().min(1).optional()
+});
+
+export const orderDeleteSchema = accessTokenSchema.extend({
+  orderId: cuidLikeSchema
 });
 
 export const orderByIdSchema = accessTokenSchema.extend({
