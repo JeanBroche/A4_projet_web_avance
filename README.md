@@ -2,7 +2,7 @@
   <h1>CESI A4 - Projet Web Avancé</h1>
   <h3>AERONEXIS Dynamics - Precision Beyond Limits</h3>
   <h3>Développement d'un ERP modulaire pour composants mécaniques aéronautiques</h3>
-  <p><strong>Antoine TAFOUREAU</strong> • <strong>Killian HUBAULT</strong> • <strong>Hugo HELM</strong></p>
+  <p><strong>Antoine TAFFOUREAU</strong> • <strong>Killian HUBAULT</strong> • <strong>Hugo HELM</strong></p>
   <p><em>CESI A4 - Module Développement Web </em></p>
 </div>
 
@@ -10,7 +10,7 @@
 
 AERONEXIS Dynamics est un ERP de gestion logistique développé lors du module de développement web avancé (CESI A4). Il est conçu pour gérer les ordres de production, le stock, les commandes et les expéditions de composants mécaniques aéronautiques, tout en intégrant un assistant IA pour automatiser certaines tâches.
 > [!WARNING]
-> Cette ERP a été développé dans le cadre de la finalisation d'un module de formation, lors d'une période de développement intensive de 1 semaine. Merci de prendre ceci en compte vis-à-vis de la qualité du code et de la présence de certaines fonctionnalités incomplètes ou non optimisées.
+> Cet ERP a été développé dans le cadre de la finalisation d'un module de formation, lors d'une période de développement intensive de 1 semaine. Merci de prendre ceci en compte vis-à-vis de la qualité du code et de la présence de certaines fonctionnalités incomplètes ou non optimisées.
 
 ## Contexte métier
 
